@@ -12,10 +12,8 @@ def run():
 
 threading.Thread(target=run).start()
 
-import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-
 import os
+import json
 import html
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -34,7 +32,58 @@ MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"
 
 CHANNEL_LINK = "https://t.me/+riEDwvUvQdxmMzU0"
 
-WELCOME_TEXT = "👋 مرحباً بك في متجر RASEEDKOM!\nاختر المنتج الذي تريده من القائمة أدناه:"
+SUPPORTED_LANGS = ("ar", "en", "fr")
+
+# ---------- نصوص الواجهة بالثلاث لغات ----------
+CHOOSE_LANG_TEXT = "🌐 اختر لغتك\nChoose your language\nChoisissez votre langue"
+
+TEXTS = {
+    "ar": {
+        "welcome": "👋 مرحباً بك في متجر RASEEDKOM!\nاختر المنتج الذي تريده من القائمة أدناه:",
+        "order_now": "اطلب الآن 🛒",
+        "join_channel": "اشترك في القناة استفد من الخصم -%",
+        "back": "رجوع ⬅️",
+        "notify_me": "🔔 أعلمني عند التوفر",
+        "notify_ok": "✅ تم تسجيل اهتمامك! سنحاول توفير المنتج في أقرب وقت.",
+        "change_lang": "🌐 اللغة / Language / Langue",
+        "chosen": "✅ اخترت:",
+        "price": "💰 السعر:",
+        "available": "📦 المتوفر:",
+        "description": "❞ الوصف:",
+        "buy_hint": "🛒 لإتمام الطلب والشراء، اضغط على زر 'اطلب الآن 🛒' لتتوجه مباشرة للخاص.",
+        "out_of_stock": "❌ هذا المنتج نفد من المخزون حالياً.\n🛒 للاستفسار أو الطلب المسبق، اضغط على 'اطلب الآن'.",
+    },
+    "en": {
+        "welcome": "👋 Welcome to the RASEEDKOM store!\nChoose the product you want from the list below:",
+        "order_now": "Order now 🛒",
+        "join_channel": "Join the channel for discounts -%",
+        "back": "Back ⬅️",
+        "notify_me": "🔔 Notify me when available",
+        "notify_ok": "✅ Your interest has been noted! We will try to restock as soon as possible.",
+        "change_lang": "🌐 اللغة / Language / Langue",
+        "chosen": "✅ You chose:",
+        "price": "💰 Price:",
+        "available": "📦 Available:",
+        "description": "❞ Description:",
+        "buy_hint": "🛒 To complete your order, tap 'Order now 🛒' to go directly to the private chat.",
+        "out_of_stock": "❌ This product is currently out of stock.\n🛒 For questions or pre-orders, tap 'Order now'.",
+    },
+    "fr": {
+        "welcome": "👋 Bienvenue dans la boutique RASEEDKOM !\nChoisissez le produit souhaité dans la liste ci-dessous :",
+        "order_now": "Commander maintenant 🛒",
+        "join_channel": "Rejoignez le canal pour des réductions -%",
+        "back": "Retour ⬅️",
+        "notify_me": "🔔 M'avertir dès la disponibilité",
+        "notify_ok": "✅ Votre intérêt est enregistré ! Nous ferons de notre mieux pour remettre le produit en stock rapidement.",
+        "change_lang": "🌐 اللغة / Language / Langue",
+        "chosen": "✅ Vous avez choisi :",
+        "price": "💰 Prix :",
+        "available": "📦 Disponible :",
+        "description": "❞ Description :",
+        "buy_hint": "🛒 Pour finaliser votre commande, appuyez sur « Commander maintenant 🛒 » pour aller directement en privé.",
+        "out_of_stock": "❌ Ce produit est actuellement en rupture de stock.\n🛒 Pour toute question ou précommande, appuyez sur « Commander maintenant ».",
+    },
+}
 
 # لإضافة صورة خاصة بمنتج: زد داخل المنتج سطر  "image": "رابط مباشر أو file_id"
 products = [
@@ -190,46 +239,298 @@ products = [
 ]
 
 
+# ---------- ترجمات المنتجات (الإنجليزية والفرنسية) ----------
+# إذا لم توجد ترجمة لمنتج أو لحقل معيّن، يُعرض النص العربي الأصلي
+TRANSLATIONS = {
+    "sep_gift_cards": {
+        "en": {
+            "text": "⬇️ Gift Cards ⬇️"
+        },
+        "fr": {
+            "text": "⬇️ Cartes cadeaux ⬇️"
+        }
+    },
+    "gemini_18m": {
+        "en": {
+            "description": "🤖 Gemini AI Pro 18 months [NW]\n⭐️ Gemini AI Pro for 18 months\n✦ 🚫 Activation without a card\n✦ ⏩ 5 TB of Google One cloud storage\n✦ 🚀 No VPN needed.\n\n✨ Extra features:\n- 1050 free credits on Google Flow and images\n- 3 free videos on Gemini every day for the whole subscription (18 months)\n- Activation is done on your own Gmail through an activation link only\n\nI tested it myself, so there is no replacement\n🫶 12-hour warranty."
+        },
+        "fr": {
+            "description": "🤖 Gemini AI Pro 18 mois [NW]\n⭐️ Gemini AI Pro pour 18 mois\n✦ 🚫 Activation sans carte bancaire\n✦ ⏩ 5 To de stockage cloud Google One\n✦ 🚀 Aucun VPN nécessaire.\n\n✨ Avantages supplémentaires :\n- 1050 crédits gratuits sur Google Flow et images\n- 3 vidéos gratuites sur Gemini chaque jour pendant toute la durée de l'abonnement (18 mois)\n- L'activation se fait sur votre propre Gmail via un lien d'activation uniquement\n\nJe l'ai testé moi-même, donc il n'y a pas de remplacement\n🫶 Garantie de 12 heures."
+        }
+    },
+    "capcut_1m": {
+        "en": {
+            "description": "🎬 Ready CapCut Pro (team) accounts with 640 AI credits\n\n⚡ Instant delivery\n📧 Ready accounts\n💎 Access to CapCut Pro\n🚀 Fast and easy"
+        },
+        "fr": {
+            "description": "🎬 Comptes CapCut Pro (équipe) prêts avec 640 crédits d'IA\n\n⚡ Livraison instantanée\n📧 Comptes prêts\n💎 Accès à CapCut Pro\n🚀 Rapide et facile"
+        }
+    },
+    "duolingo_12m": {
+        "en": {
+            "description": "🦉 Super Duolingo 12 months (official account upgrade)\n- Full warranty\n- Use Duolingo Super with all advanced features\n- Learn languages without ads"
+        },
+        "fr": {
+            "description": "🦉 Super Duolingo 12 mois (mise à niveau officielle du compte)\n- Garantie complète\n- Utilisez Duolingo Super avec toutes les fonctionnalités avancées\n- Apprenez les langues sans publicité"
+        }
+    },
+    "duolingo_link_12m": {
+        "en": {
+            "name": "Duolingo Super 1 year (link) + 1 month warranty",
+            "description": "⭐ Link to get a Duolingo Super offer for one year with a 1-month warranty\n\n📊 Sales: 103 accounts\n\n🔗 Link to get a Duolingo Super offer for one year with a 1-month warranty\n\n❇️ A smooth, effective and unlimited experience for learning foreign languages.\n❇️ When you buy the offer, it is applied directly to the main account you currently use.\n❇️ Method: a link to claim the offer.\n❇️ Subscription duration: one year.\n⚙️ Warranty: one month.\n⛓️‍💥 Please use the link right after payment.\n❇️ No payment card needed: just open the link the bot sends you and get the offer"
+        },
+        "fr": {
+            "name": "Duolingo Super 1 an (lien) + garantie 1 mois",
+            "description": "⭐ Lien pour obtenir l'offre Duolingo Super pendant un an avec une garantie d'un mois\n\n📊 Ventes : 103 comptes\n\n🔗 Lien pour obtenir l'offre Duolingo Super pendant un an avec une garantie d'un mois\n\n❇️ Une expérience fluide, efficace et illimitée pour apprendre les langues étrangères.\n❇️ Lors de l'achat, l'offre est appliquée directement sur le compte principal que vous utilisez actuellement.\n❇️ Méthode : un lien pour obtenir l'offre.\n❇️ Durée de l'abonnement : un an.\n⚙️ Garantie : un mois.\n⛓️‍💥 Veuillez utiliser le lien juste après le paiement.\n❇️ Aucune carte bancaire nécessaire : ouvrez simplement le lien envoyé par le bot et obtenez l'offre"
+        }
+    },
+    "netflix_full": {
+        "en": {
+            "name": "Netflix 2 months full account (5 profiles)",
+            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n✅ Login with email and password\n✅ 1-month warranty\n🔵 Cheapest price — 9$ means 4.5$ for a full account 😍\n✅ High-quality streaming\n✅ Up to 5 profiles and 4 devices\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available 12/24 hours\n📊 Sold: 216 accounts"
+        },
+        "fr": {
+            "name": "Netflix 2 mois compte complet (5 profils)",
+            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n✅ Connexion par e-mail et mot de passe\n✅ Garantie d'un mois\n🔵 Prix le plus bas — 9$ soit 4,5$ le compte complet 😍\n✅ Streaming haute qualité\n✅ Jusqu'à 5 profils et 4 appareils\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible 12/24 heures\n📊 Vendus : 216 comptes"
+        }
+    },
+    "netflix_profile": {
+        "en": {
+            "name": "Netflix 2 months single profile",
+            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n❌ Do not change the name or the password, otherwise you will be removed from the account with no warranty\n✅ Login with email and password\n🔵 Cheapest price — 2.70$\n✅ High-quality streaming\n✅ One profile on one account\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available when needed\n📊 Sold: 216 accounts"
+        },
+        "fr": {
+            "name": "Netflix 2 mois un seul profil",
+            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n❌ Interdiction de changer le nom ou le mot de passe, sinon vous serez exclu du compte sans garantie\n✅ Connexion par e-mail et mot de passe\n🔵 Prix le plus bas — 2,70$\n✅ Streaming haute qualité\n✅ Un profil sur un compte\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible en cas de besoin\n📊 Vendus : 216 comptes"
+        }
+    },
+    "nordvpn_3m": {
+        "en": {
+            "description": "🛡️ NordVPN - 3 months\n\n- Premium access to NordVPN for 3 months on up to 10 devices at the same time.\n\nActivation steps in detail:\n➡️ Activation link: https://my.nordaccount.com/activate\n- Enter your code here\n➡️ Enter your email address\n➡️ Enter the verification code received in your email\n➡️ On the payment page, scroll down and click Skip\n\nDone! Just log in with your email on any device.\n\n📊 Sold: 390 accounts"
+        },
+        "fr": {
+            "description": "🛡️ NordVPN - 3 mois\n\n- Accès premium à NordVPN pendant 3 mois sur jusqu'à 10 appareils simultanément.\n\nÉtapes d'activation détaillées :\n➡️ Lien d'activation : https://my.nordaccount.com/activate\n- Saisissez votre code ici\n➡️ Saisissez votre adresse e-mail\n➡️ Saisissez le code de vérification reçu par e-mail\n➡️ Sur la page de paiement, faites défiler vers le bas et cliquez sur Skip (Passer)\n\nC'est fait ! Connectez-vous simplement avec votre e-mail sur n'importe quel appareil.\n\n📊 Vendus : 390 comptes"
+        }
+    },
+    "n8n_starter_12m": {
+        "en": {
+            "description": "⚡ N8N Starter 12m\n\n- Duration: 12 months\n- Official voucher code\n- 🚫 No warranty after the code is activated on your account\n\n⚠️ Please note that the code must be redeemed within 7 days of purchase. Codes not used within this period may expire and are no longer eligible for support or replacement.\n\n📊 Sold: 4 accounts"
+        },
+        "fr": {
+            "description": "⚡ N8N Starter 12m\n\n- Durée : 12 mois\n- Code coupon officiel\n- 🚫 Aucune garantie après l'activation du code sur votre compte\n\n⚠️ Veuillez noter que le code doit être utilisé dans les 7 jours suivant l'achat. Les codes non utilisés durant cette période peuvent expirer et ne sont plus éligibles au support ni au remplacement.\n\n📊 Vendus : 4 comptes"
+        }
+    },
+    "snapchat_3m": {
+        "en": {
+            "description": "👻 Snapchat Plus+ 3M FW available\n\n- Warranty: 90 days\n- Stock: manual activation accounts\n- Sold: 354 accounts\n\n❞ Description:\nActivate Snapchat+ and give your account a real Premium experience with exclusive features:\n\nNo password needed, only your username (ID)\n✅ Storage solution (depending on your plan)\n🎨 Amazing themes\n👑 A new and unique account look\n⚡ Fast and safe activation\n\n👌Activation method: send me only your Username in private and get fast activation 💨"
+        },
+        "fr": {
+            "description": "👻 Snapchat Plus+ 3M FW disponible\n\n- Garantie : 90 jours\n- Stock : comptes à activation manuelle\n- Vendus : 354 comptes\n\n❞ Description :\nActivez Snapchat+ et offrez à votre compte une vraie expérience Premium avec des fonctionnalités exclusives :\n\nAucun mot de passe nécessaire, uniquement votre nom d'utilisateur (ID)\n✅ Solution de stockage (selon votre forfait)\n🎨 Thèmes magnifiques\n👑 Un look de compte nouveau et unique\n⚡ Activation rapide et sécurisée\n\n👌Méthode d'activation : envoyez-moi uniquement votre Username en privé pour une activation rapide 💨"
+        }
+    },
+    "snapchat_6m": {
+        "en": {
+            "description": "👻 Snapchat Plus+ 6M FW available\n\n- Warranty: 180 days\n- Stock: manual activation accounts\n- Sold: 354 accounts\n\n❞ Description:\nActivate Snapchat+ and give your account a real Premium experience with exclusive features:\n\nNo password needed, only your account ID\nAndroid + iPhone\n✅ Storage solution (depending on your plan)\n🎨 Amazing themes\n👑 A new and unique account look\n⚡ Fast and safe activation\n\n👌Activation method: send me only your Username in private and get fast activation 💨"
+        },
+        "fr": {
+            "description": "👻 Snapchat Plus+ 6M FW disponible\n\n- Garantie : 180 jours\n- Stock : comptes à activation manuelle\n- Vendus : 354 comptes\n\n❞ Description :\nActivez Snapchat+ et offrez à votre compte une vraie expérience Premium avec des fonctionnalités exclusives :\n\nAucun mot de passe nécessaire, uniquement l'ID de votre compte\nAndroid + iPhone\n✅ Solution de stockage (selon votre forfait)\n🎨 Thèmes magnifiques\n👑 Un look de compte nouveau et unique\n⚡ Activation rapide et sécurisée\n\n👌Méthode d'activation : envoyez-moi uniquement votre Username en privé pour une activation rapide 💨"
+        }
+    },
+    "snapchat_12m": {
+        "en": {
+            "description": "👻 Snapchat Plus+ 12M FW available\n\n- Warranty: for the whole subscription period\n- Stock: manual activation accounts\n- Sold: 231 accounts\n\n❞ Description:\nActivate Snapchat+ and give your account a real Premium experience with exclusive features: for a full year\n\nNo password needed, only your account ID\nAndroid + iPhone\n✅ Storage solution (depending on your plan)\n🎨 Amazing themes\n👑 A new and unique account look\n⚡ Fast and safe activation\n\n👌Activation method: send me only your Username in private and get fast activation 💨"
+        },
+        "fr": {
+            "description": "👻 Snapchat Plus+ 12M FW disponible\n\n- Garantie : pendant toute la durée de l'abonnement\n- Stock : comptes à activation manuelle\n- Vendus : 231 comptes\n\n❞ Description :\nActivez Snapchat+ et offrez à votre compte une vraie expérience Premium avec des fonctionnalités exclusives : pour une année complète\n\nAucun mot de passe nécessaire, uniquement l'ID de votre compte\nAndroid + iPhone\n✅ Solution de stockage (selon votre forfait)\n🎨 Thèmes magnifiques\n👑 Un look de compte nouveau et unique\n⚡ Activation rapide et sécurisée\n\n👌Méthode d'activation : envoyez-moi uniquement votre Username en privé pour une activation rapide 💨"
+        }
+    },
+    "canva_edu_500": {
+        "en": {
+            "name": "Canva Edu Pro — 500 seats",
+            "description": "🎨 Canva Edu Pro — 500 seats\n\n🔥 Canva Education account/dashboard for students and teachers\nEnjoy Canva's education benefits and Pro tools to create professional designs easily.\n\n✨ What do you get?\n- 🎓 Access to Canva education benefits.\n- 💎 Canva Pro tools and many professional features.\n- 📚 Ready-made education templates.\n- 🎨 Design presentations, posts, videos and educational files.\n- 🤖 AI tools such as Magic Write.\n\n📦 Capacity: 500 seats\n💰 Price: only 10$\n⚠️ Important: no warranty on this product.\n\n🚀 Suitable for students, teachers, designers and business owners"
+        },
+        "fr": {
+            "name": "Canva Edu Pro — 500 places",
+            "description": "🎨 Canva Edu Pro — 500 places\n\n🔥 Compte/tableau de bord Canva Éducation pour les étudiants et les enseignants\nProfitez des avantages éducatifs de Canva et des outils Pro pour créer facilement des designs professionnels.\n\n✨ Ce que vous obtenez :\n- 🎓 Accès aux avantages éducatifs de Canva.\n- 💎 Les outils Canva Pro et de nombreuses fonctionnalités professionnelles.\n- 📚 Modèles éducatifs prêts à l'emploi.\n- 🎨 Création de présentations, publications, vidéos et documents éducatifs.\n- 🤖 Outils d'IA comme Magic Write.\n\n📦 Capacité : 500 places\n💰 Prix : seulement 10$\n⚠️ Important : produit sans garantie.\n\n🚀 Idéal pour les étudiants, enseignants, designers et porteurs de projets"
+        }
+    },
+    "canva_edu_5000": {
+        "en": {
+            "name": "Canva Edu Pro — 5000 seats",
+            "description": "🎨 Canva Edu Pro — 5000 seats\n\n🔥 Canva Education account/dashboard\nAdd 5000 people with full control\n\n✨ What do you get?\n- 🎓 Access to Canva education benefits.\n- 💎 Canva Pro tools and many professional features.\n- 📚 Ready-made education templates.\n- 🎨 Design presentations, posts, videos and educational files.\n- 🤖 AI tools such as Magic Write.\n\n📦 Capacity: 5000 seats\n💰 Price: only 21.50$\n⚠️ Important: this product comes with a warranty\n\n🚀 Suitable for students, teachers, designers and business owners"
+        },
+        "fr": {
+            "name": "Canva Edu Pro — 5000 places",
+            "description": "🎨 Canva Edu Pro — 5000 places\n\n🔥 Compte/tableau de bord Canva Éducation\nAjoutez 5000 personnes avec un contrôle total\n\n✨ Ce que vous obtenez :\n- 🎓 Accès aux avantages éducatifs de Canva.\n- 💎 Les outils Canva Pro et de nombreuses fonctionnalités professionnelles.\n- 📚 Modèles éducatifs prêts à l'emploi.\n- 🎨 Création de présentations, publications, vidéos et documents éducatifs.\n- 🤖 Outils d'IA comme Magic Write.\n\n📦 Capacité : 5000 places\n💰 Prix : seulement 21,50$\n⚠️ Important : produit avec garantie\n\n🚀 Idéal pour les étudiants, enseignants, designers et porteurs de projets"
+        }
+    },
+    "freefire_diamonds": {
+        "en": {
+            "description": "🔥 Free Fire Diamonds 💎 top-up in the fastest and easiest way! 🔥\n\nNeed to top up your account's diamonds? 💎\nWith our service you can top up Free Fire Diamonds with the ID only ✅\n\n🔒 No password or any account information needed\n⚡️ The top-up is fast, in just one minute after payment is completed and the ID is sent.\n\n💎 Package prices without bonus diamonds:\n\n110💎 ▶️ 1.45$\n\n231💎 ▶️ 2.20$\n\n583💎 ▶️ 5.05$\n\n1188💎 ▶️ 10.10$\n\n2420💎 ▶️ 19.50$\n\n📩 How to order:\n1️⃣ Contact us\n2️⃣ Choose the package that suits you\n3️⃣ Make the payment\n4️⃣ Send us only your account ID\n5️⃣ The diamonds are added to your account ⚡️\n\n🛡️ Warranty available ✅\n🚀 Fast execution\n🔐 We don't ask for any sensitive account information\n\n💎 Order your top-up now and enjoy the game! 🎮🔥"
+        },
+        "fr": {
+            "description": "🔥 Recharge Free Fire Diamonds 💎 de la manière la plus rapide et la plus simple ! 🔥\n\nBesoin de recharger les diamants de votre compte ? 💎\nRechargez Free Fire Diamonds avec l'ID uniquement ✅\n\n🔒 Aucun mot de passe ni information de compte requis\n⚡️ Recharge en une minute après le paiement et l'envoi de l'ID.\n\n💎 Prix des packs sans diamants bonus :\n\n110💎 ▶️ 1.45$\n\n231💎 ▶️ 2.20$\n\n583💎 ▶️ 5.05$\n\n1188💎 ▶️ 10.10$\n\n2420💎 ▶️ 19.50$\n\n📩 Comment commander :\n1️⃣ Contactez-nous\n2️⃣ Choisissez le pack qui vous convient\n3️⃣ Effectuez le paiement\n4️⃣ Envoyez-nous uniquement l'ID de votre compte\n5️⃣ Les diamants sont ajoutés à votre compte ⚡️\n\n🛡️ Garantie disponible ✅\n🚀 Exécution rapide\n🔐 Aucune information sensible demandée\n\n💎 Commandez votre recharge maintenant et profitez du jeu ! 🎮🔥"
+        }
+    },
+    "apple_gift_tr": {
+        "en": {
+            "name": "Apple Gift Card 🇹🇷 Turkish",
+            "description": "🍎 Apple Gift Card 🇹🇷 — Turkey\n\nFor the Turkish App Store 📱\n💳 After payment you receive the activation code immediately.\n\nApple Gift Card. 10TRK ▶️ 1.00$\n\nApple Gift Card. 50TRK ▶️ 1.35$\n\nApple Gift Card. 100TRK ▶️ 2.50$\n\nApple Gift Card. 150TRK ▶️ 3.60$\n\nApple Gift Card. 200TRK ▶️ 5.00$\n\nApple Gift Card. 250TRK ▶️ 5.70$\n\n\n🛡️ Warranty: one hour from the time of purchase.\n(We have never had any problem with the codes.)"
+        },
+        "fr": {
+            "name": "Apple Gift Card 🇹🇷 Turque",
+            "description": "🍎 Apple Gift Card 🇹🇷 — Turquie\n\nDestinée à l'App Store turc 📱\n💳 Après le paiement, vous recevez immédiatement le code d'activation.\n\nApple Gift Card. 10TRK ▶️ 1.00$\n\nApple Gift Card. 50TRK ▶️ 1.35$\n\nApple Gift Card. 100TRK ▶️ 2.50$\n\nApple Gift Card. 150TRK ▶️ 3.60$\n\nApple Gift Card. 200TRK ▶️ 5.00$\n\nApple Gift Card. 250TRK ▶️ 5.70$\n\n\n🛡️ Garantie : une heure à partir de l'achat.\n(Nous n'avons jamais eu de problème avec les codes.)"
+        }
+    },
+    "apple_gift_in": {
+        "en": {
+            "name": "Apple Gift Card 🇮🇳 Indian",
+            "description": "🍎 Apple Gift Card 🇮🇳 — India\n\nCards for the Indian App Store 📱\n💳 After payment you receive the activation code immediately.\n\n🎁 Cards and prices:\n\nApple Gift Card >100INR ▶️ 1.40$\n\nApple Gift Card >200INR ▶️ 2,45$\n\nApple Gift Card >250INR ▶️ 3,05$\n\nApple Gift Card >500INR ▶️ 6,15$\n\nApple Gift Card >1000INR ▶️ 12$\n\nApple Gift Card 1500INR ▶️ 28,10$\n\n🛡️ Warranty: one hour from the time of purchase.\n(We have never had any problem with the codes.)"
+        },
+        "fr": {
+            "name": "Apple Gift Card 🇮🇳 Indienne",
+            "description": "🍎 Apple Gift Card 🇮🇳 — Inde\n\nCartes destinées à l'App Store indien 📱\n💳 Après le paiement, vous recevez immédiatement le code d'activation.\n\n🎁 Cartes et prix :\n\nApple Gift Card >100INR ▶️ 1.40$\n\nApple Gift Card >200INR ▶️ 2,45$\n\nApple Gift Card >250INR ▶️ 3,05$\n\nApple Gift Card >500INR ▶️ 6,15$\n\nApple Gift Card >1000INR ▶️ 12$\n\nApple Gift Card 1500INR ▶️ 28,10$\n\n🛡️ Garantie : une heure à partir de l'achat.\n(Nous n'avons jamais eu de problème avec les codes.)"
+        }
+    },
+    "apple_gift_fr": {
+        "en": {
+            "name": "Apple Gift Card 🇫🇷 French",
+            "description": "🍎 Apple Gift Card 🇫🇷 — France\n\nCards for the French App Store 📱\n💳 After payment you receive the activation code immediately.\n\n🎁 Cards and prices:\n\nApple Gift Card >2EUR ▶️ 2,45$\n\nApple Gift Card >10EUR ▶️ 12$\n\nApple Gift Card >20EUR ▶️ 23,65$\n\nApple Gift Card >50EUR ▶️ 59$\n\nApple Gift Card >75EUR ▶️ 89$\n\nApple Gift Card 100EUR ▶️ 116,22$\n\n🛡️ Warranty: one hour from the time of purchase.\n(We have never had any problem with the codes.)"
+        },
+        "fr": {
+            "name": "Apple Gift Card 🇫🇷 Française",
+            "description": "🍎 Apple Gift Card 🇫🇷 — France\n\nCartes destinées à l'App Store français 📱\n💳 Après le paiement, vous recevez immédiatement le code d'activation.\n\n🎁 Cartes et prix :\n\nApple Gift Card >2EUR ▶️ 2,45$\n\nApple Gift Card >10EUR ▶️ 12$\n\nApple Gift Card >20EUR ▶️ 23,65$\n\nApple Gift Card >50EUR ▶️ 59$\n\nApple Gift Card >75EUR ▶️ 89$\n\nApple Gift Card 100EUR ▶️ 116,22$\n\n🛡️ Garantie : une heure à partir de l'achat.\n(Nous n'avons jamais eu de problème avec les codes.)"
+        }
+    }
+}
+
+
+# ---------- حفظ لغة كل زبون ----------
+LANG_FILE = "user_lang.json"
+try:
+    with open(LANG_FILE, encoding="utf-8") as f:
+        user_lang = json.load(f)
+except Exception:
+    user_lang = {}
+
+
+def save_langs():
+    try:
+        with open(LANG_FILE, "w", encoding="utf-8") as f:
+            json.dump(user_lang, f)
+    except Exception as e:
+        print(f"Could not save languages: {e}")
+
+
+def get_lang(user_id):
+    lang = user_lang.get(str(user_id), "ar")
+    return lang if lang in SUPPORTED_LANGS else "ar"
+
+
+def t(lang, key):
+    return TEXTS.get(lang, TEXTS["ar"])[key]
+
+
+def tr(item, field, lang):
+    if lang != "ar":
+        value = TRANSLATIONS.get(item["id"], {}).get(lang, {}).get(field)
+        if value:
+            return value
+    return item[field]
+
+
 def find_product(product_id):
     return next((p for p in products if p["id"] == product_id), None)
 
 
-def generate_store_keyboard():
+def generate_store_keyboard(lang):
     markup = InlineKeyboardMarkup(row_width=2)
     for item in products:
         if item.get("type") == "separator":
-            markup.add(InlineKeyboardButton(text=item["text"], callback_data="noop"))
+            markup.add(InlineKeyboardButton(text=tr(item, "text", lang), callback_data="noop"))
             continue
         stock_display = item["stock"] if item["stock"] == "♾️" else f"📦 {item['stock']}"
-        button_text = f"{item['icon']} {item['name']} | {item['price']} | {stock_display}"
+        button_text = f"{item['icon']} {tr(item, 'name', lang)} | {item['price']} | {stock_display}"
         markup.add(InlineKeyboardButton(text=button_text, callback_data=f"buy_{item['id']}"))
+    markup.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="change_lang"))
     return markup
 
 
-def send_main_menu(chat_id):
+def send_language_menu(chat_id):
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en"),
+        InlineKeyboardButton(text="🇸🇦 العربية", callback_data="lang_ar"),
+        InlineKeyboardButton(text="🇫🇷 Français", callback_data="lang_fr"),
+    )
     try:
-        bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=WELCOME_TEXT, reply_markup=generate_store_keyboard())
+        bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=CHOOSE_LANG_TEXT, reply_markup=markup)
     except Exception:
-        bot.send_message(chat_id, WELCOME_TEXT, reply_markup=generate_store_keyboard())
+        bot.send_message(chat_id, CHOOSE_LANG_TEXT, reply_markup=markup)
+
+
+def send_main_menu(chat_id, lang):
+    caption = t(lang, "welcome")
+    try:
+        bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=caption, reply_markup=generate_store_keyboard(lang))
+    except Exception:
+        bot.send_message(chat_id, caption, reply_markup=generate_store_keyboard(lang))
 
 
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
-    send_main_menu(message.chat.id)
+    uid = str(message.from_user.id)
+    if uid in user_lang:
+        send_main_menu(message.chat.id, get_lang(uid))
+    else:
+        send_language_menu(message.chat.id)
 
 
-def notify_admin(user, product):
+@bot.message_handler(commands=["language", "lang"])
+def choose_language(message):
+    send_language_menu(message.chat.id)
+
+
+def notify_admin(user, product, lang):
     try:
         username = f"@{user.username}" if user.username else user.first_name
         text = (
             f"🔔 <b>زبون اختار منتج من المتجر</b>\n\n"
             f"👤 الزبون: {html.escape(username)} (ID: <code>{user.id}</code>)\n"
             f"📦 المنتج: <b>{html.escape(product['name'])}</b>\n"
-            f"💰 السعر: <b>{html.escape(product['price'])}</b>"
+            f"💰 السعر: <b>{html.escape(product['price'])}</b>\n"
+            f"🌐 اللغة: {lang}"
         )
         bot.send_message(ADMIN_CHAT_ID, text, parse_mode="HTML")
     except Exception as e:
         print(f"Error sending admin notification: {e}")
+
+
+# ---------- اختيار اللغة ----------
+@bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
+def handle_set_lang(call):
+    lang = call.data.replace("lang_", "")
+    if lang not in SUPPORTED_LANGS:
+        bot.answer_callback_query(call.id)
+        return
+    user_lang[str(call.from_user.id)] = lang
+    save_langs()
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    send_main_menu(call.message.chat.id, lang)
+    bot.answer_callback_query(call.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "change_lang")
+def handle_change_lang(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    send_language_menu(call.message.chat.id)
+    bot.answer_callback_query(call.id)
 
 
 # ---------- عرض المنتج ----------
@@ -241,30 +542,32 @@ def handle_product_view(call):
         bot.answer_callback_query(call.id)
         return
 
+    lang = get_lang(call.from_user.id)
+
     # إشعار فوري لك عند اختيار الزبون للمنتج
-    notify_admin(call.from_user, selected_product)
+    notify_admin(call.from_user, selected_product, lang)
 
     markup = InlineKeyboardMarkup()
 
     # زر "اطلب الآن" يوجه الزبون للخاص المباشر
-    markup.add(InlineKeyboardButton(text="اطلب الآن 🛒", url=MY_PRIVATE_CHAT_LINK))
-    markup.add(InlineKeyboardButton(text="اشترك في القناة استفد من الخصم -%", url=CHANNEL_LINK))
+    markup.add(InlineKeyboardButton(text=t(lang, "order_now"), url=MY_PRIVATE_CHAT_LINK))
+    markup.add(InlineKeyboardButton(text=t(lang, "join_channel"), url=CHANNEL_LINK))
 
     stock_val = selected_product["stock"]
     if stock_val == "♾️" or (isinstance(stock_val, int) and stock_val > 0):
-        caption_bottom = "🛒 لإتمام الطلب والشراء، اضغط على زر 'اطلب الآن 🛒' لتتوجه مباشرة للخاص."
+        caption_bottom = t(lang, "buy_hint")
     else:
-        caption_bottom = "❌ هذا المنتج نفد من المخزون حالياً.\n🛒 للاستفسار أو الطلب المسبق، اضغط على 'اطلب الآن'."
-        markup.add(InlineKeyboardButton(text="🔔 أعلمني عند التوفر", callback_data=f"notify_{selected_product['id']}"))
+        caption_bottom = t(lang, "out_of_stock")
+        markup.add(InlineKeyboardButton(text=t(lang, "notify_me"), callback_data=f"notify_{selected_product['id']}"))
 
-    markup.add(InlineKeyboardButton(text="رجوع ⬅️", callback_data="back_to_main"))
+    markup.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
 
     display_stock = "♾️" if stock_val == "♾️" else str(stock_val)
     caption = (
-        f"✅ اخترت: *{selected_product['name']}*\n"
-        f"💰 السعر: *{selected_product['price']}*\n"
-        f"📦 المتوفر: *{display_stock}*\n\n"
-        f"❞ الوصف:\n{selected_product['description']}\n\n"
+        f"{t(lang, 'chosen')} *{tr(selected_product, 'name', lang)}*\n"
+        f"{t(lang, 'price')} *{selected_product['price']}*\n"
+        f"{t(lang, 'available')} *{display_stock}*\n\n"
+        f"{t(lang, 'description')}\n{tr(selected_product, 'description', lang)}\n\n"
         f"{caption_bottom}"
     )
 
@@ -320,7 +623,7 @@ def handle_back(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
-    send_main_menu(call.message.chat.id)
+    send_main_menu(call.message.chat.id, get_lang(call.from_user.id))
     bot.answer_callback_query(call.id)
 
 
@@ -328,7 +631,7 @@ def handle_back(call):
 def handle_notify(call):
     bot.answer_callback_query(
         call.id,
-        text="✅ تم تسجيل اهتمامك! سنحاول توفير المنتج في أقرب وقت.",
+        text=t(get_lang(call.from_user.id), "notify_ok"),
         show_alert=True,
     )
 
