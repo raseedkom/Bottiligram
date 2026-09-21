@@ -460,7 +460,7 @@ def send_language_menu(chat_id):
     markup = InlineKeyboardMarkup()
     markup.row(
         InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en"),
-        InlineKeyboardButton(text="🇸🇦 العربية", callback_data="lang_ar"),
+        InlineKeyboardButton(text="🇩🇿 العربية", callback_data="lang_ar"),
         InlineKeyboardButton(text="🇫🇷 Français", callback_data="lang_fr"),
     )
     try:
