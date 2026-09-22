@@ -18,6 +18,11 @@ import html
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+try:
+    from telebot.types import BotCommand, BotCommandScopeChat
+except ImportError:  # مكتبة قديمة: زر القائمة لن يعمل لكن البوت يشتغل
+    BotCommand = BotCommandScopeChat = None
+
 # البوت: https://t.me/RASEEDKOM_store_bot
 # التوكن يُقرأ من Render > Environment باسم BOT_TOKEN (لا تكتبه في الكود)
 TOKEN = os.environ["BOT_TOKEN"]
@@ -50,6 +55,10 @@ TEXTS = {
         "price": "💰 السعر:",
         "available": "📦 المتوفر:",
         "description": "❞ الوصف:",
+        "cmd_language": "🌐 تغيير اللغة",
+        "cmd_support": "💬 الدعم",
+        "support_msg": "💬 للدعم والطلبات، تواصل معي مباشرة في الخاص 👇",
+        "support_btn": "💬 تواصل مع الدعم",
         "buy_hint": "🛒 لإتمام الطلب والشراء، اضغط على زر 'اطلب الآن 🛒' لتتوجه مباشرة للخاص.",
         "out_of_stock": "❌ هذا المنتج نفد من المخزون حالياً.\n🛒 للاستفسار أو الطلب المسبق، اضغط على 'اطلب الآن'.",
     },
@@ -65,6 +74,10 @@ TEXTS = {
         "price": "💰 Price:",
         "available": "📦 Available:",
         "description": "❞ Description:",
+        "cmd_language": "🌐 Change language",
+        "cmd_support": "💬 Support",
+        "support_msg": "💬 For support and orders, contact me directly in private 👇",
+        "support_btn": "💬 Contact support",
         "buy_hint": "🛒 To complete your order, tap 'Order now 🛒' to go directly to the private chat.",
         "out_of_stock": "❌ This product is currently out of stock.\n🛒 For questions or pre-orders, tap 'Order now'.",
     },
@@ -80,6 +93,10 @@ TEXTS = {
         "price": "💰 Prix :",
         "available": "📦 Disponible :",
         "description": "❞ Description :",
+        "cmd_language": "🌐 Changer de langue",
+        "cmd_support": "💬 Assistance",
+        "support_msg": "💬 Pour l'assistance et les commandes, contactez-moi directement en privé 👇",
+        "support_btn": "💬 Contacter l'assistance",
         "buy_hint": "🛒 Pour finaliser votre commande, appuyez sur « Commander maintenant 🛒 » pour aller directement en privé.",
         "out_of_stock": "❌ Ce produit est actuellement en rupture de stock.\n🛒 Pour toute question ou précommande, appuyez sur « Commander maintenant ».",
     },
@@ -129,7 +146,7 @@ products = [
         "price": "$9.00",
         "stock": 100,
         "icon": "🍿",
-        "image": "https://i.postimg.cc/DZYwrn6r/IMG-3153.jpg",
+        "image": "https://i.postimg.cc/zDM5d4D3/IMG-3568.jpg",
         "description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n✅ ضمان لمدة شهر الأول\n🔵 أرخص سعر — 9$ يعني 4,5$ حساب كامل 😍\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام ما يصل إلى 5 ملفات شخصية و4 أجهزة\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح 12/24 ساعة\n📊 المباعة: 216 حسابات",
     },
     {
@@ -138,7 +155,7 @@ products = [
         "price": "$2.70",
         "stock": 1000,
         "icon": "🍿",
-        "image": "https://i.postimg.cc/DZYwrn6r/IMG-3153.jpg",
+        "image": "https://i.postimg.cc/zDM5d4D3/IMG-3568.jpg",
         "description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n❌ ممنوع تغيير الاسم و كلمة السر هاذا يتم طردك من الحساب مع عدم وجود ضمان\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n🔵 أرخص سعر — 2.70$\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام بروفيل في حساب واحد\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح عند الحاجة\n📊 المباعة: 216 حسابات",
     },
     {
@@ -439,6 +456,37 @@ def tr(item, field, lang):
     return item[field]
 
 
+def set_user_commands(chat_id, lang):
+    # زر Menu: "تغيير اللغة" و"الدعم" بلغة الزبون
+    if BotCommand is None:
+        return
+    try:
+        bot.set_my_commands(
+            [
+                BotCommand("language", t(lang, "cmd_language")),
+                BotCommand("support", t(lang, "cmd_support")),
+            ],
+            scope=BotCommandScopeChat(chat_id),
+        )
+    except Exception as e:
+        print(f"Could not set commands: {e}")
+
+
+def set_default_commands():
+    # القائمة الافتراضية (قبل ما يختار الزبون لغته)
+    if BotCommand is None:
+        return
+    try:
+        bot.set_my_commands(
+            [
+                BotCommand("language", "🌐 اللغة / Language / Langue"),
+                BotCommand("support", "💬 الدعم / Support"),
+            ]
+        )
+    except Exception as e:
+        print(f"Could not set default commands: {e}")
+
+
 def find_product(product_id):
     return next((p for p in products if p["id"] == product_id), None)
 
@@ -481,6 +529,7 @@ def send_main_menu(chat_id, lang):
 def send_welcome(message):
     uid = str(message.from_user.id)
     if uid in user_lang:
+        set_user_commands(message.chat.id, get_lang(uid))
         send_main_menu(message.chat.id, get_lang(uid))
     else:
         send_language_menu(message.chat.id)
@@ -489,6 +538,14 @@ def send_welcome(message):
 @bot.message_handler(commands=["language", "lang"])
 def choose_language(message):
     send_language_menu(message.chat.id)
+
+
+@bot.message_handler(commands=["support"])
+def support_command(message):
+    lang = get_lang(message.from_user.id)
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK))
+    bot.send_message(message.chat.id, t(lang, "support_msg"), reply_markup=markup)
 
 
 def notify_admin(user, product, lang):
@@ -515,6 +572,7 @@ def handle_set_lang(call):
         return
     user_lang[str(call.from_user.id)] = lang
     save_langs()
+    set_user_commands(call.message.chat.id, lang)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
@@ -635,6 +693,8 @@ def handle_notify(call):
         show_alert=True,
     )
 
+
+set_default_commands()
 
 print("Bot is running...")
 bot.infinity_polling()
