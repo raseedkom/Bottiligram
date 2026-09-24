@@ -115,12 +115,12 @@ products = [
     },
     {
         "id": "capcut_1m",
-        "name": "Capcut pro 1M FW",
-        "price": "$1.32",
-        "stock": 23,
-        "icon": "🍄",
+        "name": "CapCut Pro (حساب خاص - شهر كامل)",
+        "price": "$2.20",
+        "stock": 16,
+        "icon": "🎬",
         "image": "https://i.postimg.cc/DzpSgryL/IMG-3143.jpg",
-        "description": "🎬 حسابات كاب كات (فريق) برو جاهزة مع 640 رصيد ذكاء اصطناعي\n\n⚡ تسليم فوري\n📧 حسابات جاهزة\n💎 وصول إلى CapCut Pro\n🚀 سريع وسهل",
+        "description": "🔥 اشتراك كاب كات برو | CapCut Pro (حساب خاص - شهر كامل) 🎬\n\n⚡️ المباع: 89\n⏳ المدة: 30 يوم (شهر كامل).\n🛡️ الضمان: ضمان كامل طوال فترة الاشتراك (30 يوم).\n\nاستلم حسابك وابدأ المونتاج باحترافية بدون قيود!\n\n✨ المميزات:\n- أدوات الذكاء الاصطناعي (AI): قص ذكي، توليد التسميات التلقائية (Auto-captions)، وتتبع احترافي.\n- مكتبة برو كاملة: خطوط ترند، موسيقى، مؤثرات، وقوالب جاهزة غير محدودة.\n- تصدير بأعلى جودة: دقة 4K و 60 إطار في الثانية (60 FPS).\n- بدون علامة مائية وبدون إعلانات.\n\n⚙️ تفاصيل الحساب:\n👤 النوع: حساب خاص وجديد بالكامل (إيميل + باسوورد) لمشاريعك فقط.\n💻 الأجهزة المدعومة: Android, iOS, Windows, Mac والموقع مباشرة.\n⚡ التسليم: فوري وتلقائي 24/7.",
     },
     {
         "id": "duolingo_12m",
@@ -273,14 +273,6 @@ TRANSLATIONS = {
         },
         "fr": {
             "description": "🤖 Gemini AI Pro 18 mois [NW]\n⭐️ Gemini AI Pro pour 18 mois\n✦ 🚫 Activation sans carte bancaire\n✦ ⏩ 5 To de stockage cloud Google One\n✦ 🚀 Aucun VPN nécessaire.\n\n✨ Avantages supplémentaires :\n- 1050 crédits gratuits sur Google Flow et images\n- 3 vidéos gratuites sur Gemini chaque jour pendant toute la durée de l'abonnement (18 mois)\n- L'activation se fait sur votre propre Gmail via un lien d'activation uniquement\n\nJe l'ai testé moi-même, donc il n'y a pas de remplacement\n🫶 Garantie de 12 heures."
-        }
-    },
-    "capcut_1m": {
-        "en": {
-            "description": "🎬 Ready CapCut Pro (team) accounts with 640 AI credits\n\n⚡ Instant delivery\n📧 Ready accounts\n💎 Access to CapCut Pro\n🚀 Fast and easy"
-        },
-        "fr": {
-            "description": "🎬 Comptes CapCut Pro (équipe) prêts avec 640 crédits d'IA\n\n⚡ Livraison instantanée\n📧 Comptes prêts\n💎 Accès à CapCut Pro\n🚀 Rapide et facile"
         }
     },
     "duolingo_12m": {
