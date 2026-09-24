@@ -16,7 +16,7 @@ import os
 import json
 import html
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 try:
     from telebot.types import BotCommand, BotCommandScopeChat
@@ -61,6 +61,12 @@ TEXTS = {
         "support_btn": "💬 تواصل مع الدعم",
         "buy_hint": "🛒 لإتمام الطلب والشراء، اضغط على زر 'اطلب الآن 🛒' لتتوجه مباشرة للخاص.",
         "out_of_stock": "❌ هذا المنتج نفد من المخزون حالياً.\n🛒 للاستفسار أو الطلب المسبق، اضغط على 'اطلب الآن'.",
+        "kb_start": "🚀 ابدأ",
+        "kb_products": "🛍️ المنتجات",
+        "kb_support": "💬 الدعم",
+        "kb_lang": "🌐 اللغة",
+        "menu_hint": "⬇️ القائمة:",
+        "start_guide": "🎉 !مرحباً بك 🎉\n\n🎯 :دليل سريع كيف تستعمل البوت\n\n1. اختر المنتج الذي تريده\n2. اضغط على \"🛒 اطلب الآن\"\n3. أكمل الدفع\n4. بعد الدفع، أرسل رقم الطلب للتحقق\n5. يتم ارسال طلبك ✅\n\n🎯 عدم فهم طريقة الاستخدام؟ تواصل معنا 👇",
     },
     "en": {
         "welcome": "👋 Welcome to the RASEEDKOM store!\nChoose the product you want from the list below:",
@@ -80,6 +86,12 @@ TEXTS = {
         "support_btn": "💬 Contact support",
         "buy_hint": "🛒 To complete your order, tap 'Order now 🛒' to go directly to the private chat.",
         "out_of_stock": "❌ This product is currently out of stock.\n🛒 For questions or pre-orders, tap 'Order now'.",
+        "kb_start": "🚀 Start",
+        "kb_products": "🛍️ Products",
+        "kb_support": "💬 Support",
+        "kb_lang": "🌐 Language",
+        "menu_hint": "⬇️ Menu:",
+        "start_guide": "🎉 Welcome! 🎉\n\n🎯 Quick guide on how to use the bot:\n\n1. Choose the product you want\n2. Tap \"🛒 Order now\"\n3. Complete the payment\n4. After payment, send the order number for verification\n5. Your order will be sent to you ✅\n\n🎯 Don't understand how to use it? Contact us 👇",
     },
     "fr": {
         "welcome": "👋 Bienvenue dans la boutique RASEEDKOM !\nChoisissez le produit souhaité dans la liste ci-dessous :",
@@ -99,6 +111,12 @@ TEXTS = {
         "support_btn": "💬 Contacter l'assistance",
         "buy_hint": "🛒 Pour finaliser votre commande, appuyez sur « Commander maintenant 🛒 » pour aller directement en privé.",
         "out_of_stock": "❌ Ce produit est actuellement en rupture de stock.\n🛒 Pour toute question ou précommande, appuyez sur « Commander maintenant ».",
+        "kb_start": "🚀 Commencer",
+        "kb_products": "🛍️ Produits",
+        "kb_support": "💬 Assistance",
+        "kb_lang": "🌐 Langue",
+        "menu_hint": "⬇️ Menu :",
+        "start_guide": "🎉 Bienvenue ! 🎉\n\n🎯 Guide rapide pour utiliser le bot :\n\n1. Choisissez le produit que vous voulez\n2. Appuyez sur « 🛒 Commander maintenant »\n3. Terminez le paiement\n4. Après le paiement, envoyez le numéro de commande pour vérification\n5. Votre commande vous sera envoyée ✅\n\n🎯 Vous ne comprenez pas comment l'utiliser ? Contactez-nous 👇",
     },
 }
 
@@ -273,6 +291,16 @@ TRANSLATIONS = {
         },
         "fr": {
             "description": "🤖 Gemini AI Pro 18 mois [NW]\n⭐️ Gemini AI Pro pour 18 mois\n✦ 🚫 Activation sans carte bancaire\n✦ ⏩ 5 To de stockage cloud Google One\n✦ 🚀 Aucun VPN nécessaire.\n\n✨ Avantages supplémentaires :\n- 1050 crédits gratuits sur Google Flow et images\n- 3 vidéos gratuites sur Gemini chaque jour pendant toute la durée de l'abonnement (18 mois)\n- L'activation se fait sur votre propre Gmail via un lien d'activation uniquement\n\nJe l'ai testé moi-même, donc il n'y a pas de remplacement\n🫶 Garantie de 12 heures."
+        }
+    },
+    "capcut_1m": {
+        "en": {
+            "name": "CapCut Pro (private account - full month)",
+            "description": "🔥 CapCut Pro subscription (private account - full month) 🎬\n\n⚡️ Sold: 89\n⏳ Duration: 30 days (a full month).\n🛡️ Warranty: full warranty for the entire subscription period (30 days).\n\nGet your account and start editing professionally with no limits!\n\n✨ Features:\n- AI tools: smart trimming, auto-generated captions, and professional tracking.\n- Full Pro library: trending fonts, music, effects, and unlimited ready-made templates.\n- Top-quality export: 4K resolution and 60 frames per second (60 FPS).\n- No watermark and no ads.\n\n⚙️ Account details:\n👤 Type: a brand-new private account (email + password) just for your projects.\n💻 Supported devices: Android, iOS, Windows, Mac, and directly on the website.\n⚡ Delivery: instant and automatic, 24/7."
+        },
+        "fr": {
+            "name": "CapCut Pro (compte privé - mois complet)",
+            "description": "🔥 Abonnement CapCut Pro (compte privé - mois complet) 🎬\n\n⚡️ Vendus : 89\n⏳ Durée : 30 jours (un mois complet).\n🛡️ Garantie : garantie complète pendant toute la durée de l'abonnement (30 jours).\n\nRécupérez votre compte et commencez à monter professionnellement sans limites !\n\n✨ Fonctionnalités :\n- Outils d'IA : découpage intelligent, génération automatique de sous-titres (Auto-captions), et suivi professionnel.\n- Bibliothèque Pro complète : polices tendance, musique, effets et modèles prêts à l'emploi illimités.\n- Export en qualité maximale : résolution 4K et 60 images par seconde (60 FPS).\n- Sans filigrane et sans publicité.\n\n⚙️ Détails du compte :\n👤 Type : compte privé entièrement nouveau (e-mail + mot de passe) réservé à vos projets.\n💻 Appareils compatibles : Android, iOS, Windows, Mac et directement sur le site.\n⚡ Livraison : instantanée et automatique, 24h/24 et 7j/7."
         }
     },
     "duolingo_12m": {
@@ -496,6 +524,25 @@ def generate_store_keyboard(lang):
     return markup
 
 
+def build_reply_keyboard(lang):
+    # القائمة السفلية الثابتة (Menu): ابدأ / المنتجات / الدعم / اللغة
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row(KeyboardButton(t(lang, "kb_start")), KeyboardButton(t(lang, "kb_products")))
+    markup.row(KeyboardButton(t(lang, "kb_support")), KeyboardButton(t(lang, "kb_lang")))
+    return markup
+
+
+def send_persistent_menu(chat_id, lang):
+    bot.send_message(chat_id, t(lang, "menu_hint"), reply_markup=build_reply_keyboard(lang))
+
+
+# نصوص أزرار القائمة السفلية بكل اللغات المتوفرة، لمطابقتها بغض النظر عن اللغة الحالية
+KB_START_TEXTS = {TEXTS[l]["kb_start"] for l in SUPPORTED_LANGS}
+KB_PRODUCTS_TEXTS = {TEXTS[l]["kb_products"] for l in SUPPORTED_LANGS}
+KB_SUPPORT_TEXTS = {TEXTS[l]["kb_support"] for l in SUPPORTED_LANGS}
+KB_LANG_TEXTS = {TEXTS[l]["kb_lang"] for l in SUPPORTED_LANGS}
+
+
 def send_language_menu(chat_id):
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -521,8 +568,10 @@ def send_main_menu(chat_id, lang):
 def send_welcome(message):
     uid = str(message.from_user.id)
     if uid in user_lang:
-        set_user_commands(message.chat.id, get_lang(uid))
-        send_main_menu(message.chat.id, get_lang(uid))
+        lang = get_lang(uid)
+        set_user_commands(message.chat.id, lang)
+        send_persistent_menu(message.chat.id, lang)
+        send_main_menu(message.chat.id, lang)
     else:
         send_language_menu(message.chat.id)
 
@@ -569,6 +618,7 @@ def handle_set_lang(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
+    send_persistent_menu(call.message.chat.id, lang)
     send_main_menu(call.message.chat.id, lang)
     bot.answer_callback_query(call.id)
 
@@ -581,6 +631,29 @@ def handle_change_lang(call):
         pass
     send_language_menu(call.message.chat.id)
     bot.answer_callback_query(call.id)
+
+
+# ---------- أزرار القائمة السفلية الثابتة (Menu) ----------
+@bot.message_handler(func=lambda m: m.text in KB_START_TEXTS)
+def handle_kb_start(message):
+    lang = get_lang(message.from_user.id)
+    bot.send_message(message.chat.id, t(lang, "start_guide"))
+
+
+@bot.message_handler(func=lambda m: m.text in KB_PRODUCTS_TEXTS)
+def handle_kb_products(message):
+    lang = get_lang(message.from_user.id)
+    send_main_menu(message.chat.id, lang)
+
+
+@bot.message_handler(func=lambda m: m.text in KB_SUPPORT_TEXTS)
+def handle_kb_support(message):
+    support_command(message)
+
+
+@bot.message_handler(func=lambda m: m.text in KB_LANG_TEXTS)
+def handle_kb_lang(message):
+    send_language_menu(message.chat.id)
 
 
 # ---------- عرض المنتج ----------
