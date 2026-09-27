@@ -30,10 +30,7 @@ TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "8491461365")  # الآيدي الخاص بك للإشعارات الفورية
 bot = telebot.TeleBot(TOKEN)
 
-# --- إرسال منتج واحد كل ساعة تلقائياً ---
-# الوجهة الافتراضية هي خاصك (ADMIN_CHAT_ID). إذا تحب ترسلها لقناة/كروب، حط في
-# Render > Environment متغيّر BROADCAST_CHAT_ID بآيدي القناة الرقمي (مثال: -1001234567890)
-BROADCAST_CHAT_ID = os.environ.get("BROADCAST_CHAT_ID", ADMIN_CHAT_ID)
+# --- إرسال منتج واحد كل ساعة تلقائياً لكل الزبائن اللي بدأو البوت ---
 BROADCAST_INTERVAL_SECONDS = int(os.environ.get("BROADCAST_INTERVAL_SECONDS", 3600))  # ساعة واحدة
 
 # رابط الصورة الموحدة للمتجر (يجب أن يكون رابطاً مباشراً ينتهي بـ .jpg أو .png)
@@ -789,29 +786,36 @@ def handle_notify(call):
 set_default_commands()
 
 
-# ---------- إرسال منتج واحد كل ساعة تلقائياً ----------
+# ---------- إرسال منتج واحد كل ساعة تلقائياً لكل الزبائن ----------
 def get_broadcastable_products():
     return [p for p in products if p.get("type") != "separator"]
 
 
-def send_single_product_broadcast(chat_id, item):
-    stock_display = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
+def send_single_product_broadcast(chat_id, item, lang="ar"):
+    stock_val = item["stock"]
+    display_stock = "♾️" if stock_val == "♾️" else str(stock_val)
     caption = (
-        f"{item['icon']} <b>{html.escape(item['name'])}</b>\n\n"
-        f"📦 Current stock: {html.escape(stock_display)}\n"
-        f"💰 Price: {html.escape(item['price'])}"
+        f"{item['icon']} <b>{html.escape(tr(item, 'name', lang))}</b>\n\n"
+        f"{t(lang, 'available')} <b>{html.escape(display_stock)}</b>\n"
+        f"{t(lang, 'price')} <b>{html.escape(item['price'])}</b>"
     )
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text="🛒 Buy now", callback_data=f"buy_{item['id']}"))
+    markup.add(InlineKeyboardButton(text=t(lang, "order_now"), callback_data=f"buy_{item['id']}"))
     photo = item.get("image", UNIFIED_IMAGE_URL)
     try:
         bot.send_photo(chat_id, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
+        return True
     except Exception as e:
-        print(f"Broadcast error (photo): {e}")
+        err = str(e)
+        # الزبون حظر البوت أو حذف حسابه: ما نعاودوش نحاولو معاه في المرات الجاية
+        if "bot was blocked" in err.lower() or "user is deactivated" in err.lower() or "chat not found" in err.lower():
+            return False
         try:
             bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
+            return True
         except Exception as e2:
-            print(f"Broadcast error (fallback): {e2}")
+            print(f"Broadcast error for {chat_id}: {e2}")
+            return False
 
 
 def hourly_broadcast_loop():
@@ -821,7 +825,14 @@ def hourly_broadcast_loop():
     index = 0
     while True:
         item = items[index % len(items)]
-        send_single_product_broadcast(BROADCAST_CHAT_ID, item)
+        # نبعث لكل الزبائن اللي بدأو البوت واختارو لغة (كل واحد بلغته)
+        for uid in list(user_lang.keys()):
+            lang = get_lang(uid)
+            ok = send_single_product_broadcast(int(uid), item, lang)
+            if not ok:
+                user_lang.pop(uid, None)  # نظافة القائمة من الحسابات الميتة/الحاظرة للبوت
+            time.sleep(0.08)  # تفادي حظر تليجرام لكثرة الرسائل المتتالية
+        save_langs()
         index += 1
         time.sleep(BROADCAST_INTERVAL_SECONDS)
 
