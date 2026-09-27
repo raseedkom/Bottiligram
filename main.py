@@ -15,6 +15,7 @@ threading.Thread(target=run).start()
 import os
 import json
 import html
+import time
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
@@ -28,6 +29,12 @@ except ImportError:  # مكتبة قديمة: زر القائمة لن يعمل 
 TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "8491461365")  # الآيدي الخاص بك للإشعارات الفورية
 bot = telebot.TeleBot(TOKEN)
+
+# --- إرسال منتج واحد كل ساعة تلقائياً ---
+# الوجهة الافتراضية هي خاصك (ADMIN_CHAT_ID). إذا تحب ترسلها لقناة/كروب، حط في
+# Render > Environment متغيّر BROADCAST_CHAT_ID بآيدي القناة الرقمي (مثال: -1001234567890)
+BROADCAST_CHAT_ID = os.environ.get("BROADCAST_CHAT_ID", ADMIN_CHAT_ID)
+BROADCAST_INTERVAL_SECONDS = int(os.environ.get("BROADCAST_INTERVAL_SECONDS", 3600))  # ساعة واحدة
 
 # رابط الصورة الموحدة للمتجر (يجب أن يكون رابطاً مباشراً ينتهي بـ .jpg أو .png)
 UNIFIED_IMAGE_URL = "https://i.postimg.cc/MpN8H2jq/IMG-3158"
@@ -780,6 +787,46 @@ def handle_notify(call):
 
 
 set_default_commands()
+
+
+# ---------- إرسال منتج واحد كل ساعة تلقائياً ----------
+def get_broadcastable_products():
+    return [p for p in products if p.get("type") != "separator"]
+
+
+def send_single_product_broadcast(chat_id, item):
+    stock_display = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
+    caption = (
+        f"{item['icon']} <b>{html.escape(item['name'])}</b>\n\n"
+        f"📦 Current stock: {html.escape(stock_display)}\n"
+        f"💰 Price: {html.escape(item['price'])}"
+    )
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text="🛒 Buy now", callback_data=f"buy_{item['id']}"))
+    photo = item.get("image", UNIFIED_IMAGE_URL)
+    try:
+        bot.send_photo(chat_id, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
+    except Exception as e:
+        print(f"Broadcast error (photo): {e}")
+        try:
+            bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
+        except Exception as e2:
+            print(f"Broadcast error (fallback): {e2}")
+
+
+def hourly_broadcast_loop():
+    items = get_broadcastable_products()
+    if not items:
+        return
+    index = 0
+    while True:
+        item = items[index % len(items)]
+        send_single_product_broadcast(BROADCAST_CHAT_ID, item)
+        index += 1
+        time.sleep(BROADCAST_INTERVAL_SECONDS)
+
+
+threading.Thread(target=hourly_broadcast_loop, daemon=True).start()
 
 print("Bot is running...")
 bot.infinity_polling()
