@@ -34,7 +34,7 @@ bot = telebot.TeleBot(TOKEN)
 # الوجهة الافتراضية هي خاصك (ADMIN_CHAT_ID). إذا تحب ترسلها لقناة/كروب، حط في
 # Render > Environment متغيّر BROADCAST_CHAT_ID بآيدي القناة الرقمي (مثال: -1001234567890)
 BROADCAST_CHAT_ID = os.environ.get("BROADCAST_CHAT_ID", ADMIN_CHAT_ID)
-BROADCAST_INTERVAL_SECONDS = int(os.environ.get("BROADCAST_INTERVAL_SECONDS", 1200))  # 20 دقيقة
+BROADCAST_INTERVAL_SECONDS = int(os.environ.get("BROADCAST_INTERVAL_SECONDS", 3600))  # ساعة واحدة
 
 # رابط الصورة الموحدة للمتجر (يجب أن يكون رابطاً مباشراً ينتهي بـ .jpg أو .png)
 UNIFIED_IMAGE_URL = "https://i.postimg.cc/MpN8H2jq/IMG-3158"
@@ -177,11 +177,11 @@ products = [
     {
         "id": "netflix_profile",
         "name": "Netflix شهرين بروفيل واحد",
-        "price": "$2.35",
-        "stock": 16,
+        "price": "$2.70",
+        "stock": 0,
         "icon": "🍿",
         "image": "https://i.postimg.cc/zDM5d4D3/IMG-3568.jpg",
-        "description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n❌ ممنوع تغيير الاسم و كلمة السر هاذا يتم طردك من الحساب مع عدم وجود ضمان\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n🔵 أرخص سعر — 2.35$\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام بروفيل في حساب واحد\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح عند الحاجة\n📊 المباعة: 216 حسابات",
+        "description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n❌ ممنوع تغيير الاسم و كلمة السر هاذا يتم طردك من الحساب مع عدم وجود ضمان\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n🔵 أرخص سعر — 2.70$\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام بروفيل في حساب واحد\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح عند الحاجة\n📊 المباعة: 216 حسابات",
     },
     {
         "id": "nordvpn_3m",
@@ -341,11 +341,11 @@ TRANSLATIONS = {
     "netflix_profile": {
         "en": {
             "name": "Netflix 2 months single profile",
-            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n❌ Do not change the name or the password, otherwise you will be removed from the account with no warranty\n✅ Login with email and password\n🔵 Cheapest price — 2.35$\n✅ High-quality streaming\n✅ One profile on one account\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available when needed\n📊 Sold: 216 accounts"
+            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n❌ Do not change the name or the password, otherwise you will be removed from the account with no warranty\n✅ Login with email and password\n🔵 Cheapest price — 2.70$\n✅ High-quality streaming\n✅ One profile on one account\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available when needed\n📊 Sold: 216 accounts"
         },
         "fr": {
             "name": "Netflix 2 mois un seul profil",
-            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n❌ Interdiction de changer le nom ou le mot de passe, sinon vous serez exclu du compte sans garantie\n✅ Connexion par e-mail et mot de passe\n🔵 Prix le plus bas — 2,35$\n✅ Streaming haute qualité\n✅ Un profil sur un compte\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible en cas de besoin\n📊 Vendus : 216 comptes"
+            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n❌ Interdiction de changer le nom ou le mot de passe, sinon vous serez exclu du compte sans garantie\n✅ Connexion par e-mail et mot de passe\n🔵 Prix le plus bas — 2,70$\n✅ Streaming haute qualité\n✅ Un profil sur un compte\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible en cas de besoin\n📊 Vendus : 216 comptes"
         }
     },
     "nordvpn_3m": {
@@ -466,32 +466,6 @@ def save_langs():
         print(f"Could not save languages: {e}")
 
 
-# ---------- حفظ قائمة كل المشتركين (باش يوصلهم البث الدوري) ----------
-USERS_FILE = "known_users.json"
-users_lock = threading.Lock()
-try:
-    with open(USERS_FILE, encoding="utf-8") as f:
-        known_users = set(json.load(f))
-except Exception:
-    known_users = set()
-
-
-def save_known_users():
-    try:
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(list(known_users), f)
-    except Exception as e:
-        print(f"Could not save known users: {e}")
-
-
-def register_user(chat_id):
-    # تسجيل أي زبون تفاعل مع البوت بأي طريقة (رسالة، زر...) حتى لو ما ضغطش /start
-    with users_lock:
-        if chat_id not in known_users:
-            known_users.add(chat_id)
-            save_known_users()
-
-
 def get_lang(user_id):
     lang = user_lang.get(str(user_id), "ar")
     return lang if lang in SUPPORTED_LANGS else "ar"
@@ -595,20 +569,6 @@ def send_main_menu(chat_id, lang):
         bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=caption, reply_markup=generate_store_keyboard(lang))
     except Exception:
         bot.send_message(chat_id, caption, reply_markup=generate_store_keyboard(lang))
-
-
-# تسجيل أي مستخدم يبعث أي رسالة أو يضغط أي زر، حتى لو ما ضغطش /start أبداً
-@bot.message_handler(func=lambda m: True, content_types=[
-    "text", "photo", "sticker", "document", "voice", "video", "audio",
-    "location", "contact", "animation", "video_note",
-])
-def register_any_message(message):
-    register_user(message.chat.id)
-
-
-@bot.callback_query_handler(func=lambda call: True)
-def register_any_callback(call):
-    register_user(call.message.chat.id)
 
 
 @bot.message_handler(commands=["start"])
@@ -829,13 +789,12 @@ def handle_notify(call):
 set_default_commands()
 
 
-# ---------- إرسال منتج واحد كل 20 دقيقة تلقائياً ----------
+# ---------- إرسال منتج واحد كل ساعة تلقائياً ----------
 def get_broadcastable_products():
     return [p for p in products if p.get("type") != "separator"]
 
 
 def send_single_product_broadcast(chat_id, item):
-    # ملاحظة: هذي الرسالة بالإنجليزية دائماً (بث عام)، ما تعتمدش على لغة الزبون
     stock_display = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
     caption = (
         f"{item['icon']} <b>{html.escape(item['name'])}</b>\n\n"
@@ -847,29 +806,12 @@ def send_single_product_broadcast(chat_id, item):
     photo = item.get("image", UNIFIED_IMAGE_URL)
     try:
         bot.send_photo(chat_id, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
-    except Exception:
-        # لو فشل إرسال الصورة، نجرب نص فقط؛ وإذا فشل هذا أيضاً نرفع الخطأ
-        # لفوق باش broadcast_to_all_users يقدر يتعرف عليه (زبون سكّر البوت مثلاً)
-        bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
-
-
-def broadcast_to_all_users(item):
-    # نبعث لكل مشترك قديم أو جديد مسجل في known_users
-    with users_lock:
-        targets = list(known_users)
-    for chat_id in targets:
+    except Exception as e:
+        print(f"Broadcast error (photo): {e}")
         try:
-            send_single_product_broadcast(chat_id, item)
-        except Exception as e:
-            err = str(e).lower()
-            if "blocked" in err or "chat not found" in err or "user is deactivated" in err or "kicked" in err:
-                # الزبون سكّر البوت أو حساب محذوف: نشيلوه من القائمة
-                with users_lock:
-                    known_users.discard(chat_id)
-                    save_known_users()
-            else:
-                print(f"Broadcast send error to {chat_id}: {e}")
-        time.sleep(0.05)  # تجنب تجاوز حدود تيليجرام في الإرسال السريع
+            bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
+        except Exception as e2:
+            print(f"Broadcast error (fallback): {e2}")
 
 
 def hourly_broadcast_loop():
@@ -879,7 +821,7 @@ def hourly_broadcast_loop():
     index = 0
     while True:
         item = items[index % len(items)]
-        broadcast_to_all_users(item)
+        send_single_product_broadcast(BROADCAST_CHAT_ID, item)
         index += 1
         time.sleep(BROADCAST_INTERVAL_SECONDS)
 
