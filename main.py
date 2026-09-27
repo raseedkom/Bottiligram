@@ -177,8 +177,8 @@ products = [
     {
         "id": "netflix_profile",
         "name": "Netflix شهرين بروفيل واحد",
-        "price": "$2.70",
-        "stock": 0,
+        "price": "$2.30",
+        "stock": 36,
         "icon": "🍿",
         "image": "https://i.postimg.cc/zDM5d4D3/IMG-3568.jpg",
         "description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n❌ ممنوع تغيير الاسم و كلمة السر هاذا يتم طردك من الحساب مع عدم وجود ضمان\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n🔵 أرخص سعر — 2.70$\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام بروفيل في حساب واحد\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح عند الحاجة\n📊 المباعة: 216 حسابات",
@@ -341,11 +341,11 @@ TRANSLATIONS = {
     "netflix_profile": {
         "en": {
             "name": "Netflix 2 months single profile",
-            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n❌ Do not change the name or the password, otherwise you will be removed from the account with no warranty\n✅ Login with email and password\n🔵 Cheapest price — 2.70$\n✅ High-quality streaming\n✅ One profile on one account\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available when needed\n📊 Sold: 216 accounts"
+            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n❌ Do not change the name or the password, otherwise you will be removed from the account with no warranty\n✅ Login with email and password\n🔵 Cheapest price — 2.30$\n✅ High-quality streaming\n✅ One profile on one account\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available when needed\n📊 Sold: 216 accounts"
         },
         "fr": {
             "name": "Netflix 2 mois un seul profil",
-            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n❌ Interdiction de changer le nom ou le mot de passe, sinon vous serez exclu du compte sans garantie\n✅ Connexion par e-mail et mot de passe\n🔵 Prix le plus bas — 2,70$\n✅ Streaming haute qualité\n✅ Un profil sur un compte\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible en cas de besoin\n📊 Vendus : 216 comptes"
+            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n❌ Interdiction de changer le nom ou le mot de passe, sinon vous serez exclu du compte sans garantie\n✅ Connexion par e-mail et mot de passe\n🔵 Prix le plus bas — 2,30$\n✅ Streaming haute qualité\n✅ Un profil sur un compte\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible en cas de besoin\n📊 Vendus : 216 comptes"
         }
     },
     "nordvpn_3m": {
