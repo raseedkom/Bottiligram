@@ -171,7 +171,7 @@ products = [
         "id": "netflix_profile",
         "name": "Netflix شهرين بروفيل واحد",
         "price": "$2.70",
-        "stock": 1000,
+        "stock": 0,
         "icon": "🍿",
         "image": "https://i.postimg.cc/zDM5d4D3/IMG-3568.jpg",
         "description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n❌ ممنوع تغيير الاسم و كلمة السر هاذا يتم طردك من الحساب مع عدم وجود ضمان\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n🔵 أرخص سعر — 2.70$\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام بروفيل في حساب واحد\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح عند الحاجة\n📊 المباعة: 216 حسابات",
@@ -227,12 +227,12 @@ products = [
     },
     {
         "id": "canva_edu_5000",
-        "name": "Canva Edu Pro — 5000 مقعد",
-        "price": "$21.50",
-        "stock": 5000,
+        "name": "اشتراك Canva Education المميز | 3 سنوات على حسابك الشخصي",
+        "price": "$1.20",
+        "stock": 500,
         "icon": "🎨",
         "image": "https://i.postimg.cc/sxq1rsZR/IMG-3373.jpg",
-        "description": "🎨 Canva Edu Pro — 5000 مقعد\n\n🔥 حساب/لوحة Canva Education\nاضافة 5000 شخص مع تحكم الكامل\n\n✨ ماذا تحصل عليه؟\n- 🎓 وصول إلى مزايا Canva التعليمية.\n- 💎 أدوات Canva Pro والعديد من الميزات الاحترافية.\n- 📚 قوالب تعليمية جاهزة.\n- 🎨 تصميم عروض تقديمية، منشورات، فيديوهات وملفات تعليمية.\n- 🤖 أدوات الذكاء الاصطناعي مثل Magic Write.\n\n📦 السعة: 5000 مقعد\n💰 السعر: 21.50$ فقط\n⚠️ مهم: المنتج مع ضمان\n\n🚀 مناسب للطلاب، الأساتذة، المصممين وأصحاب المشاريع",
+        "description": "✨ اشتراك CNVA Education المميز | 3 سنوات على حسابك الشخصي ✨\n\n❇️ المباع: 34150\n\nصمّم باحترافية وبدون حدود مع وصول كامل لمكتبة التصميم الضخمة:\n⏳ المدة: 3 سنوات كاملة مع تفعيل فوري ودعم فني متواصل 🛠️\n💎 المميزات: وصول مفتوح لملايين القوالب، الصور، الفيديوهات، والخطوط المميزة (Premium) 🖼️🎬\n💻 التوافق: يعمل بسلاسة على الكمبيوتر (PC / Mac) والهواتف (Android / iOS) 📱\n🔒 الأمان والخصوصية: التفعيل يتم عبر رابط دعوة رسمي أو رمز — لا نطلب كلمة المرور أبداً 🔑🚫\n\n📥 خطوات التفعيل السريع:\n1️⃣ أكّد طلبك 🛒\n2️⃣ أرسل إيميل حسابك في المحادثة ✉️\n3️⃣ اقبل الدعوة ومبروك عليك التفعيل فوراً 🎉",
     },
     {
         "id": "freefire_diamonds",
@@ -324,11 +324,11 @@ TRANSLATIONS = {
     "netflix_full": {
         "en": {
             "name": "Netflix 2 months full account (5 profiles)",
-            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n✅ Login with email and password\n✅ 1-month warranty\n🔵 Cheapest price — 9$ means 4.5$ for a full account 😍\n✅ High-quality streaming\n✅ Up to 5 profiles and 4 devices\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available 12/24 hours\n📊 Sold: 216 accounts"
+            "description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n✅ Login with email and password\n✅ 1-month warranty\n🔵 Cheapest price — 10$ means 5$ for a full account 😍\n✅ High-quality streaming\n✅ Up to 5 profiles and 4 devices\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available 12/24 hours\n📊 Sold: 432 accounts"
         },
         "fr": {
             "name": "Netflix 2 mois compte complet (5 profils)",
-            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n✅ Connexion par e-mail et mot de passe\n✅ Garantie d'un mois\n🔵 Prix le plus bas — 9$ soit 4,5$ le compte complet 😍\n✅ Streaming haute qualité\n✅ Jusqu'à 5 profils et 4 appareils\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible 12/24 heures\n📊 Vendus : 216 comptes"
+            "description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n✅ Connexion par e-mail et mot de passe\n✅ Garantie d'un mois\n🔵 Prix le plus bas — 10$ soit 5$ le compte complet 😍\n✅ Streaming haute qualité\n✅ Jusqu'à 5 profils et 4 appareils\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible 12/24 heures\n📊 Vendus : 432 comptes"
         }
     },
     "netflix_profile": {
@@ -393,12 +393,12 @@ TRANSLATIONS = {
     },
     "canva_edu_5000": {
         "en": {
-            "name": "Canva Edu Pro — 5000 seats",
-            "description": "🎨 Canva Edu Pro — 5000 seats\n\n🔥 Canva Education account/dashboard\nAdd 5000 people with full control\n\n✨ What do you get?\n- 🎓 Access to Canva education benefits.\n- 💎 Canva Pro tools and many professional features.\n- 📚 Ready-made education templates.\n- 🎨 Design presentations, posts, videos and educational files.\n- 🤖 AI tools such as Magic Write.\n\n📦 Capacity: 5000 seats\n💰 Price: only 21.50$\n⚠️ Important: this product comes with a warranty\n\n🚀 Suitable for students, teachers, designers and business owners"
+            "name": "Canva Education Premium subscription | 3 years on your personal account",
+            "description": "✨ Canva Education Premium subscription | 3 years on your personal account ✨\n\n❇️ Sold: 34150\n\nDesign professionally with no limits, with full access to the huge design library:\n⏳ Duration: 3 full years with instant activation and continuous technical support 🛠️\n💎 Features: open access to millions of templates, photos, videos and premium fonts 🖼️🎬\n💻 Compatibility: works smoothly on computer (PC / Mac) and phones (Android / iOS) 📱\n🔒 Security & privacy: activation is done via an official invite link or code — we never ask for your password 🔑🚫\n\n📥 Quick activation steps:\n1️⃣ Confirm your order 🛒\n2️⃣ Send your account email in the chat ✉️\n3️⃣ Accept the invite, congrats — it's activated instantly 🎉"
         },
         "fr": {
-            "name": "Canva Edu Pro — 5000 places",
-            "description": "🎨 Canva Edu Pro — 5000 places\n\n🔥 Compte/tableau de bord Canva Éducation\nAjoutez 5000 personnes avec un contrôle total\n\n✨ Ce que vous obtenez :\n- 🎓 Accès aux avantages éducatifs de Canva.\n- 💎 Les outils Canva Pro et de nombreuses fonctionnalités professionnelles.\n- 📚 Modèles éducatifs prêts à l'emploi.\n- 🎨 Création de présentations, publications, vidéos et documents éducatifs.\n- 🤖 Outils d'IA comme Magic Write.\n\n📦 Capacité : 5000 places\n💰 Prix : seulement 21,50$\n⚠️ Important : produit avec garantie\n\n🚀 Idéal pour les étudiants, enseignants, designers et porteurs de projets"
+            "name": "Abonnement Canva Education Premium | 3 ans sur votre compte personnel",
+            "description": "✨ Abonnement Canva Education Premium | 3 ans sur votre compte personnel ✨\n\n❇️ Vendus : 34150\n\nCréez des designs professionnels sans limites, avec un accès complet à l'immense bibliothèque de création :\n⏳ Durée : 3 années complètes avec activation instantanée et support technique continu 🛠️\n💎 Fonctionnalités : accès ouvert à des millions de modèles, photos, vidéos et polices premium 🖼️🎬\n💻 Compatibilité : fonctionne parfaitement sur ordinateur (PC / Mac) et téléphones (Android / iOS) 📱\n🔒 Sécurité et confidentialité : l'activation se fait via un lien d'invitation officiel ou un code — nous ne demandons jamais votre mot de passe 🔑🚫\n\n📥 Étapes d'activation rapide :\n1️⃣ Confirmez votre commande 🛒\n2️⃣ Envoyez l'e-mail de votre compte dans la conversation ✉️\n3️⃣ Acceptez l'invitation, félicitations — activation instantanée 🎉"
         }
     },
     "freefire_diamonds": {
@@ -604,6 +604,21 @@ def notify_admin(user, product, lang):
         print(f"Error sending admin notification: {e}")
 
 
+def notify_admin_interest(user, product, lang):
+    try:
+        username = f"@{user.username}" if user.username else user.first_name
+        text = (
+            f"🔔 <b>زبون طلب أن يُعلَم عند توفر منتج نفد من المخزون</b>\n\n"
+            f"👤 الزبون: {html.escape(username)} (ID: <code>{user.id}</code>)\n"
+            f"📦 المنتج: <b>{html.escape(product['name'])}</b>\n"
+            f"💰 السعر: <b>{html.escape(product['price'])}</b>\n"
+            f"🌐 اللغة: {lang}"
+        )
+        bot.send_message(ADMIN_CHAT_ID, text, parse_mode="HTML")
+    except Exception as e:
+        print(f"Error sending admin interest notification: {e}")
+
+
 # ---------- اختيار اللغة ----------
 @bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
 def handle_set_lang(call):
@@ -752,9 +767,14 @@ def handle_back(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("notify_"))
 def handle_notify(call):
+    product_id = call.data.replace("notify_", "")
+    product = find_product(product_id)
+    lang = get_lang(call.from_user.id)
+    if product:
+        notify_admin_interest(call.from_user, product, lang)
     bot.answer_callback_query(
         call.id,
-        text=t(get_lang(call.from_user.id), "notify_ok"),
+        text=t(lang, "notify_ok"),
         show_alert=True,
     )
 
