@@ -17,6 +17,7 @@ import json
 import html
 import time
 import telebot
+from telebot.apihelper import ApiTelegramException
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 try:
@@ -30,11 +31,14 @@ TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "8491461365")  # الآيدي الخاص بك للإشعارات الفورية
 bot = telebot.TeleBot(TOKEN)
 
-# --- إرسال منتج واحد كل ساعة تلقائياً ---
+# --- إرسال منتج واحد كل نصف ساعة تلقائياً ---
 # الوجهة الافتراضية هي خاصك (ADMIN_CHAT_ID). إذا تحب ترسلها لقناة/كروب، حط في
 # Render > Environment متغيّر BROADCAST_CHAT_ID بآيدي القناة الرقمي (مثال: -1001234567890)
 BROADCAST_CHAT_ID = os.environ.get("BROADCAST_CHAT_ID", ADMIN_CHAT_ID)
-BROADCAST_INTERVAL_SECONDS = int(os.environ.get("BROADCAST_INTERVAL_SECONDS", 3600))  # ساعة واحدة
+BROADCAST_INTERVAL_SECONDS = int(os.environ.get("BROADCAST_INTERVAL_SECONDS", 1200))  # القناة: كل 20 دقيقة
+USER_BROADCAST_INTERVAL_SECONDS = int(os.environ.get("USER_BROADCAST_INTERVAL_SECONDS", 7200))  # الزبانة في الخاص: كل ساعتين
+USER_BROADCAST_ENABLED = os.environ.get("USER_BROADCAST_ENABLED", "1") == "1"  # "0" لإيقاف البث للزبانة
+BOT_LINK = "https://t.me/RASEEDKOM_store_bot"
 
 # رابط الصورة الموحدة للمتجر (يجب أن يكون رابطاً مباشراً ينتهي بـ .jpg أو .png)
 UNIFIED_IMAGE_URL = "https://i.postimg.cc/MpN8H2jq/IMG-3158"
@@ -64,6 +68,7 @@ TEXTS = {
         "description": "❞ الوصف:",
         "cmd_language": "🌐 تغيير اللغة",
         "cmd_support": "💬 الدعم",
+        "cmd_update": "🔄 تحديث",
         "support_msg": "💬 للدعم والطلبات، تواصل معي مباشرة في الخاص 👇",
         "support_btn": "💬 تواصل مع الدعم",
         "buy_hint": "🛒 لإتمام الطلب والشراء، اضغط على زر 'اطلب الآن 🛒' لتتوجه مباشرة للخاص.",
@@ -72,6 +77,7 @@ TEXTS = {
         "kb_products": "🛍️ المنتجات",
         "kb_support": "💬 الدعم",
         "kb_lang": "🌐 اللغة",
+        "kb_update": "🔄 تحديث",
         "menu_hint": "⬇️ القائمة:",
         "start_guide": "🎉 !مرحباً بك 🎉\n\n🎯 :دليل سريع كيف تستعمل البوت\n\n1. اختر المنتج الذي تريده\n2. اضغط على \"🛒 اطلب الآن\"\n3. أكمل الدفع\n4. بعد الدفع، أرسل رقم الطلب للتحقق\n5. يتم ارسال طلبك ✅\n\n🎯 عدم فهم طريقة الاستخدام؟ تواصل معنا 👇",
     },
@@ -89,6 +95,7 @@ TEXTS = {
         "description": "❞ Description:",
         "cmd_language": "🌐 Change language",
         "cmd_support": "💬 Support",
+        "cmd_update": "🔄 Refresh",
         "support_msg": "💬 For support and orders, contact me directly in private 👇",
         "support_btn": "💬 Contact support",
         "buy_hint": "🛒 To complete your order, tap 'Order now 🛒' to go directly to the private chat.",
@@ -97,6 +104,7 @@ TEXTS = {
         "kb_products": "🛍️ Products",
         "kb_support": "💬 Support",
         "kb_lang": "🌐 Language",
+        "kb_update": "🔄 Refresh",
         "menu_hint": "⬇️ Menu:",
         "start_guide": "🎉 Welcome! 🎉\n\n🎯 Quick guide on how to use the bot:\n\n1. Choose the product you want\n2. Tap \"🛒 Order now\"\n3. Complete the payment\n4. After payment, send the order number for verification\n5. Your order will be sent to you ✅\n\n🎯 Don't understand how to use it? Contact us 👇",
     },
@@ -114,6 +122,7 @@ TEXTS = {
         "description": "❞ Description :",
         "cmd_language": "🌐 Changer de langue",
         "cmd_support": "💬 Assistance",
+        "cmd_update": "🔄 Actualiser",
         "support_msg": "💬 Pour l'assistance et les commandes, contactez-moi directement en privé 👇",
         "support_btn": "💬 Contacter l'assistance",
         "buy_hint": "🛒 Pour finaliser votre commande, appuyez sur « Commander maintenant 🛒 » pour aller directement en privé.",
@@ -122,6 +131,7 @@ TEXTS = {
         "kb_products": "🛍️ Produits",
         "kb_support": "💬 Assistance",
         "kb_lang": "🌐 Langue",
+        "kb_update": "🔄 Actualiser",
         "menu_hint": "⬇️ Menu :",
         "start_guide": "🎉 Bienvenue ! 🎉\n\n🎯 Guide rapide pour utiliser le bot :\n\n1. Choisissez le produit que vous voulez\n2. Appuyez sur « 🛒 Commander maintenant »\n3. Terminez le paiement\n4. Après le paiement, envoyez le numéro de commande pour vérification\n5. Votre commande vous sera envoyée ✅\n\n🎯 Vous ne comprenez pas comment l'utiliser ? Contactez-nous 👇",
     },
@@ -451,19 +461,124 @@ TRANSLATIONS = {
 
 # ---------- حفظ لغة كل زبون ----------
 LANG_FILE = "user_lang.json"
-try:
-    with open(LANG_FILE, encoding="utf-8") as f:
-        user_lang = json.load(f)
-except Exception:
-    user_lang = {}
+LANG_KEY = "user_lang"    # Redis hash: user_id -> lang
+USERS_KEY = "all_users"   # Redis set: كل من تفاعل مع البوت
+
+# الاتصال بـ Upstash (المتغيرات موجودة في Render: UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN)
+db = None
+if os.environ.get("UPSTASH_REDIS_REST_URL") and os.environ.get("UPSTASH_REDIS_REST_TOKEN"):
+    try:
+        from upstash_redis import Redis
+        db = Redis.from_env()
+        print("Upstash Redis connected.")
+    except Exception as e:
+        print(f"Upstash unavailable, using local file only: {e}")
+        db = None
+
+
+def _load_lang_file():
+    try:
+        with open(LANG_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 def save_langs():
+    # نسخة احتياطية محلية (تتمسح مع كل redeploy في Render، الأصل هو Upstash)
     try:
         with open(LANG_FILE, "w", encoding="utf-8") as f:
             json.dump(user_lang, f)
     except Exception as e:
         print(f"Could not save languages: {e}")
+
+
+def load_langs():
+    langs = _load_lang_file()
+    if db:
+        try:
+            remote = {str(k): v for k, v in (db.hgetall(LANG_KEY) or {}).items()}
+            merged = {**langs, **remote}
+            missing = {k: v for k, v in merged.items() if k not in remote}
+            if missing:  # ترحيل الموجود محلياً إلى Upstash
+                db.hset(LANG_KEY, values=missing)
+            return merged
+        except Exception as e:
+            print(f"Could not load langs from Upstash: {e}")
+    return langs
+
+
+user_lang = load_langs()
+
+
+def load_users():
+    users = set(user_lang.keys())
+    if db:
+        try:
+            remote = {str(u) for u in (db.smembers(USERS_KEY) or [])}
+            missing = users - remote
+            if missing:
+                db.sadd(USERS_KEY, *missing)
+            users |= remote
+        except Exception as e:
+            print(f"Could not load users from Upstash: {e}")
+    return users
+
+
+known_users = load_users()
+
+
+def save_lang(user_id, lang):
+    uid = str(user_id)
+    user_lang[uid] = lang
+    if db:
+        try:
+            db.hset(LANG_KEY, uid, lang)
+        except Exception as e:
+            print(f"Could not save lang to Upstash: {e}")
+    save_langs()
+
+
+def register_user(user_id):
+    """يسجّل الآيدي في قائمة البث (أي واحد تفاعل مع البوت)."""
+    uid = str(user_id)
+    if uid in known_users:
+        return
+    known_users.add(uid)
+    if db:
+        try:
+            db.sadd(USERS_KEY, uid)
+        except Exception as e:
+            print(f"Could not register user: {e}")
+
+
+def remove_user(user_id):
+    """يحذف اللي بلوكا البوت من قائمة البث."""
+    uid = str(user_id)
+    known_users.discard(uid)
+    if db:
+        try:
+            db.srem(USERS_KEY, uid)
+        except Exception as e:
+            print(f"Could not remove user: {e}")
+
+
+def db_get_int(key, default=0):
+    if db:
+        try:
+            value = db.get(key)
+            return int(value) if value is not None else default
+        except Exception as e:
+            print(f"db_get_int error: {e}")
+    return default
+
+
+def db_set(key, value):
+    if db:
+        try:
+            db.set(key, value)
+        except Exception as e:
+            print(f"db_set error: {e}")
 
 
 def get_lang(user_id):
@@ -484,12 +599,13 @@ def tr(item, field, lang):
 
 
 def set_user_commands(chat_id, lang):
-    # زر Menu: "تغيير اللغة" و"الدعم" بلغة الزبون
+    # زر Menu: "تغيير اللغة" و"الدعم" و"تحديث" بلغة الزبون
     if BotCommand is None:
         return
     try:
         bot.set_my_commands(
             [
+                BotCommand("update", t(lang, "cmd_update")),
                 BotCommand("language", t(lang, "cmd_language")),
                 BotCommand("support", t(lang, "cmd_support")),
             ],
@@ -506,6 +622,7 @@ def set_default_commands():
     try:
         bot.set_my_commands(
             [
+                BotCommand("update", "🔄 تحديث / Refresh / Actualiser"),
                 BotCommand("language", "🌐 اللغة / Language / Langue"),
                 BotCommand("support", "💬 الدعم / Support"),
             ]
@@ -532,10 +649,11 @@ def generate_store_keyboard(lang):
 
 
 def build_reply_keyboard(lang):
-    # القائمة السفلية الثابتة (Menu): ابدأ / المنتجات / الدعم / اللغة
+    # القائمة السفلية الثابتة (Menu): ابدأ / المنتجات / الدعم / اللغة / تحديث
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row(KeyboardButton(t(lang, "kb_start")), KeyboardButton(t(lang, "kb_products")))
     markup.row(KeyboardButton(t(lang, "kb_support")), KeyboardButton(t(lang, "kb_lang")))
+    markup.row(KeyboardButton(t(lang, "kb_update")))
     return markup
 
 
@@ -548,6 +666,7 @@ KB_START_TEXTS = {TEXTS[l]["kb_start"] for l in SUPPORTED_LANGS}
 KB_PRODUCTS_TEXTS = {TEXTS[l]["kb_products"] for l in SUPPORTED_LANGS}
 KB_SUPPORT_TEXTS = {TEXTS[l]["kb_support"] for l in SUPPORTED_LANGS}
 KB_LANG_TEXTS = {TEXTS[l]["kb_lang"] for l in SUPPORTED_LANGS}
+KB_UPDATE_TEXTS = {TEXTS[l]["kb_update"] for l in SUPPORTED_LANGS}
 
 
 def send_language_menu(chat_id):
@@ -573,6 +692,7 @@ def send_main_menu(chat_id, lang):
 
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
+    register_user(message.from_user.id)
     uid = str(message.from_user.id)
     if uid in user_lang:
         lang = get_lang(uid)
@@ -583,13 +703,34 @@ def send_welcome(message):
         send_language_menu(message.chat.id)
 
 
+def refresh_for_user(chat_id, user_id):
+    """يعيد فتح القائمة للزبون: مفيدة للزبانة القدامى اللي بديو خدمو البوت من زمان
+    ويحتاجو غير يضغطو 'تحديث' باش تتحدّث عندهم القائمة والأزرار الجديدة."""
+    register_user(user_id)
+    uid = str(user_id)
+    if uid in user_lang:
+        lang = get_lang(uid)
+        set_user_commands(chat_id, lang)
+        send_persistent_menu(chat_id, lang)
+        send_main_menu(chat_id, lang)
+    else:
+        send_language_menu(chat_id)
+
+
+@bot.message_handler(commands=["update", "refresh"])
+def update_command(message):
+    refresh_for_user(message.chat.id, message.from_user.id)
+
+
 @bot.message_handler(commands=["language", "lang"])
 def choose_language(message):
+    register_user(message.from_user.id)
     send_language_menu(message.chat.id)
 
 
 @bot.message_handler(commands=["support"])
 def support_command(message):
+    register_user(message.from_user.id)
     lang = get_lang(message.from_user.id)
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK))
@@ -633,8 +774,8 @@ def handle_set_lang(call):
     if lang not in SUPPORTED_LANGS:
         bot.answer_callback_query(call.id)
         return
-    user_lang[str(call.from_user.id)] = lang
-    save_langs()
+    save_lang(call.from_user.id, lang)
+    register_user(call.from_user.id)
     set_user_commands(call.message.chat.id, lang)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -658,12 +799,14 @@ def handle_change_lang(call):
 # ---------- أزرار القائمة السفلية الثابتة (Menu) ----------
 @bot.message_handler(func=lambda m: m.text in KB_START_TEXTS)
 def handle_kb_start(message):
+    register_user(message.from_user.id)
     lang = get_lang(message.from_user.id)
     bot.send_message(message.chat.id, t(lang, "start_guide"))
 
 
 @bot.message_handler(func=lambda m: m.text in KB_PRODUCTS_TEXTS)
 def handle_kb_products(message):
+    register_user(message.from_user.id)
     lang = get_lang(message.from_user.id)
     send_main_menu(message.chat.id, lang)
 
@@ -675,7 +818,13 @@ def handle_kb_support(message):
 
 @bot.message_handler(func=lambda m: m.text in KB_LANG_TEXTS)
 def handle_kb_lang(message):
+    register_user(message.from_user.id)
     send_language_menu(message.chat.id)
+
+
+@bot.message_handler(func=lambda m: m.text in KB_UPDATE_TEXTS)
+def handle_kb_update(message):
+    refresh_for_user(message.chat.id, message.from_user.id)
 
 
 # ---------- عرض المنتج ----------
@@ -688,6 +837,8 @@ def handle_product_view(call):
         return
 
     lang = get_lang(call.from_user.id)
+    if call.message.chat.type == "private":
+        register_user(call.from_user.id)
 
     # إشعار فوري لك عند اختيار الزبون للمنتج
     notify_admin(call.from_user, selected_product, lang)
@@ -789,12 +940,88 @@ def handle_notify(call):
 set_default_commands()
 
 
-# ---------- إرسال منتج واحد كل ساعة تلقائياً ----------
+# ---------- إشعار جماعي للزبانة القدامى بأن هناك زر تحديث جديد ----------
+UPDATE_ANNOUNCE_TEXTS = {
+    "ar": "📢 حدّثنا البوت! اضغط على زر «🔄 تحديث» في الأسفل (أو أرسل /update) باش تشوف آخر تحديث فالمنتجات.",
+    "en": "📢 The bot got an update! Tap the “🔄 Refresh” button below (or send /update) to see the latest products.",
+    "fr": "📢 Le bot a été mis à jour ! Appuyez sur le bouton « 🔄 Actualiser » en bas (ou envoyez /update) pour voir les derniers produits.",
+}
+
+
+@bot.message_handler(commands=["broadcast_update"])
+def broadcast_update_button(message):
+    # فقط أنت (ADMIN_CHAT_ID) تقدر تشغّل هاذ الأمر
+    if str(message.chat.id) != str(ADMIN_CHAT_ID):
+        return
+    sent, failed = 0, 0
+    for uid_str in list(known_users):
+        lang = get_lang(uid_str)
+        try:
+            bot.send_message(
+                int(uid_str),
+                UPDATE_ANNOUNCE_TEXTS.get(lang, UPDATE_ANNOUNCE_TEXTS["ar"]),
+                reply_markup=build_reply_keyboard(lang),
+            )
+            sent += 1
+        except ApiTelegramException as e:
+            failed += 1
+            if e.error_code == 403:
+                remove_user(uid_str)
+        except Exception as e:
+            failed += 1
+            print(f"broadcast_update: failed for {uid_str}: {e}")
+        time.sleep(0.05)  # تفادي تجاوز حدود تيليغرام
+    bot.send_message(message.chat.id, f"✅ تم الإرسال إلى {sent} زبون. فشل: {failed}.")
+
+
+@bot.message_handler(commands=["stats"])
+def stats_command(message):
+    if str(message.chat.id) != str(ADMIN_CHAT_ID):
+        return
+    storage = "Upstash ✅" if db else "ملف محلي فقط ⚠️ (Upstash غير متصل)"
+    bot.reply_to(message, f"👥 عدد الزبانة المسجلين: {len(known_users)}\n🗄️ التخزين: {storage}")
+
+
+# ---------- إرسال منتج واحد تلقائياً: للقناة + لكل الزبانة ----------
 def get_broadcastable_products():
     return [p for p in products if p.get("type") != "separator"]
 
 
-def send_single_product_broadcast(chat_id, item):
+def _retry_after(e):
+    try:
+        return int(e.result_json.get("parameters", {}).get("retry_after", 5))
+    except Exception:
+        return 5
+
+
+def send_product_post(chat_id, item, caption, markup):
+    """True = وصلت | False = الزبون بلوكا البوت/حذف حسابو | None = خطأ مؤقت"""
+    photo = item.get("image", UNIFIED_IMAGE_URL)
+    for _ in range(3):
+        try:
+            try:
+                bot.send_photo(chat_id, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
+            except ApiTelegramException as e:
+                if e.error_code in (403, 429):
+                    raise
+                bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
+            return True
+        except ApiTelegramException as e:
+            if e.error_code == 429:
+                time.sleep(_retry_after(e) + 1)
+                continue
+            if e.error_code == 403 or "chat not found" in str(e).lower():
+                return False
+            print(f"Broadcast error to {chat_id}: {e}")
+            return None
+        except Exception as e:
+            print(f"Broadcast error to {chat_id}: {e}")
+            return None
+    return None
+
+
+def send_channel_post(chat_id, item):
+    # في القناة: زر برابط يفتح البوت (أزرار callback ما تنفعش في القنوات)
     stock_display = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
     caption = (
         f"{item['icon']} <b>{html.escape(item['name'])}</b>\n\n"
@@ -802,31 +1029,72 @@ def send_single_product_broadcast(chat_id, item):
         f"💰 Price: {html.escape(item['price'])}"
     )
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text="🛒 Buy now", callback_data=f"buy_{item['id']}"))
-    photo = item.get("image", UNIFIED_IMAGE_URL)
-    try:
-        bot.send_photo(chat_id, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
-    except Exception as e:
-        print(f"Broadcast error (photo): {e}")
-        try:
-            bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
-        except Exception as e2:
-            print(f"Broadcast error (fallback): {e2}")
+    markup.add(InlineKeyboardButton(text="🛒 Buy now", url=BOT_LINK))
+    return send_product_post(chat_id, item, caption, markup)
 
 
-def hourly_broadcast_loop():
+def send_user_post(user_id, item):
+    # للزبون في الخاص: بلغتو، والزر يفتح تفاصيل المنتج مباشرة
+    lang = get_lang(user_id)
+    stock_display = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
+    caption = (
+        f"{item['icon']} <b>{html.escape(tr(item, 'name', lang))}</b>\n\n"
+        f"{t(lang, 'available')} {html.escape(stock_display)}\n"
+        f"{t(lang, 'price')} {html.escape(item['price'])}"
+    )
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text=t(lang, "order_now"), callback_data=f"buy_{item['id']}"))
+    return send_product_post(int(user_id), item, caption, markup)
+
+
+def channel_round(item):
+    send_channel_post(BROADCAST_CHAT_ID, item)
+
+
+def users_round(item):
+    sent = blocked = 0
+    for uid in list(known_users):
+        if uid == str(BROADCAST_CHAT_ID):
+            continue
+        result = send_user_post(uid, item)
+        if result is True:
+            sent += 1
+        elif result is False:
+            remove_user(uid)
+            blocked += 1
+        time.sleep(0.05)  # تفادي حدود تيليغرام
+    print(f"Users broadcast '{item['id']}': sent={sent}, removed={blocked}")
+
+
+def run_broadcast_loop(name, interval, send_round):
     items = get_broadcastable_products()
     if not items:
         return
-    index = 0
+    # نحفظ آخر إرسال ورقم المنتج في Upstash، باش إعادة تشغيل Render ما تعاودش الإرسال من الصفر
+    index = db_get_int(f"{name}_bc_index", 0)
+    last = db_get_int(f"{name}_bc_last", 0)
+    wait = last + interval - int(time.time())
+    if wait > 0:
+        time.sleep(wait)
     while True:
-        item = items[index % len(items)]
-        send_single_product_broadcast(BROADCAST_CHAT_ID, item)
+        try:
+            send_round(items[index % len(items)])
+        except Exception as e:
+            print(f"Broadcast round '{name}' failed: {e}")
         index += 1
-        time.sleep(BROADCAST_INTERVAL_SECONDS)
+        db_set(f"{name}_bc_index", index)
+        db_set(f"{name}_bc_last", int(time.time()))
+        time.sleep(interval)
 
 
-threading.Thread(target=hourly_broadcast_loop, daemon=True).start()
+threading.Thread(
+    target=run_broadcast_loop, args=("channel", BROADCAST_INTERVAL_SECONDS, channel_round), daemon=True
+).start()
+
+if USER_BROADCAST_ENABLED:
+    threading.Thread(
+        target=run_broadcast_loop, args=("users", USER_BROADCAST_INTERVAL_SECONDS, users_round), daemon=True
+    ).start()
 
 print("Bot is running...")
 bot.infinity_polling()
