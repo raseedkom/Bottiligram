@@ -68,11 +68,16 @@ GIFT_VARIANTS = {
     ],
 }
 
-PICK_AMOUNT = {
-    "ar": "👇 اختر قيمة البطاقة:",
-    "en": "👇 Choose the card amount:",
-    "fr": "👇 Choisissez la valeur de la carte :",
-}
+def clean_gift_description(text):
+    """يحذف قائمة أسعار القيم من وصف بطاقات الهداية (يبقى الوصف فقط)."""
+    lines = [
+        l for l in text.split("\n")
+        if not ("Apple Gift Card" in l and "▶" in l) and not l.strip().startswith("🎁")
+    ]
+    out = "\n".join(lines)
+    while "\n\n\n" in out:
+        out = out.replace("\n\n\n", "\n\n")
+    return out.strip()
 
 # ========== إعدادات الدفع التلقائي ==========
 BINANCE_PAY_ID = os.environ.get("BINANCE_PAY_ID", "878309128")  # معرف حسابك في Binance Pay
@@ -116,6 +121,8 @@ TEXTS = {
         "support_msg": "💬 للدعم والطلبات، تواصل معي مباشرة في الخاص 👇",
         "support_btn": "💬 تواصل مع الدعم",
         "buy_hint": "🛒 لإتمام الطلب والشراء، اضغط على زر 'اطلب الآن 🛒' لتتوجه مباشرة للخاص.",
+        "choose_card": "🛒 لإتمام الطلب اختر بطاقتك",
+        "thanks": "🤍 شكرا على ثقتكم 🤍",
         "out_of_stock": "❌ هذا المنتج نفد من المخزون حالياً.\n🛒 للاستفسار أو الطلب المسبق، اضغط على 'اطلب الآن'.",
         "kb_start": "🚀 ابدأ",
         "kb_products": "🛍️ المنتجات",
@@ -166,6 +173,8 @@ TEXTS = {
         "support_msg": "💬 For support and orders, contact me directly in private 👇",
         "support_btn": "💬 Contact support",
         "buy_hint": "🛒 To complete your order, tap 'Order now 🛒' to go directly to the private chat.",
+        "choose_card": "🛒 To complete your order, choose your card",
+        "thanks": "🤍 Thank you for your trust 🤍",
         "out_of_stock": "❌ This product is currently out of stock.\n🛒 For questions or pre-orders, tap 'Order now'.",
         "kb_start": "🚀 Start",
         "kb_products": "🛍️ Products",
@@ -216,6 +225,8 @@ TEXTS = {
         "support_msg": "💬 Pour l'assistance et les commandes, contactez-moi directement en privé 👇",
         "support_btn": "💬 Contacter l'assistance",
         "buy_hint": "🛒 Pour finaliser votre commande, appuyez sur « Commander maintenant 🛒 » pour aller directement en privé.",
+        "choose_card": "🛒 Pour finaliser votre commande, choisissez votre carte",
+        "thanks": "🤍 Merci de votre confiance 🤍",
         "out_of_stock": "❌ Ce produit est actuellement en rupture de stock.\n🛒 Pour toute question ou précommande, appuyez sur « Commander maintenant ».",
         "kb_start": "🚀 Commencer",
         "kb_products": "🛍️ Produits",
@@ -951,9 +962,11 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
             text = t(lang, "delivered").format(
                 product=pname, amount=html.escape(str(claim.get("paid"))), codes=codes_html
             )
+            delivered_ok = True
             try:
                 bot.send_message(chat_id, text, parse_mode="HTML")
             except Exception as e:
+                delivered_ok = False
                 alert_admin(
                     f"⚠️ <b>تعذر إرسال الكود للزبون</b> <code>{uid}</code>\n"
                     f"🧾 <code>{html.escape(canon)}</code>\n" + codes_html
@@ -961,6 +974,14 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
                 print(f"deliver failed: {e}")
             mark("delivered")
             clear_pending(uid)
+
+            # رسالة الشكر: تُرسل مرة واحدة فقط، بعد تسليم الكود فعلياً، ولا تؤثر على التسليم
+            if delivered_ok:
+                try:
+                    bot.send_message(chat_id, t(lang, "thanks"))
+                except Exception as e:
+                    print(f"thanks message failed: {e}")
+
             margin = ""
             if cost is not None and price:
                 diff = price - cost
@@ -1409,7 +1430,7 @@ def handle_kb_lang(message):
 def handle_kb_update(message):
     refresh_for_user(message.chat.id, message.from_user.id)
 
-# ========== بطاقات الهداية: أزرار القيم (بدون وصف) ==========
+# ========== بطاقات الهداية: صفحة المنتج (الوصف + أزرار القيم) ==========
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_") and find_product(call.data[4:]) and find_product(call.data[4:]).get("id") in GIFT_VARIANTS)
 def handle_gift_card_select(call):
     product_id = call.data.replace("buy_", "")
@@ -1425,7 +1446,7 @@ def handle_gift_card_select(call):
     # إشعار الأدمن بأن الزبون اختار بطاقة هداية
     notify_admin(call.from_user, selected_product, lang)
 
-    # أزرار القيم (زر لكل قيمة، مثل أزرار المنتجات)
+    # أزرار القيم (زر لكل قيمة) + رجوع
     gift_markup = InlineKeyboardMarkup(row_width=1)
     for i, (label, price) in enumerate(GIFT_VARIANTS[product_id]):
         gift_markup.add(InlineKeyboardButton(
@@ -1434,15 +1455,20 @@ def handle_gift_card_select(call):
         ))
     gift_markup.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
 
-    gift_caption = (
-        f"{t(lang, 'chosen')} *{tr(selected_product, 'name', lang)}*\n\n"
-        f"{PICK_AMOUNT[lang]}"
+    # نفس شكل صفحة المنتج: اخترت + السعر + المتوفر + الوصف (بدون أسعار القيم) + سطر التوجيه
+    caption = (
+        f"{t(lang, 'chosen')} *{tr(selected_product, 'name', lang)}*\n"
+        f"{t(lang, 'price')} *{selected_product['price']}*\n"
+        f"{t(lang, 'available')} *♾️*\n\n"
+        f"{t(lang, 'description')}\n"
+        f"{clean_gift_description(tr(selected_product, 'description', lang))}\n\n"
+        f"{t(lang, 'choose_card')}"
     )
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
-    send_card(call.message.chat.id, selected_product, gift_caption, gift_markup)
+    send_card(call.message.chat.id, selected_product, caption, gift_markup)
     bot.answer_callback_query(call.id)
 
 # ========== اختيار قيمة بطاقة الهداية ← شاشة الدفع مباشرة ==========
