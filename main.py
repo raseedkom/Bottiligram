@@ -41,6 +41,10 @@ TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID", "8491461365")
 bot = telebot.TeleBot(TOKEN)
 
+# ========== بوت المراقبة (إشعارات مهمة فقط) ==========
+MONITOR_BOT_TOKEN = os.environ.get("MONITOR_BOT_TOKEN", "")
+MONITOR_CHAT_ID = os.environ.get("MONITOR_CHAT_ID", ADMIN_CHAT_ID)
+
 BROADCAST_CHAT_ID = os.environ.get("BROADCAST_CHAT_ID", ADMIN_CHAT_ID)
 BROADCAST_INTERVAL_SECONDS = int(os.environ.get("BROADCAST_INTERVAL_SECONDS", 1200))
 USER_BROADCAST_INTERVAL_SECONDS = int(os.environ.get("USER_BROADCAST_INTERVAL_SECONDS", 7200))
@@ -754,6 +758,39 @@ def pend_list():
             return []
     return list(_mem_pend)
 
+def _user_link(uid):
+    return f'<a href="tg://user?id={uid}">{uid}</a>'
+
+def monitor_send(text, key=None, cooldown=0):
+    """يرسل إشعاراً لبوت المراقبة. key+cooldown (ثواني) لمنع تكرار نفس التنبيه."""
+    if not MONITOR_BOT_TOKEN:
+        return
+    if key and cooldown:
+        try:
+            if not kv_set(f"rk:mon:{key}", "1", ex=cooldown, nx=True):
+                return
+        except StorageError:
+            pass
+
+    def _do():
+        try:
+            r = requests.post(
+                f"https://api.telegram.org/bot{MONITOR_BOT_TOKEN}/sendMessage",
+                json={
+                    "chat_id": MONITOR_CHAT_ID,
+                    "text": text[:3900],
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
+                },
+                timeout=15,
+            )
+            if r.status_code != 200:
+                print(f"monitor_send http {r.status_code}: {r.text[:200]}")
+        except Exception as e:
+            print(f"monitor_send failed: {e}")
+
+    threading.Thread(target=_do, daemon=True).start()
+
 def create_invoice(user_id, product_id, label, price_usdt, product_name):
     """ينشئ فاتورة جديدة ويربطها بالزبون، يرجع invoice_id."""
     invoice_id = uuid.uuid4().hex[:10]
@@ -797,6 +834,8 @@ def gemini_stock():
         return int(db.llen(GEMINI_LINKS_KEY) or 0)
     except Exception as e:
         print(f"gemini_stock error: {e}")
+        monitor_send(f"🚨 <b>مشكل في الاتصال بـ Upstash</b>\n<code>{html.escape(str(e))[:300]}</code>",
+                     key="upstash_err", cooldown=1800)
         return 0
 
 def sync_stock():
@@ -862,6 +901,7 @@ def _fulfill_gemini(chat_id, uid, lang, claim, canon, retry, mark, failed):
         bot.send_message(chat_id, text, parse_mode="HTML", disable_web_page_preview=True)
     except Exception as e:
         print(f"gemini deliver failed: {e}")
+        monitor_send(f"⚠️ <b>تعذر إرسال رابط Gemini للزبون</b> {_user_link(uid)}\nالروابط وصلتك في البوت الرئيسي.")
         alert_admin(f"⚠️ <b>تعذر إرسال روابط Gemini للزبون</b> <code>{uid}</code>\n"
                     f"🧾 <code>{html.escape(canon)}</code>\n" + "\n".join(html.escape(x) for x in links))
     mark("delivered")
@@ -873,6 +913,18 @@ def _fulfill_gemini(chat_id, uid, lang, claim, canon, retry, mark, failed):
         + f"\n📦 {pname}\n👤 <code>{uid}</code>\n💵 مدفوع: {claim.get('paid')} USDT\n"
         f"📉 المخزون المتبقي: {left}" + (" ⚠️ اقترب من النفاد!" if left <= 2 else "")
     )
+    monitor_send(
+        f"✅ <b>شراء جديد</b>\n\n📦 {pname}\n👤 {_user_link(uid)}\n"
+        f"💵 {claim.get('paid')} USDT\n📉 المخزون المتبقي: {left}"
+    )
+    if left <= 0:
+        monitor_send(
+            "📭 <b>مخزون Gemini نفد!</b>\nزيد روابط في Upstash:\n"
+            f"<code>RPUSH {GEMINI_LINKS_KEY} \"link\"</code>",
+            key="gem_empty", cooldown=3600,
+        )
+    elif left <= 2:
+        monitor_send(f"⚠️ <b>مخزون Gemini قارب النفاد</b>: {left} فقط", key="gem_low", cooldown=3600)
 
 # ============================================================
 # ========== Binance Pay: التحقق من الدفع ==========
@@ -1192,6 +1244,7 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
         mark("paid_pending")
         if not retry and first_time:
             alert_admin(admin_text)
+            monitor_send("⏳ <b>طلب معلّق</b>\n\n" + admin_text)
         if not retry:
             bot.send_message(chat_id, t(lang, "processing"), reply_markup=support_markup(lang))
 
@@ -1245,6 +1298,7 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
                     f"🧾 <code>{html.escape(canon)}</code>\n" + codes_html
                 )
                 print(f"deliver failed: {e}")
+                monitor_send(f"⚠️ <b>تعذر إرسال الكود للزبون</b> {_user_link(uid)}\nالكود وصلك في البوت الرئيسي.")
             mark("delivered")
             clear_pending(uid)
 
@@ -1266,6 +1320,10 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
                 f"💵 مدفوع: {claim.get('paid')} USDT"
                 + (f" | تكلفة FAZER: {cost}$" if cost is not None else "") + margin
             )
+            monitor_send(
+                f"✅ <b>شراء جديد</b>\n\n📦 {pname}\n👤 {_user_link(uid)}\n"
+                f"💵 {claim.get('paid')} USDT" + margin
+            )
             return
         # الطلب مقبول لكن بلا أكواد بعد (نفس المفتاح يرجع نفس الطلب لاحقاً)
         failed(
@@ -1279,6 +1337,17 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
     err = ""
     if isinstance(data, dict):
         err = f"{data.get('code', '')} {data.get('error', '')}"
+    try:
+        raw_err = json.dumps(data, ensure_ascii=False)[:500]
+    except Exception:
+        raw_err = str(data)[:500]
+    if status == 402 or re.search(r"balance|insufficient|funds|credit|رصيد", f"{err} {raw_err}", re.I):
+        monitor_send(
+            "🚨 <b>رصيد FAZER خالص أو غير كافٍ!</b>\n\n"
+            "اشحن الحساب، والبوت يكمل الطلبات المعلقة وحدو.\n"
+            f"<code>{html.escape(err.strip())[:200]}</code>",
+            key="fazer_balance", cooldown=1800,
+        )
     # رفض واضح (4xx) = لم يُنشأ طلب، فنستعمل مفتاحاً جديداً في المحاولة القادمة
     if status in (400, 402, 403, 404, 422):
         claim["idem_n"] = n + 1
@@ -1300,6 +1369,7 @@ def retry_pending_orders():
         if time.time() - float(claim.get("ts", time.time())) > 3 * 86400:
             pend_remove(canon)
             alert_admin(f"⌛ توقفت إعادة المحاولة (مرت 3 أيام) للعملية <code>{html.escape(canon)}</code> — الزبون <code>{claim.get('user_id')}</code>. سلّم يدوياً.")
+            monitor_send(f"⌛ <b>توقفت إعادة المحاولة (3 أيام)</b>\n🧾 <code>{html.escape(canon)}</code>\n👤 {_user_link(claim.get('user_id'))}\nسلّم يدوياً.")
             continue
         uid = claim["user_id"]
         try:
@@ -1339,6 +1409,10 @@ def process_order_id(message, order_id):
             f"⌛ زبون <code>{uid}</code> أرسل رقم عملية بعد انتهاء الفاتورة\n"
             f"📦 {html.escape(invoice['product_name'])}\n🧾 <code>{html.escape(order_id)}</code>"
         )
+        monitor_send(
+            f"⌛ <b>زبون أرسل رقم عملية بعد انتهاء الفاتورة</b>\n\n"
+            f"📦 {html.escape(invoice['product_name'])}\n👤 {_user_link(uid)}\n🧾 <code>{html.escape(order_id)}</code>"
+        )
         bot.send_message(chat_id, t(lang, "expired"), reply_markup=support_markup(lang))
         return
 
@@ -1357,6 +1431,8 @@ def process_order_id(message, order_id):
     except BinanceError as e:
         print(f"binance error: {e}")
         alert_admin(f"🚨 <b>خطأ Binance أثناء التحقق</b>\n<code>{html.escape(str(e))[:400]}</code>")
+        monitor_send(f"🚨 <b>خطأ Binance أثناء التحقق</b>\n<code>{html.escape(str(e))[:300]}</code>",
+                     key="binance_err", cooldown=900)
         bot.send_message(chat_id, t(lang, "no_binance"), reply_markup=support_markup(lang))
         return
 
@@ -1788,6 +1864,8 @@ def handle_gift_variant(call):
     try:
         mapping = fazer_resolve(product_id, label, allow_fetch=False)
         if mapping and mapping.get("stock") is not None and int(mapping["stock"]) <= 0:
+            monitor_send(f"📦 <b>نفدت قيمة في FAZER</b>\n{html.escape(product['name'])} — {html.escape(label)}",
+                         key=f"fz_out_{product_id}_{label}", cooldown=3600)
             bot.answer_callback_query(call.id, t(lang, "out_variant"), show_alert=True)
             return
     except Exception:
@@ -1824,6 +1902,16 @@ def handle_copy_id(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("cancel_"))
 def handle_cancel_invoice(call):
     lang = get_lang(call.from_user.id)
+    try:
+        _inv_id = get_pending_invoice_id(call.from_user.id)
+        _inv = get_invoice(_inv_id) if _inv_id else None
+    except StorageError:
+        _inv = None
+    if _inv:
+        monitor_send(
+            f"❌ <b>إلغاء فاتورة</b>\n\n📦 {html.escape(_inv['product_name'])}\n"
+            f"💵 {html.escape(str(_inv['price_usdt']))} USDT\n👤 {_user_link(call.from_user.id)}"
+        )
     clear_pending(call.from_user.id)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -2169,5 +2257,6 @@ def fazer_catalog_refresher():
 threading.Thread(target=fazer_catalog_refresher, daemon=True).start()
 threading.Thread(target=pending_retry_loop, daemon=True).start()
 
+monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)
 print("Bot is running...")
 bot.infinity_polling()
