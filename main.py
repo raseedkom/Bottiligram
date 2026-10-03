@@ -522,6 +522,10 @@ products = [
     },
 ]
 
+# ========== التحكم في الأسعار من تيليغرام (الأدمن فقط) ==========
+PRICES_KEY = "rk:prices"  # hash في Upstash: product_id -> السعر
+BASE_PRICES = {p["id"]: p["price"] for p in products if p.get("type") != "separator"}
+
 LANG_FILE = "user_lang.json"
 LANG_KEY = "user_lang"
 USERS_KEY = "all_users"
@@ -838,7 +842,45 @@ def gemini_stock():
                      key="upstash_err", cooldown=1800)
         return 0
 
+_PRICE_RE = re.compile(r"\$\d+(\.\d+)?")
+
+def editable_products():
+    """المنتجات ذات السعر الواحد فقط (بدون النطاقات مثل بطاقات الهداية وFree Fire)."""
+    return [
+        p for p in products
+        if p.get("type") != "separator"
+        and p["id"] not in GIFT_VARIANTS
+        and _PRICE_RE.fullmatch(BASE_PRICES.get(p["id"], ""))
+    ]
+
+def sync_prices():
+    """يقرأ الأسعار من Upstash ويطبقها على قائمة products (أو يرجع الأصلي إذا حُذف التعديل)."""
+    if not db:
+        return
+    try:
+        data = {str(k): str(v) for k, v in (db.hgetall(PRICES_KEY) or {}).items()}
+    except Exception as e:
+        print(f"sync_prices error: {e}")
+        return
+    for p in editable_products():
+        if p["id"] in data:
+            try:
+                p["price"] = f"${Decimal(data[p['id']]):.2f}"
+            except InvalidOperation:
+                pass
+        else:
+            p["price"] = BASE_PRICES[p["id"]]
+
+def gemini_unit_price():
+    sync_prices()
+    p = find_product(GEMINI_ID)
+    try:
+        return Decimal(p["price"].lstrip("$"))
+    except Exception:
+        return GEMINI_UNIT_PRICE
+
 def sync_stock():
+    sync_prices()
     p = find_product(GEMINI_ID)
     if p:
         p["stock"] = gemini_stock()
@@ -1566,14 +1608,14 @@ def set_user_commands(chat_id, lang):
     if BotCommand is None:
         return
     try:
-        bot.set_my_commands(
-            [
-                BotCommand("update", t(lang, "cmd_update")),
-                BotCommand("language", t(lang, "cmd_language")),
-                BotCommand("support", t(lang, "cmd_support")),
-            ],
-            scope=BotCommandScopeChat(chat_id),
-        )
+        cmds = [
+            BotCommand("update", t(lang, "cmd_update")),
+            BotCommand("language", t(lang, "cmd_language")),
+            BotCommand("support", t(lang, "cmd_support")),
+        ]
+        if str(chat_id) == str(ADMIN_CHAT_ID):
+            cmds.append(BotCommand("prices", "💲 التحكم في الأسعار"))
+        bot.set_my_commands(cmds, scope=BotCommandScopeChat(chat_id))
     except Exception as e:
         print(f"Could not set commands: {e}")
 
@@ -1979,7 +2021,7 @@ def handle_gemini_qty(call):
         return
 
     product = find_product(GEMINI_ID)
-    price = str((GEMINI_UNIT_PRICE * qty).quantize(Decimal("0.01")))
+    price = str((gemini_unit_price() * qty).quantize(Decimal("0.01")))
     label = f"x{qty}"
     full_name = f"{product['name']} — {label}"
 
@@ -2011,6 +2053,7 @@ def handle_product_view(call):
     if not selected_product:
         bot.answer_callback_query(call.id)
         return
+    sync_prices()
 
     lang = get_lang(call.from_user.id)
     if call.message.chat.type == "private":
@@ -2080,6 +2123,198 @@ def handle_notify(call):
         text=t(lang, "notify_ok"),
         show_alert=True,
     )
+
+# ============================================================
+# ========== لوحة التحكم في الأسعار (الأدمن فقط) ==========
+# ============================================================
+PRICE_STEPS = ("-1", "-0.5", "+0.5", "+1")
+_price_wait = {}  # admin_id -> product_id (ينتظر سعراً يدوياً)
+
+def _is_admin_user(user_id):
+    return str(user_id) == str(ADMIN_CHAT_ID)
+
+def _cur_price(p):
+    return Decimal(p["price"].lstrip("$"))
+
+def _parse_price(text):
+    try:
+        v = Decimal(text.strip().replace("$", "").replace(",", ".").replace("،", "."))
+    except InvalidOperation:
+        return None
+    if v <= 0 or v > 1000:
+        return None
+    return v.quantize(Decimal("0.01"))
+
+def _save_price(pid, value):
+    """يحفظ في Upstash (يقرأه بوت المتجر فوراً) ويحدّث الذاكرة."""
+    if not db:
+        return False
+    db.hset(PRICES_KEY, pid, str(value))
+    p = find_product(pid)
+    if p:
+        p["price"] = f"${value:.2f}"
+    return True
+
+def _pr_show(chat_id, msg_id, text, markup):
+    try:
+        if msg_id:
+            bot.edit_message_text(text, chat_id, msg_id, parse_mode="HTML", reply_markup=markup)
+            return
+    except Exception as e:
+        if "not modified" in str(e).lower():
+            return
+    bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
+
+def show_price_list(chat_id, msg_id=None):
+    sync_prices()
+    markup = InlineKeyboardMarkup(row_width=1)
+    for p in editable_products():
+        markup.add(InlineKeyboardButton(
+            text=f"{p['icon']} {p['name']} | {p['price']}",
+            callback_data=f"pr_sel_{p['id']}",
+        ))
+    text = "💲 <b>التحكم في الأسعار</b>\nاختر المنتج:"
+    if not db:
+        text += "\n\n⚠️ Upstash غير متصل: التعديل لن يُحفظ."
+    _pr_show(chat_id, msg_id, text, markup)
+
+def show_price_panel(chat_id, msg_id, pid):
+    sync_prices()
+    p = find_product(pid)
+    if not p:
+        return show_price_list(chat_id, msg_id)
+    markup = InlineKeyboardMarkup()
+    markup.row(*[
+        InlineKeyboardButton(text=f"{s}$", callback_data=f"pr_adj_{pid}_{s}")
+        for s in PRICE_STEPS
+    ])
+    markup.add(InlineKeyboardButton(text="✏️ إدخال سعر يدوياً", callback_data=f"pr_man_{pid}"))
+    markup.add(InlineKeyboardButton(text="♻️ رجوع للسعر الأصلي", callback_data=f"pr_rst_{pid}"))
+    markup.add(InlineKeyboardButton(text="⬅️ القائمة", callback_data="pr_list"))
+    text = (
+        f"{p['icon']} <b>{html.escape(p['name'])}</b>\n\n"
+        f"💰 السعر الحالي: <b>{html.escape(p['price'])}</b>\n"
+        f"📌 السعر الأصلي: {html.escape(BASE_PRICES[pid])}"
+    )
+    _pr_show(chat_id, msg_id, text, markup)
+
+def _price_changed(pid, old, new):
+    p = find_product(pid)
+    monitor_send(
+        f"💲 <b>تغيير سعر</b>\n\n📦 {html.escape(p['name'])}\n"
+        f"{old} ➜ <b>${new:.2f}</b>"
+    )
+
+@bot.message_handler(commands=["settings", "prices"])
+def prices_command(message):
+    if not is_admin_msg(message):
+        return  # يتجاهل غير الأدمن بصمت
+    _price_wait.pop(message.from_user.id, None)
+    show_price_list(message.chat.id)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("pr_"))
+def handle_price_callbacks(call):
+    if not _is_admin_user(call.from_user.id):
+        bot.answer_callback_query(call.id)
+        return
+    chat_id, msg_id, data = call.message.chat.id, call.message.message_id, call.data
+    _price_wait.pop(call.from_user.id, None)
+
+    if data == "pr_list":
+        show_price_list(chat_id, msg_id)
+        bot.answer_callback_query(call.id)
+        return
+
+    if data.startswith("pr_sel_"):
+        show_price_panel(chat_id, msg_id, data[7:])
+        bot.answer_callback_query(call.id)
+        return
+
+    if data.startswith("pr_man_"):
+        pid = data[7:]
+        _price_wait[call.from_user.id] = pid
+        p = find_product(pid)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text="❌ إلغاء", callback_data=f"pr_sel_{pid}"))
+        _pr_show(chat_id, msg_id,
+                 f"✏️ أرسل السعر الجديد لـ <b>{html.escape(p['name'])}</b>\nمثال: <code>2.5</code>",
+                 markup)
+        bot.answer_callback_query(call.id)
+        return
+
+    if data.startswith("pr_rst_"):
+        pid = data[7:]
+        p = find_product(pid)
+        if not p or not db:
+            bot.answer_callback_query(call.id, "⚠️ Upstash غير متصل", show_alert=True)
+            return
+        old = p["price"]
+        try:
+            db.hdel(PRICES_KEY, pid)
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"خطأ: {str(e)[:150]}", show_alert=True)
+            return
+        p["price"] = BASE_PRICES[pid]
+        _price_changed(pid, old, _cur_price(p))
+        show_price_panel(chat_id, msg_id, pid)
+        bot.answer_callback_query(call.id, "♻️ تمت الاستعادة")
+        return
+
+    if data.startswith("pr_adj_"):
+        try:
+            pid, step = data[7:].rsplit("_", 1)
+            p = find_product(pid)
+            sync_prices()
+            old = p["price"]
+            new = (_cur_price(p) + Decimal(step)).quantize(Decimal("0.01"))
+        except Exception:
+            bot.answer_callback_query(call.id)
+            return
+        if new <= 0:
+            bot.answer_callback_query(call.id, "❌ السعر لا يمكن أن يكون 0 أو أقل", show_alert=True)
+            return
+        try:
+            ok = _save_price(pid, new)
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"خطأ: {str(e)[:150]}", show_alert=True)
+            return
+        if not ok:
+            bot.answer_callback_query(call.id, "⚠️ Upstash غير متصل", show_alert=True)
+            return
+        _price_changed(pid, old, new)
+        show_price_panel(chat_id, msg_id, pid)
+        bot.answer_callback_query(call.id, f"✅ ${new:.2f}")
+        return
+
+    bot.answer_callback_query(call.id)
+
+def _awaiting_price(m):
+    return (
+        bool(m.text) and not m.text.startswith("/")
+        and m.chat.type == "private" and _is_admin_user(m.from_user.id)
+        and m.from_user.id in _price_wait
+    )
+
+@bot.message_handler(func=_awaiting_price, content_types=["text"])
+def handle_manual_price(message):
+    pid = _price_wait.get(message.from_user.id)
+    value = _parse_price(message.text)
+    if value is None:
+        bot.reply_to(message, "❌ رقم غير صالح. أرسل مثلاً: 2.5")
+        return
+    p = find_product(pid)
+    old = p["price"]
+    try:
+        ok = _save_price(pid, value)
+    except Exception as e:
+        bot.reply_to(message, f"❌ خطأ في الحفظ: {str(e)[:200]}")
+        return
+    if not ok:
+        bot.reply_to(message, "⚠️ Upstash غير متصل، لم يُحفظ السعر.")
+        return
+    _price_wait.pop(message.from_user.id, None)
+    _price_changed(pid, old, value)
+    show_price_panel(message.chat.id, None, pid)
 
 # ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========
 ORDER_ID_RE = re.compile(r"[A-Za-z0-9_\-]{8,64}")
