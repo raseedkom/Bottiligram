@@ -100,6 +100,36 @@ MAX_ATTEMPTS = 8             # أقصى عدد محاولات إرسال رقم 
 FAZER_MANUAL_MAP = {
 }
 
+# ========== Gemini: دفع وتسليم تلقائي (الروابط في Upstash) ==========
+GEMINI_ID = "gemini_18m"
+GEMINI_LINKS_KEY = "rk:gemini:links"   # قائمة الروابط في Upstash
+GEMINI_UNIT_PRICE = Decimal("1.80")    # سعر الرابط الواحد
+GEMINI_QTYS = (1, 2)                   # الأعداد المتاحة
+
+GEMINI_TEXTS = {
+    "ar": {
+        "choose_qty": "🛒 اختر العدد الذي تريد شراءه",
+        "out_of_stock": "❌ هذا المنتج نفد من المخزون حالياً.",
+        "out": "❌ هذا المنتج نفد من المخزون حالياً.",
+        "qty_left": "❌ المتوفر حالياً {n} فقط، اختر عدداً أقل.",
+        "delivered": "✅ تم تأكيد الدفع!\n\n📧 إليك حسابك:\n—————————————\n\n{links}\n\n🛡️ الضمان: 0 يوم\n📌 احتفظ بهذه المعلومات في مكان آمن\n\n🙏 شكراً لشرائك!",
+    },
+    "en": {
+        "choose_qty": "🛒 Choose the quantity you want to buy",
+        "out_of_stock": "❌ This product is currently out of stock.",
+        "out": "❌ This product is currently out of stock.",
+        "qty_left": "❌ Only {n} available right now, choose a lower quantity.",
+        "delivered": "✅ Payment confirmed!\n\n📧 Here is your account:\n—————————————\n\n{links}\n\n🛡️ Warranty: 0 days\n📌 Keep this information in a safe place\n\n🙏 Thank you for your purchase!",
+    },
+    "fr": {
+        "choose_qty": "🛒 Choisissez la quantité à acheter",
+        "out_of_stock": "❌ Ce produit est actuellement en rupture de stock.",
+        "out": "❌ Ce produit est actuellement en rupture de stock.",
+        "qty_left": "❌ Seulement {n} disponible(s) pour le moment, choisissez une quantité plus petite.",
+        "delivered": "✅ Paiement confirmé !\n\n📧 Voici votre compte :\n—————————————\n\n{links}\n\n🛡️ Garantie : 0 jour\n📌 Conservez ces informations en lieu sûr\n\n🙏 Merci pour votre achat !",
+    },
+}
+
 CHOOSE_LANG_TEXT = "🌐 اختر لغتك\nChoose your language\nChoisissez votre langue"
 
 TEXTS = {
@@ -341,7 +371,7 @@ products = [
         "id": "gemini_18m",
         "name": "Gemini 18 months",
         "price": "$1.80",
-        "stock": 20,
+        "stock": 0,  # يُحدَّث تلقائياً من Upstash (عدد الروابط)
         "icon": "⚡",
         "image": "https://i.postimg.cc/52zRxRM3/IMG-3570.jpg",
         "description": "🤖 جيمني إي آي برو 18 شهراً [NW]\n⭐️ جيمني إي آي برو لمدة 18 شهراً\n✦ 🚫 تفعيل بدون بطاقة\n✦ ⏩ مساحة تخزين سحابي 5 تيرابايت على جوجل ون\n✦ 🚀 لا حاجة لشبكة افتراضية (VPN).\n\n✨ مميزات إضافية:\n- رصيد 1050 كريدي على Google Flow والصور مجاناً\n- عمل 3 فيديوهات مجاناً على Gemini كل يوم طيلة مدة الاشتراك (18 شهر)\n- طريقة التفعيل تكون على جيمايل خاص بك عن طريق رابط تفعيل فقط\n\nلقد اختبارته بنفسي لذلك لا يوجد استبدال\n🫶 ضمان لمدة 12 ساعة.",
@@ -757,6 +787,94 @@ def clear_pending(user_id):
         pass
 
 # ============================================================
+# ========== Gemini: المخزون والتسليم من Upstash ==========
+# ============================================================
+def gemini_stock():
+    """المخزون = عدد الروابط في Upstash."""
+    if not db:
+        return 0
+    try:
+        return int(db.llen(GEMINI_LINKS_KEY) or 0)
+    except Exception as e:
+        print(f"gemini_stock error: {e}")
+        return 0
+
+def sync_stock():
+    p = find_product(GEMINI_ID)
+    if p:
+        p["stock"] = gemini_stock()
+
+def _fulfill_gemini(chat_id, uid, lang, claim, canon, retry, mark, failed):
+    """يسحب الروابط من Upstash ويسلّمها. آمن ضد التسليم المزدوج."""
+    pname = html.escape(claim.get("product_name") or "Gemini")
+    try:
+        n = int(str(claim.get("label", "x1")).lstrip("x"))
+    except ValueError:
+        n = 1
+    out_key = f"rk:gem:out:{canon}"
+
+    try:
+        links = kv_get_json(out_key)
+    except StorageError:
+        failed(f"⚠️ <b>خطأ تخزين أثناء تسليم Gemini</b>\n👤 <code>{uid}</code>\n🧾 <code>{html.escape(canon)}</code>")
+        return
+
+    if not links:
+        if not db:
+            failed("⚠️ <b>Upstash غير متصل، لا يمكن تسليم Gemini</b>")
+            return
+        try:
+            got = db.lpop(GEMINI_LINKS_KEY, n)
+        except Exception as e:
+            failed(f"⚠️ <b>فشل قراءة روابط Gemini</b>\n{html.escape(str(e))[:300]}")
+            return
+        if got is None:
+            got = []
+        elif isinstance(got, str):
+            got = [got]
+        got = [str(x) for x in got]
+
+        if len(got) < n:
+            if got:
+                try:
+                    db.lpush(GEMINI_LINKS_KEY, *reversed(got))  # أرجعها
+                except Exception as e:
+                    print(f"gemini push back error: {e}")
+                    alert_admin("⚠️ تعذر إرجاع الروابط:\n" + "\n".join(html.escape(x) for x in got))
+            failed(
+                f"⚠️ <b>دفع مقبول لكن مخزون Gemini غير كافٍ</b>\n\n"
+                f"📦 {pname}\n👤 ID: <code>{uid}</code>\n💵 {claim.get('paid')} USDT\n"
+                f"🧾 <code>{html.escape(canon)}</code>\n\n"
+                f"أضف روابط من Upstash CLI:\n<code>RPUSH {GEMINI_LINKS_KEY} \"link\"</code>\n"
+                f"والبوت يسلّم تلقائياً خلال دقائق."
+            )
+            return
+        links = got
+        try:
+            kv_set(out_key, json.dumps(links), ex=30 * 86400)
+        except StorageError:
+            alert_admin(f"⚠️ تعذر حفظ نسخة التسليم. الروابط للزبون <code>{uid}</code>:\n"
+                        + "\n".join(html.escape(x) for x in links))
+
+    links_txt = "\n\n".join(f"🔑 {html.escape(l)}" for l in links)
+    text = GEMINI_TEXTS.get(lang, GEMINI_TEXTS["ar"])["delivered"].format(links=links_txt)
+    try:
+        bot.send_message(chat_id, text, parse_mode="HTML", disable_web_page_preview=True)
+    except Exception as e:
+        print(f"gemini deliver failed: {e}")
+        alert_admin(f"⚠️ <b>تعذر إرسال روابط Gemini للزبون</b> <code>{uid}</code>\n"
+                    f"🧾 <code>{html.escape(canon)}</code>\n" + "\n".join(html.escape(x) for x in links))
+    mark("delivered")
+    clear_pending(uid)
+
+    left = gemini_stock()
+    alert_admin(
+        ("✅ <b>بيع Gemini تلقائي (بعد إعادة المحاولة)</b>" if retry else "✅ <b>بيع Gemini تلقائي</b>")
+        + f"\n📦 {pname}\n👤 <code>{uid}</code>\n💵 مدفوع: {claim.get('paid')} USDT\n"
+        f"📉 المخزون المتبقي: {left}" + (" ⚠️ اقترب من النفاد!" if left <= 2 else "")
+    )
+
+# ============================================================
 # ========== Binance Pay: التحقق من الدفع ==========
 # ============================================================
 class BinanceError(Exception):
@@ -1077,6 +1195,11 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
         if not retry:
             bot.send_message(chat_id, t(lang, "processing"), reply_markup=support_markup(lang))
 
+    # Gemini: تسليم من Upstash (بدون FAZER)
+    if pid == GEMINI_ID:
+        _fulfill_gemini(chat_id, uid, lang, claim, canon, retry, mark, failed)
+        return
+
     try:
         mapping = fazer_resolve(pid, label, allow_fetch=True)
     except FazerError as e:
@@ -1189,7 +1312,7 @@ def pending_retry_loop():
     time.sleep(60)
     while True:
         try:
-            if FAZER_API_KEY:
+            if FAZER_API_KEY or db:
                 retry_pending_orders()
         except Exception as e:
             print(f"pending_retry_loop error: {e}")
@@ -1396,6 +1519,7 @@ def find_product(product_id):
     return next((p for p in products if p["id"] == product_id), None)
 
 def generate_store_keyboard(lang):
+    sync_stock()
     markup = InlineKeyboardMarkup(row_width=2)
     for item in products:
         if item.get("type") == "separator":
@@ -1708,6 +1832,89 @@ def handle_cancel_invoice(call):
     send_main_menu(call.message.chat.id, lang)
     bot.answer_callback_query(call.id, t(lang, "cancelled"))
 
+# ========== Gemini: صفحة المنتج (الوصف + أزرار العدد 1 و 2) ==========
+@bot.callback_query_handler(func=lambda call: call.data == f"buy_{GEMINI_ID}")
+def handle_gemini_select(call):
+    product = find_product(GEMINI_ID)
+    lang = get_lang(call.from_user.id)
+    gt = GEMINI_TEXTS.get(lang, GEMINI_TEXTS["ar"])
+    if call.message.chat.type == "private":
+        register_user(call.from_user.id)
+
+    notify_admin(call.from_user, product, lang)
+    sync_stock()
+    stock = product["stock"]
+
+    markup = InlineKeyboardMarkup(row_width=3)
+    if stock > 0:
+        markup.row(*[
+            InlineKeyboardButton(text=str(q), callback_data=f"gq_{q}")
+            for q in GEMINI_QTYS if q <= stock
+        ])
+        bottom = gt["choose_qty"]
+    else:
+        bottom = gt["out_of_stock"]
+        markup.add(InlineKeyboardButton(text=t(lang, "notify_me"), callback_data=f"notify_{GEMINI_ID}"))
+    markup.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+
+    caption = (
+        f"{t(lang, 'chosen')} *{tr(product, 'name', lang)}*\n"
+        f"{t(lang, 'price')} *{product['price']}*\n"
+        f"{t(lang, 'available')} *{stock}*\n\n"
+        f"{t(lang, 'description')}\n{tr(product, 'description', lang)}\n\n"
+        f"{bottom}"
+    )
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    send_card(call.message.chat.id, product, caption, markup)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("gq_"))
+def handle_gemini_qty(call):
+    lang = get_lang(call.from_user.id)
+    gt = GEMINI_TEXTS.get(lang, GEMINI_TEXTS["ar"])
+    try:
+        qty = int(call.data[3:])
+    except ValueError:
+        bot.answer_callback_query(call.id)
+        return
+    if qty not in GEMINI_QTYS:
+        bot.answer_callback_query(call.id)
+        return
+
+    stock = gemini_stock()
+    if stock < qty:
+        msg = gt["out"] if stock <= 0 else gt["qty_left"].format(n=stock)
+        bot.answer_callback_query(call.id, msg, show_alert=True)
+        return
+
+    product = find_product(GEMINI_ID)
+    price = str((GEMINI_UNIT_PRICE * qty).quantize(Decimal("0.01")))
+    label = f"x{qty}"
+    full_name = f"{product['name']} — {label}"
+
+    notify_admin(call.from_user, {"name": full_name, "price": f"${price}"}, lang)
+    try:
+        invoice_id = create_invoice(call.from_user.id, GEMINI_ID, label, price, full_name)
+    except StorageError:
+        bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
+        return
+    invoice = get_invoice(invoice_id) or {"label": label, "price_usdt": price}
+
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(
+        call.message.chat.id,
+        build_invoice_text(lang, invoice, product),
+        parse_mode="HTML",
+        reply_markup=build_invoice_markup(lang, invoice_id),
+    )
+    bot.answer_callback_query(call.id)
+
 # ========== منتجات عادية (ليست بطاقات هداية) ==========
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_") and find_product(call.data[4:]) and find_product(call.data[4:]).get("id") not in GIFT_VARIANTS)
 def handle_product_view(call):
@@ -1879,6 +2086,7 @@ def send_product_post(chat_id, item, caption, markup):
     return None
 
 def send_channel_post(chat_id, item):
+    sync_stock()
     stock_display = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
     caption = (
         f"{item['icon']} <b>{html.escape(item['name'])}</b>\n\n"
@@ -1890,6 +2098,7 @@ def send_channel_post(chat_id, item):
     return send_product_post(chat_id, item, caption, markup)
 
 def send_user_post(user_id, item):
+    sync_stock()
     lang = get_lang(user_id)
     stock_display = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
     caption = (
