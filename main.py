@@ -188,6 +188,8 @@ TEXTS = {
         "no_binance": "⚠️ التحقق التلقائي غير متاح حالياً، تواصل مع الدعم برقم العملية.",
         "out_variant": "❌ هذه القيمة نفدت حالياً، اختر قيمة أخرى.",
         "cancelled": "تم إلغاء الفاتورة.",
+        "inv_expired_edit": "⌛ <b>فاتورة منتهية</b>\n\n📦 {product}\n💵 {amount} USDT\n\n❌ تم إلغاء هذه الفاتورة تلقائياً بعد {ttl} دقيقة.",
+        "inv_expired_notice": "⌛ انتهت مدة الفاتورة ({ttl} دقيقة) وتم إلغاؤها تلقائياً.\n\n⚠️ لا تدفع إليها بعد الآن.\n✅ إذا كنت قد دفعت قبل انتهائها، أرسل رقم العملية (Order ID) هنا خلال {grace} دقائق.\n🛍️ وإلا اضغط على الزر بالأسفل لإنشاء طلب جديد.",
     },
     "en": {
         "welcome": "👋 Welcome to the RASEEDKOM store!\nChoose the product you want from the list below:",
@@ -240,6 +242,8 @@ TEXTS = {
         "no_binance": "⚠️ Automatic verification is unavailable right now, contact support with your order number.",
         "out_variant": "❌ This amount is currently out of stock, choose another one.",
         "cancelled": "Invoice cancelled.",
+        "inv_expired_edit": "⌛ <b>Invoice expired</b>\n\n📦 {product}\n💵 {amount} USDT\n\n❌ This invoice was automatically cancelled after {ttl} minutes.",
+        "inv_expired_notice": "⌛ The invoice time ({ttl} minutes) is over and it was cancelled automatically.\n\n⚠️ Do not pay it anymore.\n✅ If you paid before it expired, send the Order ID here within {grace} minutes.\n🛍️ Otherwise tap the button below to create a new order.",
     },
     "fr": {
         "welcome": "👋 Bienvenue dans la boutique RASEEDKOM !\nChoisissez le produit souhaité dans la liste ci-dessous :",
@@ -292,6 +296,8 @@ TEXTS = {
         "no_binance": "⚠️ La vérification automatique est indisponible pour le moment, contactez l'assistance avec votre numéro de commande.",
         "out_variant": "❌ Cette valeur est actuellement en rupture de stock, choisissez-en une autre.",
         "cancelled": "Facture annulée.",
+        "inv_expired_edit": "⌛ <b>Facture expirée</b>\n\n📦 {product}\n💵 {amount} USDT\n\n❌ Cette facture a été annulée automatiquement après {ttl} minutes.",
+        "inv_expired_notice": "⌛ Le délai de la facture ({ttl} minutes) est écoulé et elle a été annulée automatiquement.\n\n⚠️ Ne la payez plus.\n✅ Si vous avez payé avant son expiration, envoyez le numéro de commande (Order ID) ici dans les {grace} minutes.\n🛍️ Sinon, appuyez sur le bouton ci-dessous pour créer une nouvelle commande.",
     },
 }
 
@@ -525,6 +531,8 @@ products = [
 # ========== التحكم في الأسعار من تيليغرام (الأدمن فقط) ==========
 PRICES_KEY = "rk:prices"  # hash في Upstash: product_id -> السعر
 BASE_PRICES = {p["id"]: p["price"] for p in products if p.get("type") != "separator"}
+STOCK_KEY = "rk:stock"  # hash في Upstash: product_id -> الكمية (رقم أو "inf" لـ ♾️)
+BASE_STOCK = {p["id"]: p["stock"] for p in products if p.get("type") != "separator"}
 
 LANG_FILE = "user_lang.json"
 LANG_KEY = "user_lang"
@@ -809,7 +817,50 @@ def create_invoice(user_id, product_id, label, price_usdt, product_name):
     ttl = INVOICE_TTL + INVOICE_GRACE + 600
     kv_set(f"rk:inv:{invoice_id}", json.dumps(data), ex=ttl)
     kv_set(f"rk:pend:{user_id}", invoice_id, ex=ttl)
+    inv_live_add(invoice_id)  # لتراقبها حلقة الانتهاء التلقائي
     return invoice_id
+
+# ---------- مراقبة انتهاء الفواتير (إلغاء تلقائي بعد 20 دقيقة) ----------
+_mem_live = set()
+
+def inv_live_add(inv_id):
+    if db:
+        try:
+            db.sadd("rk:invlive", inv_id)
+            return
+        except Exception as e:
+            print(f"inv_live_add error: {e}")
+    _mem_live.add(inv_id)
+
+def inv_live_remove(inv_id):
+    _mem_live.discard(inv_id)
+    if db:
+        try:
+            db.srem("rk:invlive", inv_id)
+        except Exception as e:
+            print(f"inv_live_remove error: {e}")
+
+def inv_live_list():
+    ids = set(_mem_live)
+    if db:
+        try:
+            ids |= {str(x) for x in (db.smembers("rk:invlive") or [])}
+        except Exception as e:
+            print(f"inv_live_list error: {e}")
+    return list(ids)
+
+def attach_invoice_msg(inv_id, sent):
+    """يحفظ رقم رسالة الفاتورة لنعدلها عند الانتهاء."""
+    try:
+        inv = get_invoice(inv_id)
+        if not inv:
+            return
+        inv["chat_id"] = sent.chat.id
+        inv["message_id"] = sent.message_id
+        remaining = int(INVOICE_TTL + INVOICE_GRACE + 600 - (time.time() - inv["created_at"]))
+        kv_set(f"rk:inv:{inv_id}", json.dumps(inv), ex=max(60, remaining))
+    except Exception as e:
+        print(f"attach_invoice_msg error: {e}")
 
 def get_invoice(invoice_id):
     return kv_get_json(f"rk:inv:{invoice_id}")
@@ -853,8 +904,17 @@ def editable_products():
         and _PRICE_RE.fullmatch(BASE_PRICES.get(p["id"], ""))
     ]
 
+def stock_editable_products():
+    """المنتجات ذات المخزون اليدوي (بدون Gemini لأن مخزونه من Upstash، وبدون بطاقات الهداية لأنها من FAZER)."""
+    return [
+        p for p in products
+        if p.get("type") != "separator"
+        and p["id"] != GEMINI_ID
+        and p["id"] not in GIFT_VARIANTS
+    ]
+
 def sync_prices():
-    """يقرأ الأسعار من Upstash ويطبقها على قائمة products (أو يرجع الأصلي إذا حُذف التعديل)."""
+    """يقرأ الأسعار والكميات من Upstash ويطبقها على قائمة products (أو يرجع الأصلي إذا حُذف التعديل)."""
     if not db:
         return
     try:
@@ -870,6 +930,23 @@ def sync_prices():
                 pass
         else:
             p["price"] = BASE_PRICES[p["id"]]
+
+    try:
+        sdata = {str(k): str(v) for k, v in (db.hgetall(STOCK_KEY) or {}).items()}
+    except Exception as e:
+        print(f"sync_stock overrides error: {e}")
+        return
+    for p in stock_editable_products():
+        raw = sdata.get(p["id"])
+        if raw is None:
+            p["stock"] = BASE_STOCK[p["id"]]
+        elif raw == "inf":
+            p["stock"] = "♾️"
+        else:
+            try:
+                p["stock"] = max(0, int(raw))
+            except ValueError:
+                p["stock"] = BASE_STOCK[p["id"]]
 
 def gemini_unit_price():
     sync_prices()
@@ -1927,12 +2004,13 @@ def handle_gift_variant(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
-    bot.send_message(
+    sent = bot.send_message(
         call.message.chat.id,
         build_invoice_text(lang, invoice, product),
         parse_mode="HTML",
         reply_markup=build_invoice_markup(lang, invoice_id),
     )
+    attach_invoice_msg(invoice_id, sent)
     bot.answer_callback_query(call.id)
 
 # ========== زر النسخ (احتياطي للنسخ القديمة من المكتبة) ==========
@@ -1954,6 +2032,7 @@ def handle_cancel_invoice(call):
             f"❌ <b>إلغاء فاتورة</b>\n\n📦 {html.escape(_inv['product_name'])}\n"
             f"💵 {html.escape(str(_inv['price_usdt']))} USDT\n👤 {_user_link(call.from_user.id)}"
         )
+    inv_live_remove(call.data.replace("cancel_", "", 1))  # ألغاها الزبون بنفسه: لا إشعار انتهاء
     clear_pending(call.from_user.id)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -2037,12 +2116,13 @@ def handle_gemini_qty(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
-    bot.send_message(
+    sent = bot.send_message(
         call.message.chat.id,
         build_invoice_text(lang, invoice, product),
         parse_mode="HTML",
         reply_markup=build_invoice_markup(lang, invoice_id),
     )
+    attach_invoice_msg(invoice_id, sent)
     bot.answer_callback_query(call.id)
 
 # ========== منتجات عادية (ليست بطاقات هداية) ==========
@@ -2128,7 +2208,37 @@ def handle_notify(call):
 # ========== لوحة التحكم في الأسعار (الأدمن فقط) ==========
 # ============================================================
 PRICE_STEPS = ("-1", "-0.5", "+0.5", "+1")
-_price_wait = {}  # admin_id -> product_id (ينتظر سعراً يدوياً)
+STOCK_STEPS = ("-5", "-1", "+1", "+5")
+_price_wait = {}  # admin_id -> ("price" | "stock", product_id) (ينتظر رقماً يدوياً)
+
+def _fmt_stock(v):
+    return "♾️" if v == "♾️" else str(v)
+
+def _parse_stock(text):
+    s = text.strip().replace("،", "")
+    if s in ("inf", "∞", "♾️", "♾"):
+        return "inf"
+    if not s.isdigit():
+        return None
+    v = int(s)
+    return v if 0 <= v <= 100000 else None
+
+def _save_stock(pid, value):
+    """value: رقم أو "inf". يحفظ في Upstash ويحدّث الذاكرة."""
+    if not db:
+        return False
+    db.hset(STOCK_KEY, pid, str(value))
+    p = find_product(pid)
+    if p:
+        p["stock"] = "♾️" if value == "inf" else int(value)
+    return True
+
+def _stock_changed(pid, old, new):
+    p = find_product(pid)
+    monitor_send(
+        f"📦 <b>تغيير كمية</b>\n\n📦 {html.escape(p['name'])}\n"
+        f"{html.escape(_fmt_stock(old))} ➜ <b>{html.escape(_fmt_stock(new))}</b>"
+    )
 
 def _is_admin_user(user_id):
     return str(user_id) == str(ADMIN_CHAT_ID)
@@ -2166,14 +2276,18 @@ def _pr_show(chat_id, msg_id, text, markup):
     bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
 
 def show_price_list(chat_id, msg_id=None):
-    sync_prices()
+    sync_stock()
     markup = InlineKeyboardMarkup(row_width=1)
-    for p in editable_products():
+    price_ids = {p["id"] for p in editable_products()}
+    stock_ids = {p["id"] for p in stock_editable_products()}
+    for p in products:
+        if p.get("type") == "separator" or p["id"] not in (price_ids | stock_ids):
+            continue
         markup.add(InlineKeyboardButton(
-            text=f"{p['icon']} {p['name']} | {p['price']}",
+            text=f"{p['icon']} {p['name']} | {p['price']} | 📦 {_fmt_stock(p['stock'])}",
             callback_data=f"pr_sel_{p['id']}",
         ))
-    text = "💲 <b>التحكم في الأسعار</b>\nاختر المنتج:"
+    text = "💲 <b>التحكم في الأسعار والكميات</b>\nاختر المنتج:"
     if not db:
         text += "\n\n⚠️ Upstash غير متصل: التعديل لن يُحفظ."
     _pr_show(chat_id, msg_id, text, markup)
@@ -2184,18 +2298,36 @@ def show_price_panel(chat_id, msg_id, pid):
     if not p:
         return show_price_list(chat_id, msg_id)
     markup = InlineKeyboardMarkup()
-    markup.row(*[
-        InlineKeyboardButton(text=f"{s}$", callback_data=f"pr_adj_{pid}_{s}")
-        for s in PRICE_STEPS
-    ])
-    markup.add(InlineKeyboardButton(text="✏️ إدخال سعر يدوياً", callback_data=f"pr_man_{pid}"))
-    markup.add(InlineKeyboardButton(text="♻️ رجوع للسعر الأصلي", callback_data=f"pr_rst_{pid}"))
+    text = f"{p['icon']} <b>{html.escape(p['name'])}</b>\n"
+
+    if pid in {x["id"] for x in editable_products()}:
+        markup.row(*[
+            InlineKeyboardButton(text=f"{s}$", callback_data=f"pr_adj_{pid}_{s}")
+            for s in PRICE_STEPS
+        ])
+        markup.add(InlineKeyboardButton(text="✏️ إدخال سعر يدوياً", callback_data=f"pr_man_{pid}"))
+        markup.add(InlineKeyboardButton(text="♻️ رجوع للسعر الأصلي", callback_data=f"pr_rst_{pid}"))
+        text += (
+            f"\n💰 السعر الحالي: <b>{html.escape(p['price'])}</b>\n"
+            f"📌 السعر الأصلي: {html.escape(BASE_PRICES[pid])}\n"
+        )
+
+    if pid in {x["id"] for x in stock_editable_products()}:
+        markup.row(*[
+            InlineKeyboardButton(text=f"{s} 📦", callback_data=f"pr_stk_{pid}_{s}")
+            for s in STOCK_STEPS
+        ])
+        markup.row(
+            InlineKeyboardButton(text="✏️ إدخال كمية", callback_data=f"pr_sman_{pid}"),
+            InlineKeyboardButton(text="♾️ لانهائي", callback_data=f"pr_sinf_{pid}"),
+        )
+        markup.add(InlineKeyboardButton(text="♻️ رجوع للكمية الأصلية", callback_data=f"pr_srst_{pid}"))
+        text += (
+            f"\n📦 الكمية الحالية: <b>{html.escape(_fmt_stock(p['stock']))}</b>\n"
+            f"📌 الكمية الأصلية: {html.escape(_fmt_stock(BASE_STOCK[pid]))}\n"
+        )
+
     markup.add(InlineKeyboardButton(text="⬅️ القائمة", callback_data="pr_list"))
-    text = (
-        f"{p['icon']} <b>{html.escape(p['name'])}</b>\n\n"
-        f"💰 السعر الحالي: <b>{html.escape(p['price'])}</b>\n"
-        f"📌 السعر الأصلي: {html.escape(BASE_PRICES[pid])}"
-    )
     _pr_show(chat_id, msg_id, text, markup)
 
 def _price_changed(pid, old, new):
@@ -2232,7 +2364,7 @@ def handle_price_callbacks(call):
 
     if data.startswith("pr_man_"):
         pid = data[7:]
-        _price_wait[call.from_user.id] = pid
+        _price_wait[call.from_user.id] = ("price", pid)
         p = find_product(pid)
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton(text="❌ إلغاء", callback_data=f"pr_sel_{pid}"))
@@ -2240,6 +2372,57 @@ def handle_price_callbacks(call):
                  f"✏️ أرسل السعر الجديد لـ <b>{html.escape(p['name'])}</b>\nمثال: <code>2.5</code>",
                  markup)
         bot.answer_callback_query(call.id)
+        return
+
+    if data.startswith("pr_sman_"):
+        pid = data[8:]
+        p = find_product(pid)
+        if not p or pid not in {x["id"] for x in stock_editable_products()}:
+            bot.answer_callback_query(call.id)
+            return
+        _price_wait[call.from_user.id] = ("stock", pid)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text="❌ إلغاء", callback_data=f"pr_sel_{pid}"))
+        _pr_show(chat_id, msg_id,
+                 f"✏️ أرسل الكمية الجديدة لـ <b>{html.escape(p['name'])}</b>\n"
+                 f"مثال: <code>25</code> (أو <code>inf</code> للانهائي)",
+                 markup)
+        bot.answer_callback_query(call.id)
+        return
+
+    if data.startswith("pr_sinf_") or data.startswith("pr_srst_") or data.startswith("pr_stk_"):
+        if not db:
+            bot.answer_callback_query(call.id, "⚠️ Upstash غير متصل", show_alert=True)
+            return
+        try:
+            if data.startswith("pr_stk_"):
+                pid, step = data[7:].rsplit("_", 1)
+            else:
+                pid, step = data[8:], None
+            p = find_product(pid)
+            if not p or pid not in {x["id"] for x in stock_editable_products()}:
+                bot.answer_callback_query(call.id)
+                return
+            sync_prices()
+            old = p["stock"]
+            if data.startswith("pr_stk_"):
+                base = 0 if old == "♾️" else int(old)
+                new = max(0, min(100000, base + int(step)))
+                _save_stock(pid, new)
+            elif data.startswith("pr_sinf_"):
+                new = "♾️"
+                _save_stock(pid, "inf")
+            else:
+                db.hdel(STOCK_KEY, pid)
+                p["stock"] = BASE_STOCK[pid]
+                new = p["stock"]
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"خطأ: {str(e)[:150]}", show_alert=True)
+            return
+        if new != old:
+            _stock_changed(pid, old, new)
+        show_price_panel(chat_id, msg_id, pid)
+        bot.answer_callback_query(call.id, f"📦 {_fmt_stock(new)}")
         return
 
     if data.startswith("pr_rst_"):
@@ -2297,7 +2480,28 @@ def _awaiting_price(m):
 
 @bot.message_handler(func=_awaiting_price, content_types=["text"])
 def handle_manual_price(message):
-    pid = _price_wait.get(message.from_user.id)
+    kind, pid = _price_wait.get(message.from_user.id)
+
+    if kind == "stock":
+        sval = _parse_stock(message.text)
+        if sval is None:
+            bot.reply_to(message, "❌ كمية غير صالحة. أرسل رقماً مثل: 25 (أو inf)")
+            return
+        p = find_product(pid)
+        old = p["stock"]
+        try:
+            ok = _save_stock(pid, sval)
+        except Exception as e:
+            bot.reply_to(message, f"❌ خطأ في الحفظ: {str(e)[:200]}")
+            return
+        if not ok:
+            bot.reply_to(message, "⚠️ Upstash غير متصل، لم تُحفظ الكمية.")
+            return
+        _price_wait.pop(message.from_user.id, None)
+        _stock_changed(pid, old, p["stock"])
+        show_price_panel(message.chat.id, None, pid)
+        return
+
     value = _parse_price(message.text)
     if value is None:
         bot.reply_to(message, "❌ رقم غير صالح. أرسل مثلاً: 2.5")
@@ -2491,6 +2695,74 @@ def fazer_catalog_refresher():
 
 threading.Thread(target=fazer_catalog_refresher, daemon=True).start()
 threading.Thread(target=pending_retry_loop, daemon=True).start()
+
+# ========== إلغاء الفواتير المنتهية تلقائياً (Gemini + بطاقات الهداية) ==========
+def expire_invoice(inv_id):
+    inv = get_invoice(inv_id)
+    if not inv:
+        inv_live_remove(inv_id)
+        return
+    age = time.time() - inv["created_at"]
+    if age < INVOICE_TTL:
+        return
+    uid = inv["user_id"]
+    if kv_get(f"rk:invpaid:{inv_id}") is not None:  # دُفعت: لا نلغيها
+        inv_live_remove(inv_id)
+        return
+    current = get_pending_invoice_id(uid) == inv_id
+
+    # المرحلة 1: عند انتهاء 20 دقيقة (مرة واحدة فقط)
+    if kv_set(f"rk:invexp:{inv_id}", "1", ex=INVOICE_TTL + INVOICE_GRACE + 3600, nx=True):
+        lang = get_lang(uid)
+        chat_id = inv.get("chat_id") or uid
+        mins = {"ttl": INVOICE_TTL // 60, "grace": INVOICE_GRACE // 60}
+        if inv.get("message_id"):
+            try:
+                bot.edit_message_text(
+                    t(lang, "inv_expired_edit").format(
+                        product=html.escape(inv.get("product_name", "")),
+                        amount=html.escape(str(inv.get("price_usdt", ""))),
+                        **mins,
+                    ),
+                    chat_id, inv["message_id"], parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(),  # فارغ = يحذف الأزرار
+                )
+            except Exception as e:
+                print(f"expire edit failed: {e}")
+        if current:
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton(text=t(lang, "kb_products"), callback_data="back_to_main"))
+            try:
+                bot.send_message(chat_id, t(lang, "inv_expired_notice").format(**mins), reply_markup=markup)
+            except Exception as e:
+                print(f"expire notice failed: {e}")
+            monitor_send(
+                f"⌛ <b>فاتورة انتهت تلقائياً</b>\n\n📦 {html.escape(inv.get('product_name', ''))}\n"
+                f"💵 {html.escape(str(inv.get('price_usdt', '')))} USDT\n👤 {_user_link(uid)}"
+            )
+
+    # المرحلة 2: بعد مهلة السماح نمسح الانتظار كلياً
+    if age >= INVOICE_TTL + INVOICE_GRACE:
+        if current:
+            clear_pending(uid)
+        inv_live_remove(inv_id)
+
+def invoice_expiry_loop():
+    time.sleep(20)
+    while True:
+        try:
+            for inv_id in inv_live_list():
+                try:
+                    expire_invoice(inv_id)
+                except StorageError as e:
+                    print(f"expire_invoice storage error: {e}")
+                except Exception as e:
+                    print(f"expire_invoice error for {inv_id}: {e}")
+        except Exception as e:
+            print(f"invoice_expiry_loop error: {e}")
+        time.sleep(15)
+
+threading.Thread(target=invoice_expiry_loop, daemon=True).start()
 
 monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)
 print("Bot is running...")
