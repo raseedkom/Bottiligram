@@ -134,6 +134,47 @@ GEMINI_TEXTS = {
     },
 }
 
+WALLET_PCT = 5  # نسبة المحفظة من إجمالي المشتريات المكتملة
+
+WALLET_TEXTS = {
+    "ar": {
+        "btn_profile": "👤 الملف الشخصي",
+        "btn_history": "🧾 سجل المشتريات",
+        "btn_wallet": "💼 المحفظة",
+        "unavailable": "⚠️ الخدمة غير متاحة حالياً، حاول لاحقاً.",
+        "profile": "👤 <b>ملفك الشخصي</b>\n\n🆔 المعرّف: <code>{id}</code>\n📛 الاسم: {name}\n📅 تاريخ الانضمام: {joined}\n🛒 إجمالي المشتريات: {buys}\n💵 إجمالي الإنفاق: ${spent}",
+        "history": "🧾 <b>سجل المشتريات</b>\n\n{lines}\n\n✅ المكتملة: {done} ({done_pct}%)\n❌ الملغاة: {canc} ({canc_pct}%)",
+        "by_product": "📦 المشتريات حسب المنتج:",
+        "history_empty": "— لا توجد مشتريات بعد —",
+        "wallet": "💼 <b>المحفظة</b>\n\n🛍️ مجموع مشترياتك: ${spent}\n🎁 رصيد المحفظة ({pct}%): ${total}\n➖ تم استبداله: ${used}\n✅ <b>الرصيد المتاح: ${avail}</b>",
+        "wallet_note": "ℹ️ لما يوصل رصيدك لقيمة منتج حاب تستبدل بيه، تواصل معانا في خانة الدعم (تسليم يدوي).",
+    },
+    "en": {
+        "btn_profile": "👤 My profile",
+        "btn_history": "🧾 Purchase history",
+        "btn_wallet": "💼 Wallet",
+        "unavailable": "⚠️ Service unavailable right now, try again later.",
+        "profile": "👤 <b>Your profile</b>\n\n🆔 ID: <code>{id}</code>\n📛 Name: {name}\n📅 Joined: {joined}\n🛒 Total purchases: {buys}\n💵 Total spent: ${spent}",
+        "history": "🧾 <b>Purchase history</b>\n\n{lines}\n\n✅ Completed: {done} ({done_pct}%)\n❌ Cancelled: {canc} ({canc_pct}%)",
+        "by_product": "📦 Purchases by product:",
+        "history_empty": "— No purchases yet —",
+        "wallet": "💼 <b>Wallet</b>\n\n🛍️ Your total purchases: ${spent}\n🎁 Wallet balance ({pct}%): ${total}\n➖ Already used: ${used}\n✅ <b>Available balance: ${avail}</b>",
+        "wallet_note": "ℹ️ When your balance reaches the value of a product you want to exchange it for, contact us in the support section (manual delivery).",
+    },
+    "fr": {
+        "btn_profile": "👤 Mon profil",
+        "btn_history": "🧾 Historique d'achats",
+        "btn_wallet": "💼 Portefeuille",
+        "unavailable": "⚠️ Service indisponible pour le moment, réessayez plus tard.",
+        "profile": "👤 <b>Votre profil</b>\n\n🆔 ID : <code>{id}</code>\n📛 Nom : {name}\n📅 Inscription : {joined}\n🛒 Total des achats : {buys}\n💵 Total dépensé : ${spent}",
+        "history": "🧾 <b>Historique d'achats</b>\n\n{lines}\n\n✅ Terminées : {done} ({done_pct}%)\n❌ Annulées : {canc} ({canc_pct}%)",
+        "by_product": "📦 Achats par produit :",
+        "history_empty": "— Aucun achat pour le moment —",
+        "wallet": "💼 <b>Portefeuille</b>\n\n🛍️ Total de vos achats : ${spent}\n🎁 Solde du portefeuille ({pct}%) : ${total}\n➖ Déjà utilisé : ${used}\n✅ <b>Solde disponible : ${avail}</b>",
+        "wallet_note": "ℹ️ Quand votre solde atteint la valeur d'un produit que vous voulez échanger, contactez-nous dans la section assistance (livraison manuelle).",
+    },
+}
+
 CHOOSE_LANG_TEXT = "🌐 اختر لغتك\nChoose your language\nChoisissez votre langue"
 
 TEXTS = {
@@ -1025,6 +1066,7 @@ def _fulfill_gemini(chat_id, uid, lang, claim, canon, retry, mark, failed):
                     f"🧾 <code>{html.escape(canon)}</code>\n" + "\n".join(html.escape(x) for x in links))
     mark("delivered")
     clear_pending(uid)
+    record_purchase(uid, GEMINI_ID, claim.get("product_name"), claim.get("price"), canon)
 
     left = gemini_stock()
     alert_admin(
@@ -1420,6 +1462,7 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
                 monitor_send(f"⚠️ <b>تعذر إرسال الكود للزبون</b> {_user_link(uid)}\nالكود وصلك في البوت الرئيسي.")
             mark("delivered")
             clear_pending(uid)
+            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon)
 
             # رسالة الشكر: تُرسل مرة واحدة فقط، بعد تسليم الكود فعلياً، ولا تؤثر على التسليم
             if delivered_ok:
@@ -1692,6 +1735,7 @@ def set_user_commands(chat_id, lang):
         ]
         if str(chat_id) == str(ADMIN_CHAT_ID):
             cmds.append(BotCommand("prices", "💲 التحكم في الأسعار"))
+            cmds.append(BotCommand("admin", "🛠️ لوحة الأدمن (المحافظ)"))
         bot.set_my_commands(cmds, scope=BotCommandScopeChat(chat_id))
     except Exception as e:
         print(f"Could not set commands: {e}")
@@ -1724,6 +1768,11 @@ def generate_store_keyboard(lang):
         button_text = f"{item['icon']} {tr(item, 'name', lang)} | {item['price']} | {stock_display}"
         markup.add(InlineKeyboardButton(text=button_text, callback_data=f"buy_{item['id']}"))
     markup.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="change_lang"))
+    markup.row(
+        InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"),
+        InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"),
+    )
+    markup.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
     return markup
 
 def build_reply_keyboard(lang):
@@ -1783,6 +1832,7 @@ def send_card(chat_id, product, caption, markup):
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
     register_user(message.from_user.id)
+    ensure_profile(message.from_user.id, message.from_user.first_name)
     uid = str(message.from_user.id)
     if uid in user_lang:
         lang = get_lang(uid)
@@ -1794,6 +1844,7 @@ def send_welcome(message):
 
 def refresh_for_user(chat_id, user_id):
     register_user(user_id)
+    ensure_profile(user_id)
     uid = str(user_id)
     if uid in user_lang:
         lang = get_lang(uid)
@@ -1856,6 +1907,7 @@ def handle_set_lang(call):
         return
     save_lang(call.from_user.id, lang)
     register_user(call.from_user.id)
+    ensure_profile(call.from_user.id, call.from_user.first_name)
     set_user_commands(call.message.chat.id, lang)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -2032,7 +2084,9 @@ def handle_cancel_invoice(call):
             f"❌ <b>إلغاء فاتورة</b>\n\n📦 {html.escape(_inv['product_name'])}\n"
             f"💵 {html.escape(str(_inv['price_usdt']))} USDT\n👤 {_user_link(call.from_user.id)}"
         )
-    inv_live_remove(call.data.replace("cancel_", "", 1))  # ألغاها الزبون بنفسه: لا إشعار انتهاء
+    _cancel_id = call.data.replace("cancel_", "", 1)
+    inv_live_remove(_cancel_id)  # ألغاها الزبون بنفسه: لا إشعار انتهاء
+    record_cancel(call.from_user.id, _cancel_id)
     clear_pending(call.from_user.id)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -2342,6 +2396,7 @@ def prices_command(message):
     if not is_admin_msg(message):
         return  # يتجاهل غير الأدمن بصمت
     _price_wait.pop(message.from_user.id, None)
+    _adm_wait.pop(message.from_user.id, None)
     show_price_list(message.chat.id)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("pr_"))
@@ -2351,6 +2406,7 @@ def handle_price_callbacks(call):
         return
     chat_id, msg_id, data = call.message.chat.id, call.message.message_id, call.data
     _price_wait.pop(call.from_user.id, None)
+    _adm_wait.pop(call.from_user.id, None)
 
     if data == "pr_list":
         show_price_list(chat_id, msg_id)
@@ -2519,6 +2575,464 @@ def handle_manual_price(message):
     _price_wait.pop(message.from_user.id, None)
     _price_changed(pid, old, value)
     show_price_panel(message.chat.id, None, pid)
+
+# ============================================================
+# ========== الملف الشخصي + سجل المشتريات + المحفظة ==========
+# ============================================================
+def wt(lang, key):
+    return WALLET_TEXTS.get(lang, WALLET_TEXTS["ar"])[key]
+
+def _money(cents):
+    return f"{Decimal(int(cents)) / 100:.2f}"
+
+def wallet_total_c(spent_c):
+    return int(spent_c) * WALLET_PCT // 100
+
+def _prof_key(uid):
+    return f"rk:prof:{uid}"
+
+def ensure_profile(uid, name=None):
+    """ينشئ تاريخ الانضمام (مرة واحدة فقط) ويحدّث الاسم."""
+    if not db:
+        return
+    try:
+        k = _prof_key(uid)
+        db.hsetnx(k, "joined", str(int(time.time())))
+        if name:
+            db.hset(k, "name", str(name)[:100])
+    except Exception as e:
+        print(f"ensure_profile error: {e}")
+
+def prof_get(uid):
+    h = {str(k): str(v) for k, v in (db.hgetall(_prof_key(uid)) or {}).items()}
+
+    def _i(key):
+        try:
+            return int(float(h.get(key, 0) or 0))
+        except ValueError:
+            return 0
+
+    return {
+        "name": h.get("name", ""), "joined": _i("joined"), "buys": _i("buys"),
+        "spent_c": _i("spent_c"), "redeemed_c": _i("redeemed_c"), "cancelled": _i("cancelled"),
+    }
+
+def ubuy_get(uid):
+    out = {}
+    for k, v in (db.hgetall(f"rk:ubuy:{uid}") or {}).items():
+        try:
+            out[str(k)] = int(float(v))
+        except ValueError:
+            pass
+    return out
+
+def wlog_add(uid, kind, cents, note=""):
+    key = f"rk:wlog:{uid}"
+    db.lpush(key, json.dumps({"k": kind, "c": int(cents), "n": note or "", "t": int(time.time())}, ensure_ascii=False))
+    db.ltrim(key, 0, 49)
+
+def wlog_list(uid, n=5):
+    rows = []
+    for raw in (db.lrange(f"rk:wlog:{uid}", 0, n - 1) or []):
+        try:
+            rows.append(raw if isinstance(raw, dict) else json.loads(raw))
+        except Exception:
+            pass
+    return rows
+
+def record_purchase(uid, pid, pname, amount, canon):
+    """يسجل شراءً مكتملاً. آمن ضد التكرار (إعادة المحاولة لا تسجل مرتين)."""
+    if not db:
+        return
+    guard = f"rk:rec:{canon}"
+    try:
+        if not kv_set(guard, "1", nx=True):
+            return
+        cents = int((Decimal(str(amount)) * 100).to_integral_value())
+        ensure_profile(uid)
+        k = _prof_key(uid)
+        db.hincrby(k, "buys", 1)
+        db.hincrby(k, "spent_c", cents)
+        db.hincrby(f"rk:ubuy:{uid}", f"p:{pid}" if pid else f"m:{pname}", 1)
+        wlog_add(uid, "buy", cents, pname)
+    except Exception as e:
+        print(f"record_purchase error: {e}")
+        try:
+            kv_del(guard)
+        except Exception:
+            pass
+
+def record_cancel(uid, inv_id):
+    """يحسب فاتورة ملغاة/منتهية مرة واحدة فقط."""
+    if not db:
+        return
+    try:
+        if not kv_set(f"rk:cnt:{inv_id}", "1", ex=7 * 86400, nx=True):
+            return
+        ensure_profile(uid)
+        db.hincrby(_prof_key(uid), "cancelled", 1)
+    except Exception as e:
+        print(f"record_cancel error: {e}")
+
+def _fmt_date(ts):
+    return time.strftime("%d %b %Y, %H:%M", time.gmtime(ts)) if ts else "—"
+
+def _pcts(done, canc):
+    tot = done + canc
+    if tot <= 0:
+        return 0, 0
+    d = round(done * 100 / tot)
+    return d, 100 - d
+
+def _pf_markup(lang, screen, wallet_label=None):
+    m = InlineKeyboardMarkup()
+    if screen == "profile":
+        m.row(
+            InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"),
+            InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"),
+        )
+    elif screen == "hist":
+        m.add(InlineKeyboardButton(text=wallet_label or wt(lang, "btn_wallet"), callback_data="pf_wallet"))
+        m.add(InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"))
+    else:
+        m.add(InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK))
+        m.add(InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"))
+    m.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="pf_back"))
+    return m
+
+def _pf_show(call, text, markup):
+    chat_id = call.message.chat.id
+    if call.message.content_type == "text":
+        try:
+            bot.edit_message_text(text, chat_id, call.message.message_id, parse_mode="HTML", reply_markup=markup)
+            return
+        except Exception as e:
+            if "not modified" in str(e).lower():
+                return
+    bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
+
+def _history_lines(lang, uid):
+    items = sorted(ubuy_get(uid).items(), key=lambda kv: -kv[1])
+    if not items:
+        return wt(lang, "history_empty")
+    lines = [wt(lang, "by_product")]
+    for field, n in items:
+        kind, _, val = field.partition(":")
+        if kind == "p" and find_product(val):
+            name = tr(find_product(val), "name", lang)
+        else:
+            name = val
+        lines.append(f"• {html.escape(name)}: {n}")
+    return "\n".join(lines)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("pf_"))
+def handle_profile_callbacks(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    data = call.data
+
+    if data == "pf_back":  # لا يمسح فاتورة الدفع المفتوحة
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+        send_main_menu(call.message.chat.id, lang)
+        bot.answer_callback_query(call.id)
+        return
+
+    if not db:
+        bot.answer_callback_query(call.id, wt(lang, "unavailable"), show_alert=True)
+        return
+    register_user(uid)
+    ensure_profile(uid, call.from_user.first_name)
+    try:
+        p = prof_get(uid)
+        total_c = wallet_total_c(p["spent_c"])
+        avail_c = max(0, total_c - p["redeemed_c"])
+        if data == "pf_profile":
+            text = wt(lang, "profile").format(
+                id=uid, name=html.escape(call.from_user.first_name or "-"),
+                joined=_fmt_date(p["joined"]), buys=p["buys"], spent=_money(p["spent_c"]),
+            )
+            markup = _pf_markup(lang, "profile")
+        elif data == "pf_hist":
+            dp, cp = _pcts(p["buys"], p["cancelled"])
+            text = (
+                wt(lang, "history").format(
+                    lines=_history_lines(lang, uid), done=p["buys"], done_pct=dp,
+                    canc=p["cancelled"], canc_pct=cp,
+                )
+                + "\n\n" + wt(lang, "wallet_note")
+            )
+            markup = _pf_markup(lang, "hist", f"{wt(lang, 'btn_wallet')} | ${_money(avail_c)}")
+        elif data == "pf_wallet":
+            text = (
+                wt(lang, "wallet").format(
+                    spent=_money(p["spent_c"]), pct=WALLET_PCT, total=_money(total_c),
+                    used=_money(p["redeemed_c"]), avail=_money(avail_c),
+                )
+                + "\n\n" + wt(lang, "wallet_note")
+            )
+            markup = _pf_markup(lang, "wallet")
+        else:
+            bot.answer_callback_query(call.id)
+            return
+    except Exception as e:
+        print(f"profile view error: {e}")
+        bot.answer_callback_query(call.id, wt(lang, "unavailable"), show_alert=True)
+        return
+    _pf_show(call, text, markup)
+    bot.answer_callback_query(call.id)
+
+# ---------- أدوات الأدمن: المحفظة والشراء اليدوي ----------
+_adm_wait = {}  # admin_id -> حالة المعالج بالأزرار
+
+def _acct_exists(uid):
+    uid = str(uid)
+    if uid in known_users or uid in user_lang:
+        return True
+    try:
+        return bool(db and db.exists(_prof_key(uid)))
+    except Exception:
+        return False
+
+def _wlock(uid):
+    try:
+        return bool(kv_set(f"rk:wlock:{uid}", "1", ex=10, nx=True))
+    except StorageError:
+        return False
+
+def _wunlock(uid):
+    try:
+        kv_del(f"rk:wlock:{uid}")
+    except StorageError:
+        pass
+
+def _adm_precheck(uid):
+    if not db:
+        return "⚠️ Upstash غير متصل."
+    if not _acct_exists(uid):
+        return "❌ هذا الزبون غير موجود (ما استعمل البوت من قبل)."
+    return None
+
+def wallet_use(uid, amount, note=""):
+    err = _adm_precheck(uid)
+    if err:
+        return False, err
+    cents = int(amount * 100)
+    if not _wlock(uid):
+        return False, "⏳ عملية أخرى جارية على هذا الزبون، أعد المحاولة بعد ثانية."
+    try:
+        ensure_profile(uid)
+        p = prof_get(uid)
+        avail = wallet_total_c(p["spent_c"]) - p["redeemed_c"]
+        if cents > avail:
+            return False, f"❌ المبلغ أكبر من الرصيد المتاح (${_money(max(avail, 0))})."
+        db.hincrby(_prof_key(uid), "redeemed_c", cents)
+        wlog_add(uid, "use", cents, note)
+        new_avail = avail - cents
+    except Exception as e:
+        return False, f"❌ خطأ: {str(e)[:150]}"
+    finally:
+        _wunlock(uid)
+    monitor_send(
+        f"➖ <b>خصم من المحفظة</b>\n\n👤 {_user_link(uid)}\n💵 ${_money(cents)}\n"
+        f"💼 المتاح الآن: ${_money(new_avail)}" + (f"\n📝 {html.escape(note)}" if note else "")
+    )
+    return True, f"✅ تم خصم ${_money(cents)} من محفظة <code>{uid}</code>\n💼 الرصيد المتاح الآن: <b>${_money(new_avail)}</b>"
+
+def wallet_add(uid, amount, note=""):
+    err = _adm_precheck(uid)
+    if err:
+        return False, err
+    cents = int(amount * 100)
+    if not _wlock(uid):
+        return False, "⏳ عملية أخرى جارية على هذا الزبون، أعد المحاولة بعد ثانية."
+    try:
+        ensure_profile(uid)
+        p = prof_get(uid)
+        if cents > p["redeemed_c"]:
+            return False, f"❌ لا يمكن إرجاع أكثر مما تم استبداله (${_money(p['redeemed_c'])})."
+        db.hincrby(_prof_key(uid), "redeemed_c", -cents)
+        wlog_add(uid, "add", cents, note)
+        new_avail = wallet_total_c(p["spent_c"]) - (p["redeemed_c"] - cents)
+    except Exception as e:
+        return False, f"❌ خطأ: {str(e)[:150]}"
+    finally:
+        _wunlock(uid)
+    monitor_send(
+        f"↩️ <b>إرجاع رصيد للمحفظة</b>\n\n👤 {_user_link(uid)}\n💵 ${_money(cents)}\n"
+        f"💼 المتاح الآن: ${_money(new_avail)}" + (f"\n📝 {html.escape(note)}" if note else "")
+    )
+    return True, f"✅ تم إرجاع ${_money(cents)} إلى محفظة <code>{uid}</code>\n💼 الرصيد المتاح الآن: <b>${_money(new_avail)}</b>"
+
+def add_manual_purchase(uid, amount, pname):
+    err = _adm_precheck(uid)
+    if err:
+        return False, err
+    pname = (pname or "").strip() or "شراء يدوي"
+    record_purchase(uid, None, pname, amount, f"manual:{uuid.uuid4().hex[:12]}")
+    try:
+        p = prof_get(uid)
+    except Exception as e:
+        return False, f"❌ خطأ: {str(e)[:150]}"
+    avail = wallet_total_c(p["spent_c"]) - p["redeemed_c"]
+    monitor_send(
+        f"➕ <b>شراء يدوي مسجل</b>\n\n👤 {_user_link(uid)}\n📦 {html.escape(pname)}\n💵 ${amount:.2f}\n"
+        f"💼 المتاح الآن: ${_money(avail)}"
+    )
+    return True, (
+        f"✅ سُجل شراء يدوي للزبون <code>{uid}</code>: {html.escape(pname)} — ${amount:.2f}\n"
+        f"🛒 مجموع مشترياته: {p['buys']} | 💵 ${_money(p['spent_c'])}\n"
+        f"💼 الرصيد المتاح: <b>${_money(avail)}</b>"
+    )
+
+def admin_view_text(uid):
+    err = _adm_precheck(uid)
+    if err:
+        return err
+    try:
+        p = prof_get(uid)
+        total_c = wallet_total_c(p["spent_c"])
+        name = p["name"]
+        if not name:
+            try:
+                name = bot.get_chat(int(uid)).first_name or "-"
+            except Exception:
+                name = "-"
+        dp, cp = _pcts(p["buys"], p["cancelled"])
+        kinds = {"buy": "🛒 شراء", "use": "➖ خصم", "add": "↩️ إرجاع"}
+        ops = []
+        for r in wlog_list(uid, 5):
+            when = time.strftime("%m-%d %H:%M", time.gmtime(r.get("t", 0)))
+            ops.append(f"• {when} | {kinds.get(r.get('k'), r.get('k'))} ${_money(r.get('c', 0))} {html.escape(str(r.get('n', ''))[:40])}")
+        return (
+            f"👤 <b>ملف الزبون</b>\n\n🆔 <code>{uid}</code>\n📛 {html.escape(name)}\n"
+            f"📅 الانضمام: {_fmt_date(p['joined'])}\n"
+            f"🛒 المكتملة: {p['buys']} ({dp}%) | ❌ الملغاة: {p['cancelled']} ({cp}%)\n"
+            f"💵 الإنفاق: ${_money(p['spent_c'])}\n\n"
+            f"💼 <b>المحفظة</b>: ${_money(total_c)} | المستبدل: ${_money(p['redeemed_c'])} | "
+            f"المتاح: <b>${_money(max(0, total_c - p['redeemed_c']))}</b>\n\n"
+            f"🧾 آخر العمليات:\n" + ("\n".join(ops) if ops else "— لا شيء —")
+        )
+    except Exception as e:
+        return f"❌ خطأ: {str(e)[:150]}"
+
+def _adm_args(message):
+    return (message.text or "").split(maxsplit=3)[1:]
+
+@bot.message_handler(commands=["wallet"])
+def wallet_cmd(message):
+    if not is_admin_msg(message):
+        return
+    a = _adm_args(message)
+    if not a or not a[0].isdigit():
+        bot.reply_to(message, "الاستعمال: /wallet ID")
+        return
+    bot.send_message(message.chat.id, admin_view_text(a[0]), parse_mode="HTML")
+
+@bot.message_handler(commands=["walletuse", "walletadd"])
+def wallet_change_cmd(message):
+    if not is_admin_msg(message):
+        return
+    cmd = message.text.split()[0].lstrip("/").split("@")[0]
+    a = _adm_args(message)
+    amount = _parse_price(a[1]) if len(a) > 1 else None
+    if len(a) < 2 or not a[0].isdigit() or amount is None:
+        bot.reply_to(message, f"الاستعمال: /{cmd} ID المبلغ [ملاحظة]")
+        return
+    fn = wallet_use if cmd == "walletuse" else wallet_add
+    ok, msg = fn(a[0], amount, a[2] if len(a) > 2 else "")
+    bot.send_message(message.chat.id, msg, parse_mode="HTML")
+
+@bot.message_handler(commands=["addpurchase"])
+def addpurchase_cmd(message):
+    if not is_admin_msg(message):
+        return
+    a = _adm_args(message)
+    amount = _parse_price(a[1]) if len(a) > 1 else None
+    if len(a) < 2 or not a[0].isdigit() or amount is None:
+        bot.reply_to(message, "الاستعمال: /addpurchase ID المبلغ [اسم المنتج]")
+        return
+    name = " ".join(a[2:]) if len(a) > 2 else ""
+    ok, msg = add_manual_purchase(a[0], amount, name)
+    bot.send_message(message.chat.id, msg, parse_mode="HTML")
+
+@bot.message_handler(commands=["admin"])
+def admin_panel_cmd(message):
+    if not is_admin_msg(message):
+        return
+    _adm_wait.pop(message.from_user.id, None)
+    _price_wait.pop(message.from_user.id, None)
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton(text="➖ خصم من المحفظة", callback_data="adm_use"),
+        InlineKeyboardButton(text="↩️ إرجاع رصيد", callback_data="adm_add"),
+    )
+    markup.add(InlineKeyboardButton(text="➕ تسجيل شراء يدوي", callback_data="adm_buy"))
+    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callback_data="adm_view"))
+    bot.send_message(message.chat.id, "🛠️ <b>لوحة الأدمن</b>\nاختر العملية:", parse_mode="HTML", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("adm_"))
+def handle_admin_panel(call):
+    if not _is_admin_user(call.from_user.id):
+        bot.answer_callback_query(call.id)
+        return
+    op = call.data[4:]
+    if op not in ("use", "add", "buy", "view"):
+        bot.answer_callback_query(call.id)
+        return
+    _price_wait.pop(call.from_user.id, None)
+    _adm_wait[call.from_user.id] = {"op": op, "step": "id"}
+    bot.send_message(call.message.chat.id, "🆔 أرسل ID الزبون:\n(أو /admin للإلغاء)")
+    bot.answer_callback_query(call.id)
+
+def _awaiting_admin_wizard(m):
+    return (
+        bool(m.text) and not m.text.startswith("/")
+        and m.chat.type == "private" and _is_admin_user(m.from_user.id)
+        and m.from_user.id in _adm_wait
+    )
+
+@bot.message_handler(func=_awaiting_admin_wizard, content_types=["text"])
+def handle_admin_wizard(message):
+    aid = message.from_user.id
+    st = _adm_wait[aid]
+    text = message.text.strip()
+
+    if st["step"] == "id":
+        if not text.isdigit():
+            bot.reply_to(message, "❌ ID غير صالح، أرسل أرقاماً فقط.")
+            return
+        st["uid"] = text
+        if st["op"] == "view":
+            _adm_wait.pop(aid, None)
+            bot.send_message(message.chat.id, admin_view_text(text), parse_mode="HTML")
+            return
+        st["step"] = "amount"
+        bot.reply_to(message, "💵 أرسل المبلغ بالدولار (مثال: 4.55):")
+        return
+
+    if st["step"] == "amount":
+        amount = _parse_price(text)
+        if amount is None:
+            bot.reply_to(message, "❌ مبلغ غير صالح. أرسل مثلاً: 4.55")
+            return
+        st["amount"] = amount
+        if st["op"] == "buy":
+            st["step"] = "name"
+            bot.reply_to(message, "📦 أرسل اسم المنتج (أو أرسل - لتخطيه):")
+            return
+        _adm_wait.pop(aid, None)
+        fn = wallet_use if st["op"] == "use" else wallet_add
+        ok, msg = fn(st["uid"], amount, "")
+        bot.send_message(message.chat.id, msg, parse_mode="HTML")
+        return
+
+    if st["step"] == "name":
+        _adm_wait.pop(aid, None)
+        ok, msg = add_manual_purchase(st["uid"], st["amount"], "" if text == "-" else text)
+        bot.send_message(message.chat.id, msg, parse_mode="HTML")
 
 # ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========
 ORDER_ID_RE = re.compile(r"[A-Za-z0-9_\-]{8,64}")
@@ -2713,6 +3227,7 @@ def expire_invoice(inv_id):
 
     # المرحلة 1: عند انتهاء 20 دقيقة (مرة واحدة فقط)
     if kv_set(f"rk:invexp:{inv_id}", "1", ex=INVOICE_TTL + INVOICE_GRACE + 3600, nx=True):
+        record_cancel(uid, inv_id)
         lang = get_lang(uid)
         chat_id = inv.get("chat_id") or uid
         mins = {"ttl": INVOICE_TTL // 60, "grace": INVOICE_GRACE // 60}
