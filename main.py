@@ -134,44 +134,109 @@ GEMINI_TEXTS = {
     },
 }
 
-WALLET_PCT = 5  # نسبة المحفظة من إجمالي المشتريات المكتملة
+WALLET_PCT = 5         # مكافأة المحفظة على الشراء المدفوع مباشرة بـ Binance (وعلى /addpurchase)
+GIFT_REWARD_PCT = 2    # مكافأة بطاقات الهداية
+TOPUP_PID = "__topup__"            # معرّف فاتورة شحن المحفظة
+TOPUP_AMOUNTS = (1, 5, 10, 20)     # أزرار الشحن السريع
+TOPUP_MIN = Decimal("0.5")
+TOPUP_MAX = Decimal("500")
 
 WALLET_TEXTS = {
     "ar": {
         "btn_profile": "👤 الملف الشخصي",
         "btn_history": "🧾 سجل المشتريات",
         "btn_wallet": "💼 المحفظة",
+        "btn_topup": "➕ شحن المحفظة",
+        "btn_topup_other": "✏️ مبلغ آخر",
         "unavailable": "⚠️ الخدمة غير متاحة حالياً، حاول لاحقاً.",
         "profile": "👤 <b>ملفك الشخصي</b>\n\n🆔 المعرّف: <code>{id}</code>\n📛 الاسم: {name}\n📅 تاريخ الانضمام: {joined}\n🛒 إجمالي المشتريات: {buys}\n💵 إجمالي الإنفاق: ${spent}",
-        "history": "🧾 <b>سجل المشتريات</b>\n\n{lines}\n\n✅ المكتملة: {done} ({done_pct}%)\n❌ الملغاة: {canc} ({canc_pct}%)",
+        "history": "🧾 <b>سجل المشتريات</b>\n\n{lines}\n\n✅ المكتملة: {done}\n❌ الملغاة: {canc}\n📊 نسبة النجاح: {pct}%",
         "by_product": "📦 المشتريات حسب المنتج:",
         "history_empty": "— لا توجد مشتريات بعد —",
-        "wallet": "💼 <b>المحفظة</b>\n\n🛍️ مجموع مشترياتك: ${spent}\n🎁 رصيد المحفظة ({pct}%): ${total}\n➖ تم استبداله: ${used}\n✅ <b>الرصيد المتاح: ${avail}</b>",
+        "wallet": "💼 <b>المحفظة</b>\n\n🎁 المكافآت: ${rewards}\n💳 الرصيد المشحون: ${topup}\n➖ المستخدم: ${used}\n✅ <b>الرصيد المتاح: ${avail}</b>\n\n🎁 مكافأة {pct}% على كل شراء مدفوع مباشرة بـ Binance ({gift_pct}% لبطاقات الهداية). الشحن والدفع من المحفظة لا يعطيان مكافأة.",
         "wallet_note": "ℹ️ لما يوصل رصيدك لقيمة منتج حاب تستبدل بيه، تواصل معانا في خانة الدعم (تسليم يدوي).",
+        "topup_pick": "➕ <b>شحن المحفظة</b>\n\nاختر المبلغ الذي تريد شحنه (USDT):",
+        "topup_other_prompt": "✏️ أرسل المبلغ الذي تريد شحنه بالدولار (من {min} إلى {max}).\nمثال: <code>7.5</code>",
+        "topup_bad": "❌ مبلغ غير صالح. أرسل رقماً بين {min} و {max}.",
+        "topup_name": "💳 شحن المحفظة",
+        "topup_steps": "1️⃣ افتح Binance ← Pay ← إرسال\n2️⃣ ضع المعرف أعلاه وأرسل المبلغ بعملة <b>USDT</b>\n3️⃣ بعد الدفع انسخ <b>رقم العملية (Order ID)</b> وأرسله هنا في الشات\n\n✅ يُضاف المبلغ المدفوع فعلياً إلى محفظتك بعد التحقق (بدون مكافأة).",
+        "topup_edit_done": "✅ <b>تم شحن المحفظة</b>\n\n💵 {amount} USDT",
+        "topup_credited": "✅ تم شحن محفظتك بمبلغ <b>{amount}$</b>.\n💼 الرصيد المتاح: <b>${avail}</b>",
+        "partial": "✅ تم استلام <b>{paid} USDT</b> من أصل {need} USDT.\n\n💳 أكمل المبلغ الباقي <b>{rest}$</b> وابعث رقم العملية الجديد باش نسلّمك منتجك.",
+        "already_counted": "ℹ️ رقم العملية هذا محسوب مسبقاً.\n💳 المبلغ المتبقي: <b>{rest}$</b> — ابعث رقم عملية جديد.",
+        "converted": "⌛ انتهت الفاتورة ولم يكتمل الدفع.\n💼 تمت إضافة <b>{amount}$</b> إلى محفظتك (بدون مكافأة). تقدر تشحن الباقي وتشتري من المحفظة.",
+        "wpay_btn": "💼 ادفع من المحفظة",
+        "wpay_done": "✅ <b>تم الدفع من المحفظة</b>\n\n📦 {product}\n💵 {amount} USDT",
+        "wpay_fail": "⚠️ تعذر تسليم طلبك الآن، تم إرجاع <b>{amount}$</b> إلى محفظتك. حاول لاحقاً أو تواصل مع الدعم.",
+        "wpay_short": "❌ رصيد المحفظة غير كافٍ.",
+        "wpay_expired": "⌛ انتهت صلاحية هذه الفاتورة.",
+        "wpay_mixed": "⚠️ دفعت جزءاً من هذه الفاتورة عبر Binance، أكمل الباقي عبر Binance (لا يمكن الدفع المختلط).",
+        "wpay_busy": "⏳ حاول مرة أخرى بعد لحظة.",
+        "wpay_out": "❌ هذا المنتج غير متوفر حالياً.",
     },
     "en": {
         "btn_profile": "👤 My profile",
         "btn_history": "🧾 Purchase history",
         "btn_wallet": "💼 Wallet",
+        "btn_topup": "➕ Top up wallet",
+        "btn_topup_other": "✏️ Other amount",
         "unavailable": "⚠️ Service unavailable right now, try again later.",
         "profile": "👤 <b>Your profile</b>\n\n🆔 ID: <code>{id}</code>\n📛 Name: {name}\n📅 Joined: {joined}\n🛒 Total purchases: {buys}\n💵 Total spent: ${spent}",
-        "history": "🧾 <b>Purchase history</b>\n\n{lines}\n\n✅ Completed: {done} ({done_pct}%)\n❌ Cancelled: {canc} ({canc_pct}%)",
+        "history": "🧾 <b>Purchase history</b>\n\n{lines}\n\n✅ Completed: {done}\n❌ Cancelled: {canc}\n📊 Success rate: {pct}%",
         "by_product": "📦 Purchases by product:",
         "history_empty": "— No purchases yet —",
-        "wallet": "💼 <b>Wallet</b>\n\n🛍️ Your total purchases: ${spent}\n🎁 Wallet balance ({pct}%): ${total}\n➖ Already used: ${used}\n✅ <b>Available balance: ${avail}</b>",
+        "wallet": "💼 <b>Wallet</b>\n\n🎁 Rewards: ${rewards}\n💳 Topped-up balance: ${topup}\n➖ Used: ${used}\n✅ <b>Available balance: ${avail}</b>\n\n🎁 {pct}% reward on every purchase paid directly with Binance ({gift_pct}% for gift cards). Top-ups and wallet payments earn no reward.",
         "wallet_note": "ℹ️ When your balance reaches the value of a product you want to exchange it for, contact us in the support section (manual delivery).",
+        "topup_pick": "➕ <b>Top up wallet</b>\n\nChoose the amount to add (USDT):",
+        "topup_other_prompt": "✏️ Send the amount you want to add in dollars ({min} to {max}).\nExample: <code>7.5</code>",
+        "topup_bad": "❌ Invalid amount. Send a number between {min} and {max}.",
+        "topup_name": "💳 Wallet top-up",
+        "topup_steps": "1️⃣ Open Binance → Pay → Send\n2️⃣ Enter the ID above and send the amount in <b>USDT</b>\n3️⃣ After paying, copy the <b>Order ID</b> and send it here in the chat\n\n✅ The amount actually paid is added to your wallet after verification (no reward).",
+        "topup_edit_done": "✅ <b>Wallet topped up</b>\n\n💵 {amount} USDT",
+        "topup_credited": "✅ Your wallet was topped up with <b>{amount}$</b>.\n💼 Available balance: <b>${avail}</b>",
+        "partial": "✅ Received <b>{paid} USDT</b> out of {need} USDT.\n\n💳 Pay the remaining <b>{rest}$</b> and send the new Order ID so we can deliver your product.",
+        "already_counted": "ℹ️ This Order ID was already counted.\n💳 Remaining amount: <b>{rest}$</b> — send a new Order ID.",
+        "converted": "⌛ The invoice expired and the payment was not completed.\n💼 <b>{amount}$</b> was added to your wallet (no reward). You can top up the rest and buy from the wallet.",
+        "wpay_btn": "💼 Pay from wallet",
+        "wpay_done": "✅ <b>Paid from wallet</b>\n\n📦 {product}\n💵 {amount} USDT",
+        "wpay_fail": "⚠️ We couldn't deliver your order right now, <b>{amount}$</b> was refunded to your wallet. Try again later or contact support.",
+        "wpay_short": "❌ Not enough wallet balance.",
+        "wpay_expired": "⌛ This invoice has expired.",
+        "wpay_mixed": "⚠️ You already paid part of this invoice with Binance, pay the rest with Binance (mixed payment isn't possible).",
+        "wpay_busy": "⏳ Please try again in a moment.",
+        "wpay_out": "❌ This product is currently unavailable.",
     },
     "fr": {
         "btn_profile": "👤 Mon profil",
         "btn_history": "🧾 Historique d'achats",
         "btn_wallet": "💼 Portefeuille",
+        "btn_topup": "➕ Recharger le portefeuille",
+        "btn_topup_other": "✏️ Autre montant",
         "unavailable": "⚠️ Service indisponible pour le moment, réessayez plus tard.",
         "profile": "👤 <b>Votre profil</b>\n\n🆔 ID : <code>{id}</code>\n📛 Nom : {name}\n📅 Inscription : {joined}\n🛒 Total des achats : {buys}\n💵 Total dépensé : ${spent}",
-        "history": "🧾 <b>Historique d'achats</b>\n\n{lines}\n\n✅ Terminées : {done} ({done_pct}%)\n❌ Annulées : {canc} ({canc_pct}%)",
+        "history": "🧾 <b>Historique d'achats</b>\n\n{lines}\n\n✅ Terminées : {done}\n❌ Annulées : {canc}\n📊 Taux de réussite : {pct}%",
         "by_product": "📦 Achats par produit :",
         "history_empty": "— Aucun achat pour le moment —",
-        "wallet": "💼 <b>Portefeuille</b>\n\n🛍️ Total de vos achats : ${spent}\n🎁 Solde du portefeuille ({pct}%) : ${total}\n➖ Déjà utilisé : ${used}\n✅ <b>Solde disponible : ${avail}</b>",
+        "wallet": "💼 <b>Portefeuille</b>\n\n🎁 Récompenses : ${rewards}\n💳 Solde rechargé : ${topup}\n➖ Utilisé : ${used}\n✅ <b>Solde disponible : ${avail}</b>\n\n🎁 {pct}% de récompense sur chaque achat payé directement avec Binance ({gift_pct}% pour les cartes cadeaux). Les recharges et paiements par portefeuille ne donnent pas de récompense.",
         "wallet_note": "ℹ️ Quand votre solde atteint la valeur d'un produit que vous voulez échanger, contactez-nous dans la section assistance (livraison manuelle).",
+        "topup_pick": "➕ <b>Recharger le portefeuille</b>\n\nChoisissez le montant à ajouter (USDT) :",
+        "topup_other_prompt": "✏️ Envoyez le montant à ajouter en dollars ({min} à {max}).\nExemple : <code>7.5</code>",
+        "topup_bad": "❌ Montant invalide. Envoyez un nombre entre {min} et {max}.",
+        "topup_name": "💳 Recharge du portefeuille",
+        "topup_steps": "1️⃣ Ouvrez Binance → Pay → Envoyer\n2️⃣ Entrez l'ID ci-dessus et envoyez le montant en <b>USDT</b>\n3️⃣ Après le paiement, copiez le <b>numéro de commande (Order ID)</b> et envoyez-le ici dans le chat\n\n✅ Le montant réellement payé est ajouté à votre portefeuille après vérification (sans récompense).",
+        "topup_edit_done": "✅ <b>Portefeuille rechargé</b>\n\n💵 {amount} USDT",
+        "topup_credited": "✅ Votre portefeuille a été rechargé de <b>{amount}$</b>.\n💼 Solde disponible : <b>${avail}</b>",
+        "partial": "✅ Reçu <b>{paid} USDT</b> sur {need} USDT.\n\n💳 Payez le reste <b>{rest}$</b> et envoyez le nouveau numéro de commande pour recevoir votre produit.",
+        "already_counted": "ℹ️ Ce numéro de commande est déjà comptabilisé.\n💳 Montant restant : <b>{rest}$</b> — envoyez un nouveau numéro.",
+        "converted": "⌛ La facture a expiré et le paiement n'a pas été complété.\n💼 <b>{amount}$</b> ont été ajoutés à votre portefeuille (sans récompense). Vous pouvez recharger le reste et acheter avec le portefeuille.",
+        "wpay_btn": "💼 Payer avec le portefeuille",
+        "wpay_done": "✅ <b>Payé avec le portefeuille</b>\n\n📦 {product}\n💵 {amount} USDT",
+        "wpay_fail": "⚠️ Impossible de livrer votre commande pour le moment, <b>{amount}$</b> ont été remboursés dans votre portefeuille. Réessayez plus tard ou contactez l'assistance.",
+        "wpay_short": "❌ Solde du portefeuille insuffisant.",
+        "wpay_expired": "⌛ Cette facture a expiré.",
+        "wpay_mixed": "⚠️ Vous avez déjà payé une partie de cette facture avec Binance, payez le reste avec Binance (paiement mixte impossible).",
+        "wpay_busy": "⏳ Réessayez dans un instant.",
+        "wpay_out": "❌ Ce produit est actuellement indisponible.",
     },
 }
 
@@ -1066,7 +1131,7 @@ def _fulfill_gemini(chat_id, uid, lang, claim, canon, retry, mark, failed):
                     f"🧾 <code>{html.escape(canon)}</code>\n" + "\n".join(html.escape(x) for x in links))
     mark("delivered")
     clear_pending(uid)
-    record_purchase(uid, GEMINI_ID, claim.get("product_name"), claim.get("price"), canon)
+    record_purchase(uid, GEMINI_ID, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))
 
     left = gemini_stock()
     alert_admin(
@@ -1406,7 +1471,7 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
         if not retry and first_time:
             alert_admin(admin_text)
             monitor_send("⏳ <b>طلب معلّق</b>\n\n" + admin_text)
-        if not retry:
+        if not retry and claim.get("via") != "wallet":
             bot.send_message(chat_id, t(lang, "processing"), reply_markup=support_markup(lang))
 
     # Gemini: تسليم من Upstash (بدون FAZER)
@@ -1462,7 +1527,7 @@ def _fulfill_locked(chat_id, uid, lang, claim, canon, retry):
                 monitor_send(f"⚠️ <b>تعذر إرسال الكود للزبون</b> {_user_link(uid)}\nالكود وصلك في البوت الرئيسي.")
             mark("delivered")
             clear_pending(uid)
-            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon)
+            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))
 
             # رسالة الشكر: تُرسل مرة واحدة فقط، بعد تسليم الكود فعلياً، ولا تؤثر على التسليم
             if delivered_ok:
@@ -1608,48 +1673,113 @@ def process_order_id(message, order_id):
         bot.send_message(chat_id, t(lang, "old_tx"))
         return
 
-    need = _to_decimal(invoice["price_usdt"])
-    if tx["amount"] < need:
-        bot.send_message(
-            chat_id,
-            t(lang, "underpaid").format(paid=tx["amount"].normalize(), need=need),
-            reply_markup=support_markup(lang),
-        )
-        return
+    _settle_payment(chat_id, uid, lang, inv_id, invoice, tx)
 
+def _settle_payment(chat_id, uid, lang, inv_id, invoice, tx):
+    """يطبّق الدفعة على الفاتورة: شحن محفظة، أو دفعة ناقصة تُجمع، أو دفعة مكتملة تُسلَّم."""
+    need = _to_decimal(invoice["price_usdt"])
     canon = tx["tx_id"]
-    claim = {
-        "user_id": uid,
-        "invoice_id": inv_id,
-        "product_id": invoice["product_id"],
-        "label": invoice["label"],
-        "product_name": invoice["product_name"],
-        "price": invoice["price_usdt"],
-        "paid": str(tx["amount"].normalize()),
-        "status": "claimed",
-        "ts": int(time.time()),
-    }
+    amount = tx["amount"]
+    is_topup = invoice["product_id"] == TOPUP_PID
+
     try:
-        if kv_set(f"rk:tx:{canon}", json.dumps(claim), nx=True):
-            # عملية جديدة: اربطها بالفاتورة (مرة واحدة فقط)
-            if not kv_set(f"rk:invpaid:{inv_id}", canon, nx=True):
-                if str(kv_get(f"rk:invpaid:{inv_id}")) != canon:
-                    kv_del(f"rk:tx:{canon}")
-                    bot.send_message(chat_id, t(lang, "used"))
-                    return
-        else:
-            existing = kv_get_json(f"rk:tx:{canon}")
-            if not existing or str(existing.get("user_id")) != str(uid):
+        existing = kv_get_json(f"rk:tx:{canon}")
+        if existing:  # طلب مكتمل سابق: إعادة محاولة تسليم لنفس الزبون فقط
+            if is_topup or str(existing.get("user_id")) != str(uid):
                 bot.send_message(chat_id, t(lang, "used"))
                 return
             if existing.get("status") == "delivered":
                 clear_pending(uid)
                 bot.send_message(chat_id, t(lang, "used"), reply_markup=support_markup(lang))
                 return
-            claim = existing  # إعادة محاولة لعملية مدفوعة لم تُسلَّم
+            fulfill_order(chat_id, uid, lang, existing, canon)
+            return
+        owner = kv_get(f"rk:txu:{canon}")  # عملية سُجلت سابقاً كدفعة جزئية/شحن
+        if owner is not None:
+            if is_topup or str(owner) != str(inv_id) or kv_get(f"rk:invpaid:{inv_id}") is not None:
+                bot.send_message(chat_id, t(lang, "used"))
+                return
+            acc = kv_get_json(f"rk:invp:{inv_id}") or {}
+            rest = max(Decimal(0), need - _to_decimal(acc.get("sum", 0)))
+            bot.send_message(chat_id, wt(lang, "already_counted").format(rest=f"{rest:.2f}"), parse_mode="HTML")
+            return
     except StorageError:
         bot.send_message(chat_id, t(lang, "temp_error"))
         return
+
+    if is_topup:
+        _handle_topup_tx(chat_id, uid, lang, inv_id, invoice, tx)
+        return
+
+    if not db and amount < need:  # بدون Upstash لا يمكن جمع الدفعات
+        bot.send_message(
+            chat_id,
+            t(lang, "underpaid").format(paid=amount.normalize(), need=need),
+            reply_markup=support_markup(lang),
+        )
+        return
+
+    if not _ilock(inv_id):
+        bot.send_message(chat_id, t(lang, "temp_error"))
+        return
+    claim = None
+    try:
+        if kv_get(f"rk:invpaid:{inv_id}") is not None:
+            bot.send_message(chat_id, t(lang, "used"))
+            return
+        if kv_get(f"rk:invconv:{inv_id}") is not None:  # تحولت دفعاتها للمحفظة
+            bot.send_message(chat_id, t(lang, "expired"), reply_markup=support_markup(lang))
+            return
+        acc = kv_get_json(f"rk:invp:{inv_id}") or {}
+        txs = dict(acc.get("txs") or {})
+        total = _to_decimal(acc.get("sum", 0)) + amount
+
+        if total < need:  # دفعة ناقصة: نسجلها ونجمعها مع التالية
+            if not kv_set(f"rk:txu:{canon}", str(inv_id), nx=True):
+                bot.send_message(chat_id, t(lang, "used"))
+                return
+            txs[canon] = str(amount)
+            acc.update({
+                "uid": uid, "pname": invoice["product_name"], "pid": invoice["product_id"],
+                "need": str(need), "txs": txs, "sum": str(total),
+                "exp": invoice["created_at"] + INVOICE_TTL + INVOICE_GRACE,
+            })
+            kv_set(f"rk:invp:{inv_id}", json.dumps(acc), ex=3 * 86400)
+            part_add(inv_id)
+            bot.send_message(
+                chat_id,
+                wt(lang, "partial").format(paid=f"{total:.2f}", need=f"{need:.2f}", rest=f"{need - total:.2f}"),
+                parse_mode="HTML",
+            )
+            return
+
+        claim = {
+            "user_id": uid,
+            "invoice_id": inv_id,
+            "product_id": invoice["product_id"],
+            "label": invoice["label"],
+            "product_name": invoice["product_name"],
+            "price": invoice["price_usdt"],
+            "paid": format(total.normalize(), "f"),
+            "txs": list(txs.keys()) + [canon],
+            "via": "binance",
+            "status": "claimed",
+            "ts": int(time.time()),
+        }
+        if not kv_set(f"rk:tx:{canon}", json.dumps(claim), nx=True):
+            bot.send_message(chat_id, t(lang, "used"))
+            return
+        if not kv_set(f"rk:invpaid:{inv_id}", canon, nx=True):
+            kv_del(f"rk:tx:{canon}")
+            bot.send_message(chat_id, t(lang, "used"))
+            return
+        kv_del(f"rk:invp:{inv_id}")
+        part_remove(inv_id)
+    except StorageError:
+        bot.send_message(chat_id, t(lang, "temp_error"))
+        return
+    finally:
+        _iunlock(inv_id)
 
     fulfill_order(chat_id, uid, lang, claim, canon)
 
@@ -2003,8 +2133,10 @@ def build_invoice_text(lang, invoice, product):
         f"⏱️ {t(lang, 'invoice_expire')}"
     )
 
-def build_invoice_markup(lang, invoice_id):
+def build_invoice_markup(lang, invoice_id, wallet=False):
     markup = InlineKeyboardMarkup()
+    if wallet:
+        markup.add(InlineKeyboardButton(text=wt(lang, "wpay_btn"), callback_data=f"wpay_{invoice_id}"))
     btn = None
     if CopyTextButton is not None:
         try:
@@ -2060,7 +2192,7 @@ def handle_gift_variant(call):
         call.message.chat.id,
         build_invoice_text(lang, invoice, product),
         parse_mode="HTML",
-        reply_markup=build_invoice_markup(lang, invoice_id),
+        reply_markup=build_invoice_markup(lang, invoice_id, _wallet_covers(call.from_user.id, invoice.get("price_usdt"))),
     )
     attach_invoice_msg(invoice_id, sent)
     bot.answer_callback_query(call.id)
@@ -2086,7 +2218,13 @@ def handle_cancel_invoice(call):
         )
     _cancel_id = call.data.replace("cancel_", "", 1)
     inv_live_remove(_cancel_id)  # ألغاها الزبون بنفسه: لا إشعار انتهاء
-    record_cancel(call.from_user.id, _cancel_id)
+    try:
+        _cinv = get_invoice(_cancel_id)
+    except StorageError:
+        _cinv = None
+    if _cinv and _cinv.get("product_id") != TOPUP_PID:
+        convert_partial(_cancel_id)  # إن كانت فيها دفعات جزئية تتحول لمحفظته
+        record_cancel(call.from_user.id, _cancel_id)
     clear_pending(call.from_user.id)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -2174,7 +2312,7 @@ def handle_gemini_qty(call):
         call.message.chat.id,
         build_invoice_text(lang, invoice, product),
         parse_mode="HTML",
-        reply_markup=build_invoice_markup(lang, invoice_id),
+        reply_markup=build_invoice_markup(lang, invoice_id, _wallet_covers(call.from_user.id, invoice.get("price_usdt"))),
     )
     attach_invoice_msg(invoice_id, sent)
     bot.answer_callback_query(call.id)
@@ -2585,8 +2723,9 @@ def wt(lang, key):
 def _money(cents):
     return f"{Decimal(int(cents)) / 100:.2f}"
 
-def wallet_total_c(spent_c):
-    return int(spent_c) * WALLET_PCT // 100
+def wallet_avail_c(p):
+    """الرصيد المتاح = المكافآت + المشحون − المستبدل (يدوي) − المصروف في الشراء من المحفظة."""
+    return max(0, p["reward_c"] + p["topup_c"] - p["redeemed_c"] - p["wspent_c"])
 
 def _prof_key(uid):
     return f"rk:prof:{uid}"
@@ -2612,10 +2751,31 @@ def prof_get(uid):
         except ValueError:
             return 0
 
+    # حسابات قديمة (قبل فصل المكافآت): المكافأة = 5% من الإنفاق
+    reward = _i("reward_c") if "reward_c" in h else _i("spent_c") * WALLET_PCT // 100
     return {
         "name": h.get("name", ""), "joined": _i("joined"), "buys": _i("buys"),
         "spent_c": _i("spent_c"), "redeemed_c": _i("redeemed_c"), "cancelled": _i("cancelled"),
+        "reward_c": reward, "topup_c": _i("topup_c"), "wspent_c": _i("wspent_c"),
     }
+
+def _ensure_reward_field(uid):
+    """يرحّل المكافأة القديمة (5% من الإنفاق) إلى حقل مستقل قبل أول زيادة جديدة."""
+    k = _prof_key(uid)
+    h = {str(a): str(b) for a, b in (db.hgetall(k) or {}).items()}
+    if "reward_c" not in h:
+        try:
+            legacy = int(float(h.get("spent_c", 0) or 0)) * WALLET_PCT // 100
+        except ValueError:
+            legacy = 0
+        db.hsetnx(k, "reward_c", str(legacy))
+
+def wallet_credit(uid, cents, kind, note=""):
+    """يضيف رصيداً مشحوناً (شحن أو دفعة ناقصة محوّلة). بدون مكافأة."""
+    ensure_profile(uid)
+    _ensure_reward_field(uid)
+    db.hincrby(_prof_key(uid), "topup_c", int(cents))
+    wlog_add(uid, kind, cents, note)
 
 def ubuy_get(uid):
     out = {}
@@ -2640,8 +2800,9 @@ def wlog_list(uid, n=5):
             pass
     return rows
 
-def record_purchase(uid, pid, pname, amount, canon):
-    """يسجل شراءً مكتملاً. آمن ضد التكرار (إعادة المحاولة لا تسجل مرتين)."""
+def record_purchase(uid, pid, pname, amount, canon, via="binance"):
+    """يسجل شراءً مكتملاً. آمن ضد التكرار (إعادة المحاولة لا تسجل مرتين).
+    via: binance/manual = مكافأة (2% بطاقات الهداية، 5% الباقي) | wallet = بدون مكافأة."""
     if not db:
         return
     guard = f"rk:rec:{canon}"
@@ -2650,11 +2811,20 @@ def record_purchase(uid, pid, pname, amount, canon):
             return
         cents = int((Decimal(str(amount)) * 100).to_integral_value())
         ensure_profile(uid)
+        _ensure_reward_field(uid)
         k = _prof_key(uid)
+        reward_c = 0
+        if via in ("binance", "manual"):
+            pct = GIFT_REWARD_PCT if pid in GIFT_VARIANTS else WALLET_PCT
+            reward_c = cents * pct // 100
         db.hincrby(k, "buys", 1)
         db.hincrby(k, "spent_c", cents)
+        if reward_c:
+            db.hincrby(k, "reward_c", reward_c)
         db.hincrby(f"rk:ubuy:{uid}", f"p:{pid}" if pid else f"m:{pname}", 1)
         wlog_add(uid, "buy", cents, pname)
+        if reward_c:
+            wlog_add(uid, "reward", reward_c, pname)
     except Exception as e:
         print(f"record_purchase error: {e}")
         try:
@@ -2677,12 +2847,10 @@ def record_cancel(uid, inv_id):
 def _fmt_date(ts):
     return time.strftime("%d %b %Y, %H:%M", time.gmtime(ts)) if ts else "—"
 
-def _pcts(done, canc):
+def _success_pct(done, canc):
+    """نسبة وحدة: المكتملة ترفعها والملغاة تخفضها."""
     tot = done + canc
-    if tot <= 0:
-        return 0, 0
-    d = round(done * 100 / tot)
-    return d, 100 - d
+    return round(done * 100 / tot) if tot > 0 else 0
 
 def _pf_markup(lang, screen, wallet_label=None):
     m = InlineKeyboardMarkup()
@@ -2694,7 +2862,15 @@ def _pf_markup(lang, screen, wallet_label=None):
     elif screen == "hist":
         m.add(InlineKeyboardButton(text=wallet_label or wt(lang, "btn_wallet"), callback_data="pf_wallet"))
         m.add(InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"))
+    elif screen == "topup":
+        m.row(*[
+            InlineKeyboardButton(text=f"{a}$", callback_data=f"pf_topa_{a}")
+            for a in TOPUP_AMOUNTS
+        ])
+        m.add(InlineKeyboardButton(text=wt(lang, "btn_topup_other"), callback_data="pf_topo"))
+        m.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
     else:
+        m.add(InlineKeyboardButton(text=wt(lang, "btn_topup"), callback_data="pf_top"))
         m.add(InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK))
         m.add(InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"))
     m.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="pf_back"))
@@ -2745,10 +2921,45 @@ def handle_profile_callbacks(call):
         return
     register_user(uid)
     ensure_profile(uid, call.from_user.first_name)
+    if data != "pf_topo":
+        _topup_wait.pop(uid, None)
+
+    # ---- شحن المحفظة ----
+    if data == "pf_top":
+        _pf_show(call, wt(lang, "topup_pick"), _pf_markup(lang, "topup"))
+        bot.answer_callback_query(call.id)
+        return
+    if data.startswith("pf_topa_"):
+        try:
+            amount = Decimal(data[len("pf_topa_"):])
+        except InvalidOperation:
+            bot.answer_callback_query(call.id)
+            return
+        if amount not in [Decimal(a) for a in TOPUP_AMOUNTS]:
+            bot.answer_callback_query(call.id)
+            return
+        try:
+            start_topup_invoice(call.message.chat.id, uid, lang, amount)
+        except StorageError:
+            bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
+            return
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+        bot.answer_callback_query(call.id)
+        return
+    if data == "pf_topo":
+        _topup_wait[uid] = True
+        m = InlineKeyboardMarkup()
+        m.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data="pf_wallet"))
+        _pf_show(call, wt(lang, "topup_other_prompt").format(min=TOPUP_MIN, max=TOPUP_MAX), m)
+        bot.answer_callback_query(call.id)
+        return
+
     try:
         p = prof_get(uid)
-        total_c = wallet_total_c(p["spent_c"])
-        avail_c = max(0, total_c - p["redeemed_c"])
+        avail_c = wallet_avail_c(p)
         if data == "pf_profile":
             text = wt(lang, "profile").format(
                 id=uid, name=html.escape(call.from_user.first_name or "-"),
@@ -2756,11 +2967,10 @@ def handle_profile_callbacks(call):
             )
             markup = _pf_markup(lang, "profile")
         elif data == "pf_hist":
-            dp, cp = _pcts(p["buys"], p["cancelled"])
             text = (
                 wt(lang, "history").format(
-                    lines=_history_lines(lang, uid), done=p["buys"], done_pct=dp,
-                    canc=p["cancelled"], canc_pct=cp,
+                    lines=_history_lines(lang, uid), done=p["buys"],
+                    canc=p["cancelled"], pct=_success_pct(p["buys"], p["cancelled"]),
                 )
                 + "\n\n" + wt(lang, "wallet_note")
             )
@@ -2768,8 +2978,9 @@ def handle_profile_callbacks(call):
         elif data == "pf_wallet":
             text = (
                 wt(lang, "wallet").format(
-                    spent=_money(p["spent_c"]), pct=WALLET_PCT, total=_money(total_c),
-                    used=_money(p["redeemed_c"]), avail=_money(avail_c),
+                    rewards=_money(p["reward_c"]), topup=_money(p["topup_c"]),
+                    used=_money(p["redeemed_c"] + p["wspent_c"]), avail=_money(avail_c),
+                    pct=WALLET_PCT, gift_pct=GIFT_REWARD_PCT,
                 )
                 + "\n\n" + wt(lang, "wallet_note")
             )
@@ -2783,6 +2994,328 @@ def handle_profile_callbacks(call):
         return
     _pf_show(call, text, markup)
     bot.answer_callback_query(call.id)
+
+# ---------- شحن المحفظة / الدفعات الناقصة / الدفع من المحفظة ----------
+_topup_wait = {}  # user_id -> ينتظر مبلغ الشحن مكتوباً
+
+def _ilock(inv_id):
+    try:
+        return bool(kv_set(f"rk:invlock:{inv_id}", "1", ex=30, nx=True))
+    except StorageError:
+        return False
+
+def _iunlock(inv_id):
+    try:
+        kv_del(f"rk:invlock:{inv_id}")
+    except StorageError:
+        pass
+
+def part_add(inv_id):
+    if db:
+        try:
+            db.sadd("rk:partset", inv_id)
+        except Exception as e:
+            print(f"part_add error: {e}")
+
+def part_remove(inv_id):
+    if db:
+        try:
+            db.srem("rk:partset", inv_id)
+        except Exception as e:
+            print(f"part_remove error: {e}")
+
+def part_list():
+    if not db:
+        return []
+    try:
+        return [str(x) for x in (db.smembers("rk:partset") or [])]
+    except Exception as e:
+        print(f"part_list error: {e}")
+        return []
+
+def _edit_invoice_msg(invoice, text):
+    """يعدّل رسالة الفاتورة ويحذف أزرارها."""
+    if invoice and invoice.get("message_id"):
+        try:
+            bot.edit_message_text(
+                text, invoice.get("chat_id") or invoice["user_id"], invoice["message_id"],
+                parse_mode="HTML", reply_markup=InlineKeyboardMarkup(),
+            )
+        except Exception as e:
+            print(f"edit invoice failed: {e}")
+
+def _wallet_covers(uid, price):
+    """هل رصيد المحفظة يكفي كامل السعر؟ (لإظهار زر الدفع من المحفظة)."""
+    if not db or price is None:
+        return False
+    try:
+        need_c = int((_to_decimal(price) * 100).to_integral_value())
+        return need_c > 0 and wallet_avail_c(prof_get(uid)) >= need_c
+    except Exception:
+        return False
+
+def build_topup_invoice_text(lang, invoice):
+    return (
+        f"<b>{t(lang, 'invoice_title')}</b>\n\n"
+        f"{html.escape(wt(lang, 'topup_name'))}\n"
+        f"{t(lang, 'invoice_amount')} <b>{html.escape(str(invoice['price_usdt']))} USDT</b>\n\n"
+        f"💳 <b>Binance Pay ID:</b>\n<code>{html.escape(BINANCE_PAY_ID)}</code>\n\n"
+        f"{wt(lang, 'topup_steps')}\n\n"
+        f"⏱️ {t(lang, 'invoice_expire')}"
+    )
+
+def start_topup_invoice(chat_id, uid, lang, amount):
+    price = f"{amount:.2f}"
+    inv_id = create_invoice(uid, TOPUP_PID, "topup", price, "💳 شحن المحفظة")
+    invoice = get_invoice(inv_id) or {"price_usdt": price}
+    sent = bot.send_message(
+        chat_id, build_topup_invoice_text(lang, invoice),
+        parse_mode="HTML", reply_markup=build_invoice_markup(lang, inv_id),
+    )
+    attach_invoice_msg(inv_id, sent)
+
+def _awaiting_topup(m):
+    return (
+        bool(m.text) and not m.text.startswith("/")
+        and m.chat.type == "private" and m.from_user.id in _topup_wait
+    )
+
+@bot.message_handler(func=_awaiting_topup, content_types=["text"])
+def handle_topup_amount(message):
+    uid = message.from_user.id
+    lang = get_lang(uid)
+    amount = _parse_price(message.text)
+    if amount is None or amount < TOPUP_MIN or amount > TOPUP_MAX:
+        bot.reply_to(message, wt(lang, "topup_bad").format(min=TOPUP_MIN, max=TOPUP_MAX))
+        return
+    _topup_wait.pop(uid, None)
+    try:
+        start_topup_invoice(message.chat.id, uid, lang, amount)
+    except StorageError:
+        bot.send_message(message.chat.id, t(lang, "temp_error"))
+
+def _handle_topup_tx(chat_id, uid, lang, inv_id, invoice, tx):
+    """دفعة على فاتورة شحن: يُضاف المبلغ الحقيقي المدفوع للمحفظة (بدون مكافأة)."""
+    canon = tx["tx_id"]
+    if not db:
+        bot.send_message(chat_id, wt(lang, "unavailable"))
+        return
+    cents = int((tx["amount"] * 100).to_integral_value())
+    if cents <= 0:
+        bot.send_message(chat_id, t(lang, "not_found"))
+        return
+    if not _ilock(inv_id):
+        bot.send_message(chat_id, t(lang, "temp_error"))
+        return
+    try:
+        if kv_get(f"rk:invpaid:{inv_id}") is not None or not kv_set(f"rk:txu:{canon}", f"topup:{inv_id}", nx=True):
+            bot.send_message(chat_id, t(lang, "used"))
+            return
+        kv_set(f"rk:invpaid:{inv_id}", canon, nx=True)
+        try:
+            wallet_credit(uid, cents, "topup", "Binance")
+        except Exception as e:
+            print(f"topup credit error: {e}")
+            kv_del(f"rk:txu:{canon}")
+            kv_del(f"rk:invpaid:{inv_id}")
+            bot.send_message(chat_id, t(lang, "temp_error"))
+            return
+    except StorageError:
+        bot.send_message(chat_id, t(lang, "temp_error"))
+        return
+    finally:
+        _iunlock(inv_id)
+
+    clear_pending(uid)
+    inv_live_remove(inv_id)
+    _edit_invoice_msg(invoice, wt(lang, "topup_edit_done").format(amount=_money(cents)))
+    try:
+        avail = _money(wallet_avail_c(prof_get(uid)))
+    except Exception:
+        avail = "—"
+    bot.send_message(chat_id, wt(lang, "topup_credited").format(amount=_money(cents), avail=avail), parse_mode="HTML")
+    monitor_send(f"💳 <b>شحن محفظة</b>\n\n👤 {_user_link(uid)}\n💵 ${_money(cents)}\n💼 المتاح الآن: ${avail}")
+
+def convert_partial(inv_id):
+    """فاتورة لم يكتمل دفعها: المبلغ المدفوع يتحول إلى محفظة الزبون (بدون مكافأة)."""
+    if not db or not _ilock(inv_id):
+        return
+    uid = None
+    cents = 0
+    acc = None
+    try:
+        acc = kv_get_json(f"rk:invp:{inv_id}")
+        if not acc or kv_get(f"rk:invpaid:{inv_id}") is not None:
+            part_remove(inv_id)
+            return
+        if not kv_set(f"rk:invconv:{inv_id}", "1", nx=True):
+            part_remove(inv_id)
+            return
+        uid = acc["uid"]
+        cents = int((_to_decimal(acc.get("sum", 0)) * 100).to_integral_value())
+        try:
+            if cents > 0:
+                wallet_credit(uid, cents, "partial", acc.get("pname", ""))
+        except Exception as e:
+            print(f"convert_partial credit error: {e}")
+            kv_del(f"rk:invconv:{inv_id}")  # نعيد المحاولة في الدورة القادمة
+            return
+        kv_del(f"rk:invp:{inv_id}")
+        part_remove(inv_id)
+    except StorageError as e:
+        print(f"convert_partial storage error: {e}")
+        return
+    finally:
+        _iunlock(inv_id)
+
+    if uid is None or cents <= 0:
+        return
+    record_cancel(uid, inv_id)
+    lang = get_lang(uid)
+    try:
+        bot.send_message(uid, wt(lang, "converted").format(amount=_money(cents)), parse_mode="HTML",
+                         reply_markup=support_markup(lang))
+    except Exception as e:
+        print(f"converted notice failed: {e}")
+    monitor_send(
+        f"⚠️ <b>دفعة غير مكتملة تحولت للمحفظة</b>\n\n👤 {_user_link(uid)}\n"
+        f"📦 {html.escape(str(acc.get('pname', '')))}\n💵 ${_money(cents)} (من أصل {acc.get('need')} USDT)"
+    )
+
+def expire_partials():
+    for inv_id in part_list():
+        acc = kv_get_json(f"rk:invp:{inv_id}")
+        if not acc:
+            part_remove(inv_id)
+            continue
+        if time.time() >= float(acc.get("exp", 0)):
+            convert_partial(inv_id)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("wpay_"))
+def handle_wallet_pay(call):
+    """دفع فاتورة تلقائية (Gemini/بطاقات الهداية) من المحفظة. كامل المبلغ، بدون مكافأة."""
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    chat_id = call.message.chat.id
+    inv_id = call.data[5:]
+    if not db:
+        bot.answer_callback_query(call.id, wt(lang, "unavailable"), show_alert=True)
+        return
+    try:
+        invoice = get_invoice(inv_id)
+    except StorageError:
+        bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
+        return
+    if (not invoice or str(invoice.get("user_id")) != str(uid)
+            or invoice.get("product_id") == TOPUP_PID
+            or time.time() - invoice["created_at"] > INVOICE_TTL):
+        bot.answer_callback_query(call.id, wt(lang, "wpay_expired"), show_alert=True)
+        return
+
+    pid, label = invoice["product_id"], invoice["label"]
+    cents = int((_to_decimal(invoice["price_usdt"]) * 100).to_integral_value())
+
+    # التأكد من توفر المنتج قبل أي خصم
+    out = False
+    try:
+        if pid == GEMINI_ID:
+            out = gemini_stock() < int(str(label).lstrip("x") or 1)
+        else:
+            mapping = fazer_resolve(pid, label, allow_fetch=False)
+            out = bool(mapping and mapping.get("stock") is not None and int(mapping["stock"]) <= 0)
+    except Exception:
+        out = False
+    if out:
+        bot.answer_callback_query(call.id, wt(lang, "wpay_out"), show_alert=True)
+        return
+
+    if not _ilock(inv_id):
+        bot.answer_callback_query(call.id, wt(lang, "wpay_busy"), show_alert=True)
+        return
+    if not _wlock(uid):
+        _iunlock(inv_id)
+        bot.answer_callback_query(call.id, wt(lang, "wpay_busy"), show_alert=True)
+        return
+
+    canon = f"wallet-{inv_id}"
+    claim = None
+    err = None
+    deducted = False
+    try:
+        if kv_get(f"rk:invpaid:{inv_id}") is not None or kv_get(f"rk:invconv:{inv_id}") is not None:
+            err = "wpay_expired"
+        elif kv_get(f"rk:invp:{inv_id}") is not None:
+            err = "wpay_mixed"  # دفع جزءاً بـ Binance: لا دفع مختلط
+        elif wallet_avail_c(prof_get(uid)) < cents:
+            err = "wpay_short"
+        else:
+            claim = {
+                "user_id": uid, "invoice_id": inv_id, "product_id": pid, "label": label,
+                "product_name": invoice["product_name"], "price": invoice["price_usdt"],
+                "paid": invoice["price_usdt"], "via": "wallet", "status": "claimed", "ts": int(time.time()),
+            }
+            if not kv_set(f"rk:tx:{canon}", json.dumps(claim), nx=True):
+                err = "wpay_expired"
+            elif not kv_set(f"rk:invpaid:{inv_id}", canon, nx=True):
+                kv_del(f"rk:tx:{canon}")
+                err = "wpay_expired"
+            else:
+                db.hincrby(_prof_key(uid), "wspent_c", cents)
+                deducted = True
+                try:
+                    wlog_add(uid, "wpay", cents, invoice["product_name"])
+                except Exception as e:
+                    print(f"wlog wpay failed: {e}")
+    except Exception as e:
+        print(f"wallet pay error: {e}")
+        err = "unavailable"
+        if claim and not deducted:
+            try:
+                kv_del(f"rk:tx:{canon}")
+                kv_del(f"rk:invpaid:{inv_id}")
+            except Exception:
+                pass
+    finally:
+        _wunlock(uid)
+        _iunlock(inv_id)
+
+    if err:
+        bot.answer_callback_query(call.id, wt(lang, err), show_alert=True)
+        return
+
+    bot.answer_callback_query(call.id)
+    _edit_invoice_msg(invoice, wt(lang, "wpay_done").format(
+        product=html.escape(invoice["product_name"]), amount=html.escape(str(invoice["price_usdt"]))))
+    fulfill_order(chat_id, uid, lang, claim, canon)
+
+    if claim.get("status") == "delivered":
+        monitor_send(
+            f"💼 <b>شراء من المحفظة</b>\n\n📦 {html.escape(invoice['product_name'])}\n"
+            f"👤 {_user_link(uid)}\n💵 ${_money(cents)}"
+        )
+        return
+
+    # فشل التسليم: نرجع المبلغ للمحفظة ونلغي الطلب
+    try:
+        db.hincrby(_prof_key(uid), "wspent_c", -cents)
+        wlog_add(uid, "refund", cents, invoice["product_name"])
+    except Exception as e:
+        print(f"wallet refund error: {e}")
+        alert_admin(f"🚨 <b>تعذر إرجاع رصيد المحفظة</b>\n👤 <code>{uid}</code>\n💵 ${_money(cents)}\n"
+                    f"استعمل /walletadd {uid} {_money(cents)}")
+    pend_remove(canon)
+    try:
+        kv_del(f"rk:tx:{canon}")
+    except StorageError:
+        pass
+    clear_pending(uid)
+    inv_live_remove(inv_id)
+    bot.send_message(chat_id, wt(lang, "wpay_fail").format(amount=_money(cents)),
+                     parse_mode="HTML", reply_markup=support_markup(lang))
+    alert_admin(f"↩️ <b>فشل تسليم طلب بالمحفظة وتم إرجاع المبلغ</b>\n📦 {html.escape(invoice['product_name'])}\n"
+                f"👤 <code>{uid}</code>\n💵 ${_money(cents)}")
+    monitor_send(f"↩️ <b>فشل تسليم طلب بالمحفظة</b> — أُرجع ${_money(cents)}\n👤 {_user_link(uid)}\n"
+                 f"📦 {html.escape(invoice['product_name'])}")
 
 # ---------- أدوات الأدمن: المحفظة والشراء اليدوي ----------
 _adm_wait = {}  # admin_id -> حالة المعالج بالأزرار
@@ -2825,9 +3358,9 @@ def wallet_use(uid, amount, note=""):
     try:
         ensure_profile(uid)
         p = prof_get(uid)
-        avail = wallet_total_c(p["spent_c"]) - p["redeemed_c"]
+        avail = wallet_avail_c(p)
         if cents > avail:
-            return False, f"❌ المبلغ أكبر من الرصيد المتاح (${_money(max(avail, 0))})."
+            return False, f"❌ المبلغ أكبر من الرصيد المتاح (${_money(avail)})."
         db.hincrby(_prof_key(uid), "redeemed_c", cents)
         wlog_add(uid, "use", cents, note)
         new_avail = avail - cents
@@ -2855,7 +3388,7 @@ def wallet_add(uid, amount, note=""):
             return False, f"❌ لا يمكن إرجاع أكثر مما تم استبداله (${_money(p['redeemed_c'])})."
         db.hincrby(_prof_key(uid), "redeemed_c", -cents)
         wlog_add(uid, "add", cents, note)
-        new_avail = wallet_total_c(p["spent_c"]) - (p["redeemed_c"] - cents)
+        new_avail = wallet_avail_c(p) + cents
     except Exception as e:
         return False, f"❌ خطأ: {str(e)[:150]}"
     finally:
@@ -2871,12 +3404,12 @@ def add_manual_purchase(uid, amount, pname):
     if err:
         return False, err
     pname = (pname or "").strip() or "شراء يدوي"
-    record_purchase(uid, None, pname, amount, f"manual:{uuid.uuid4().hex[:12]}")
+    record_purchase(uid, None, pname, amount, f"manual:{uuid.uuid4().hex[:12]}", via="manual")
     try:
         p = prof_get(uid)
     except Exception as e:
         return False, f"❌ خطأ: {str(e)[:150]}"
-    avail = wallet_total_c(p["spent_c"]) - p["redeemed_c"]
+    avail = wallet_avail_c(p)
     monitor_send(
         f"➕ <b>شراء يدوي مسجل</b>\n\n👤 {_user_link(uid)}\n📦 {html.escape(pname)}\n💵 ${amount:.2f}\n"
         f"💼 المتاح الآن: ${_money(avail)}"
@@ -2893,15 +3426,16 @@ def admin_view_text(uid):
         return err
     try:
         p = prof_get(uid)
-        total_c = wallet_total_c(p["spent_c"])
         name = p["name"]
         if not name:
             try:
                 name = bot.get_chat(int(uid)).first_name or "-"
             except Exception:
                 name = "-"
-        dp, cp = _pcts(p["buys"], p["cancelled"])
-        kinds = {"buy": "🛒 شراء", "use": "➖ خصم", "add": "↩️ إرجاع"}
+        kinds = {
+            "buy": "🛒 شراء", "reward": "🎁 مكافأة", "use": "➖ خصم", "add": "↩️ إرجاع",
+            "topup": "💳 شحن", "partial": "⚠️ دفعة ناقصة→محفظة", "wpay": "💼 شراء بالمحفظة", "refund": "↩️ استرجاع تسليم",
+        }
         ops = []
         for r in wlog_list(uid, 5):
             when = time.strftime("%m-%d %H:%M", time.gmtime(r.get("t", 0)))
@@ -2909,10 +3443,11 @@ def admin_view_text(uid):
         return (
             f"👤 <b>ملف الزبون</b>\n\n🆔 <code>{uid}</code>\n📛 {html.escape(name)}\n"
             f"📅 الانضمام: {_fmt_date(p['joined'])}\n"
-            f"🛒 المكتملة: {p['buys']} ({dp}%) | ❌ الملغاة: {p['cancelled']} ({cp}%)\n"
+            f"🛒 المكتملة: {p['buys']} | ❌ الملغاة: {p['cancelled']} | 📊 النجاح: {_success_pct(p['buys'], p['cancelled'])}%\n"
             f"💵 الإنفاق: ${_money(p['spent_c'])}\n\n"
-            f"💼 <b>المحفظة</b>: ${_money(total_c)} | المستبدل: ${_money(p['redeemed_c'])} | "
-            f"المتاح: <b>${_money(max(0, total_c - p['redeemed_c']))}</b>\n\n"
+            f"💼 <b>المحفظة</b>\n🎁 المكافآت: ${_money(p['reward_c'])} | 💳 المشحون: ${_money(p['topup_c'])}\n"
+            f"➖ المستخدم: ${_money(p['redeemed_c'] + p['wspent_c'])} | "
+            f"✅ المتاح: <b>${_money(wallet_avail_c(p))}</b>\n\n"
             f"🧾 آخر العمليات:\n" + ("\n".join(ops) if ops else "— لا شيء —")
         )
     except Exception as e:
@@ -3227,7 +3762,8 @@ def expire_invoice(inv_id):
 
     # المرحلة 1: عند انتهاء 20 دقيقة (مرة واحدة فقط)
     if kv_set(f"rk:invexp:{inv_id}", "1", ex=INVOICE_TTL + INVOICE_GRACE + 3600, nx=True):
-        record_cancel(uid, inv_id)
+        if inv.get("product_id") != TOPUP_PID and kv_get(f"rk:invp:{inv_id}") is None:
+            record_cancel(uid, inv_id)  # الجزئية تُحسب عند تحويلها للمحفظة أو تُسلَّم
         lang = get_lang(uid)
         chat_id = inv.get("chat_id") or uid
         mins = {"ttl": INVOICE_TTL // 60, "grace": INVOICE_GRACE // 60}
@@ -3273,6 +3809,7 @@ def invoice_expiry_loop():
                     print(f"expire_invoice storage error: {e}")
                 except Exception as e:
                     print(f"expire_invoice error for {inv_id}: {e}")
+            expire_partials()
         except Exception as e:
             print(f"invoice_expiry_loop error: {e}")
         time.sleep(15)
