@@ -160,7 +160,7 @@ MANUAL_TEXTS = {
         "ask_username": "✅ تم تأكيد الدفع ({product})\n\n👻 أرسل الآن <b>اسم المستخدم (Username)</b> لحسابك على سناب شات.",
         "ask_playerid": "✅ تم تأكيد الدفع ({product})\n\n🎮 أرسل الآن <b>Player ID</b> الخاص بحسابك في Free Fire (أرقام فقط).",
         "ask_email": "✅ تم تأكيد الدفع ({product})\n\n✉️ أرسل الآن <b>البريد الإلكتروني</b> لحسابك على Canva.",
-        "bad_username": "❌ اسم مستخدم غير صالح (3-15 حرفاً، يبدأ بحرف، أحرف/أرقام/. _ - فقط). أعد الإرسال.",
+        "bad_username": "❌ اسم مستخدم غير صالح (3-15 حرفاً، يبدأ بحرف، أحرف وأرقام ونقطة وشرطة والشرطة السفلية فقط). أعد الإرسال.",
         "bad_playerid": "❌ Player ID غير صالح (أرقام فقط، من 6 إلى 14 رقماً). أعد الإرسال.",
         "bad_email": "❌ بريد إلكتروني غير صالح. أعد الإرسال.",
         "lbl_username": "اسم المستخدم", "lbl_playerid": "Player ID", "lbl_email": "البريد الإلكتروني",
@@ -192,7 +192,7 @@ MANUAL_TEXTS = {
         "ask_username": "✅ Payment confirmed ({product})\n\n👻 Now send your Snapchat <b>Username</b>.",
         "ask_playerid": "✅ Payment confirmed ({product})\n\n🎮 Now send your Free Fire <b>Player ID</b> (digits only).",
         "ask_email": "✅ Payment confirmed ({product})\n\n✉️ Now send the <b>email</b> of your Canva account.",
-        "bad_username": "❌ Invalid username (3-15 chars, starts with a letter, letters/digits/. _ - only). Send it again.",
+        "bad_username": "❌ Invalid username (3-15 chars, starts with a letter, letters, digits, dot, dash and underscore only). Send it again.",
         "bad_playerid": "❌ Invalid Player ID (digits only, 6 to 14 digits). Send it again.",
         "bad_email": "❌ Invalid email. Send it again.",
         "lbl_username": "Username", "lbl_playerid": "Player ID", "lbl_email": "Email",
@@ -224,7 +224,7 @@ MANUAL_TEXTS = {
         "ask_username": "✅ Paiement confirmé ({product})\n\n👻 Envoyez maintenant votre <b>nom d'utilisateur</b> Snapchat.",
         "ask_playerid": "✅ Paiement confirmé ({product})\n\n🎮 Envoyez maintenant votre <b>Player ID</b> Free Fire (chiffres uniquement).",
         "ask_email": "✅ Paiement confirmé ({product})\n\n✉️ Envoyez maintenant l'<b>e-mail</b> de votre compte Canva.",
-        "bad_username": "❌ Nom d'utilisateur invalide (3-15 caractères, commence par une lettre, lettres/chiffres/. _ - uniquement). Renvoyez-le.",
+        "bad_username": "❌ Nom d'utilisateur invalide (3-15 caractères, commence par une lettre, lettres, chiffres, point, tiret et underscore uniquement). Renvoyez-le.",
         "bad_playerid": "❌ Player ID invalide (chiffres uniquement, 6 à 14 chiffres). Renvoyez-le.",
         "bad_email": "❌ E-mail invalide. Renvoyez-le.",
         "lbl_username": "Nom d'utilisateur", "lbl_playerid": "Player ID", "lbl_email": "E-mail",
@@ -481,7 +481,7 @@ def handle_manual_buy(call):
 @bot.callback_query_handler(func=lambda c: c.data.startswith("mvar_"))
 def handle_manual_variant(call):
     try:
-        pid, idx = call.data[5:].rsplit("_", 1)
+        pid, idx = call.data[5:].rsplit(chr(95), 1)
         if pid != FREEFIRE_ID:
             raise ValueError("bad product")
         label, price = FREEFIRE_PACKS[int(idx)]
@@ -624,11 +624,11 @@ def handle_input_text(message):
 def handle_input_cb(call):
     uid = call.from_user.id
     lang = get_lang(uid)
-    try:
-        , act, oid = call.data.split("", 2)
-    except ValueError:
+    parts = call.data.split(chr(95), 2)
+    if len(parts) != 3:
         bot.answer_callback_query(call.id)
         return
+    act, oid = parts[1], parts[2]
     o = order_get(oid)
     if not o or str(o.get("user_id")) != str(uid) or o.get("product_id") not in MANUAL_A:
         bot.answer_callback_query(call.id)
@@ -772,7 +772,7 @@ def handle_order_admin(call):
         bot.answer_callback_query(call.id)
         return
     chat_id, msg_id = call.message.chat.id, call.message.message_id
-    parts = call.data.split("_", 2)
+    parts = call.data.split(chr(95), 2)
     act = parts[1] if len(parts) > 1 else ""
     oid = parts[2] if len(parts) > 2 else ""
     if act == "l":
