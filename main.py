@@ -52,7 +52,17 @@ patch(r"""    pid, label = invoice["product_id"], invoice["label"]
         return
 """, "wallet_stock")
 patch(r"""    if claim.get("status") == "delivered":""",
-      r"""    if claim.get("status") in ("delivered", "manual"):""", "wallet_ok")
+      r"""    if claim.get("fz_created") and claim.get("status") == "paid_pending":
+        # طلب FAZER أُنشئ لكن الأكواد لم تصل بعد: لا نُرجع المال، والبوت يسلّم تلقائياً لاحقاً
+        _safe_send(chat_id, t(lang, "processing"), reply_markup=support_markup(lang))
+        monitor_send(f"⏳ <b>طلب بالمحفظة بانتظار أكواد FAZER</b> (لم يُرجع المبلغ)\n\n📦 {html.escape(invoice['product_name'])}\n👤 {_user_link(uid)}")
+        return
+    if claim.get("status") in ("delivered", "manual"):""", "wallet_ok")
+
+# FAZER أنشأ الطلب بلا أكواد بعد: نعلّمه لكي لا تُرجَع المحفظة
+patch(r"""        # الطلب مقبول لكن بلا أكواد بعد (نفس المفتاح يرجع نفس الطلب لاحقاً)""",
+      r"""        # الطلب مقبول لكن بلا أكواد بعد (نفس المفتاح يرجع نفس الطلب لاحقاً)
+        claim["fz_created"] = True""", "fz_created_flag")
 
 # 6) صفحة المنتج: زر الشراء بدل الإحالة للخاص
 patch(r"""    markup.add(InlineKeyboardButton(text=t(lang, "order_now"), url=MY_PRIVATE_CHAT_LINK))""",
@@ -65,7 +75,7 @@ patch(r"""def _stock_changed(pid, old, new):""",
       r"""def _stock_changed(pid, old, new):
     _restock_hook(pid, old, new)""", "stock_hook")
 
-# 8) تسجيل المشتركين في الجرس
+# 😎 تسجيل المشتركين في الجرس
 patch(r"""        notify_admin_interest(call.from_user, product, lang)""",
       r"""        notify_admin_interest(call.from_user, product, lang)
         _notify_subscribe(product_id, call.from_user.id)""", "notify_sub")
@@ -615,7 +625,7 @@ def handle_input_cb(call):
     uid = call.from_user.id
     lang = get_lang(uid)
     try:
-        _, act, oid = call.data.split("_", 2)
+        , act, oid = call.data.split("", 2)
     except ValueError:
         bot.answer_callback_query(call.id)
         return
