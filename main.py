@@ -6,6 +6,10 @@
 # ============================================================
 import os, sys
 
+# ===== إعدادات يمكنك تعديلها =====
+GIFT_MAX_QTY = 3      # أقصى كمية في بطاقات الهداية
+GEMINI_MAX_QTY = 5    # أقصى كمية في Gemini (حسب المتوفر في المخزون)
+
 BASE_FILE = os.environ.get("BOT_BASE_FILE", "bot_base.py")
 if not os.path.exists(BASE_FILE):
     sys.exit("❌ لم أجد bot_base.py — أعد تسمية main.py القديم إلى bot_base.py ثم ضع هذا الملف باسم main.py")
@@ -75,7 +79,7 @@ patch(r"""def _stock_changed(pid, old, new):""",
       r"""def _stock_changed(pid, old, new):
     _restock_hook(pid, old, new)""", "stock_hook")
 
-# 😎 تسجيل المشتركين في الجرس
+# 8) تسجيل المشتركين في الجرس
 patch(r"""        notify_admin_interest(call.from_user, product, lang)""",
       r"""        notify_admin_interest(call.from_user, product, lang)
         _notify_subscribe(product_id, call.from_user.id)""", "notify_sub")
@@ -119,6 +123,29 @@ patch(r"""    record_purchase(uid, GEMINI_ID, claim.get("product_name"), claim.g
 patch(r"""            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))""",
       r"""            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))
             order_log_auto(uid, claim.get("product_name"), claim.get("price"), canon, "\n".join(codes))""", "log_fazer")
+
+
+# 15) كميات: Gemini حتى GEMINI_MAX_QTY، وبطاقات الهداية حتى GIFT_MAX_QTY
+patch(r"""GEMINI_QTYS = (1, 2)""", r"""GEMINI_QTYS = tuple(range(1, GEMINI_MAX_QTY + 1))""", "gemini_qtys")
+patch(r"""def fazer_order(category_id, card_id, idem_key):""",
+      r"""def fazer_order(category_id, card_id, idem_key, quantity=1):""", "fazer_order_sig")
+patch(r"""            json={"category_id": category_id, "card_id": card_id, "quantity": 1},""",
+      r"""            json={"category_id": category_id, "card_id": card_id, "quantity": quantity},""", "fazer_order_qty")
+patch(r"""status, data = fazer_order(mapping["category_id"], mapping["card_id"], idem_key)""",
+      r"""status, data = fazer_order(mapping["category_id"], mapping["card_id"], idem_key, _gift_qty(label))""", "fazer_order_call")
+patch(r"""    n = int(claim.get("idem_n", 0))""",
+      r"""    if cost is not None:
+        cost = cost * _gift_qty(label)
+    n = int(claim.get("idem_n", 0))""", "fazer_cost_qty")
+patch(r"""    manual = FAZER_MANUAL_MAP.get((product_id, label))""",
+      r"""    manual = FAZER_MANUAL_MAP.get((product_id, re.sub(r"\s+x\d+$", "", label)))""", "manual_map_label")
+patch(r"""            out = bool(mapping and mapping.get("stock") is not None and int(mapping["stock"]) <= 0)""",
+      r"""            out = bool(mapping and mapping.get("stock") is not None and int(mapping["stock"]) < _gift_qty(label))""", "wallet_gift_stock")
+patch(r"""    # إشعار الأدمن بالقيمة المختارة""",
+      r"""    if _gift_ask_qty(call, product, product_id, idx, label, price, lang):
+        return
+
+    # إشعار الأدمن بالقيمة المختارة""", "gift_qty_step")
 
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
@@ -911,6 +938,92 @@ def _pf_orders_view(call, uid, lang, data):
     _pf_show(call, text, m)
     bot.answer_callback_query(call.id)
     return True
+
+
+# ============================================================
+# ========== بطاقات الهداية: اختيار الكمية (حتى GIFT_MAX_QTY) ==========
+# ============================================================
+MANUAL_TEXTS["ar"]["choose_qty"] = "🔢 اختر الكمية:\n📦 {product}"
+MANUAL_TEXTS["en"]["choose_qty"] = "🔢 Choose the quantity:\n📦 {product}"
+MANUAL_TEXTS["fr"]["choose_qty"] = "🔢 Choisissez la quantité :\n📦 {product}"
+
+def _gift_qty(label):
+    m = re.search(r"\sx(\d+)$", str(label))
+    return int(m.group(1)) if m else 1
+
+def _gift_stock(pid, label):
+    # مخزون القيمة عند FAZER من الكاش (None = غير معروف)
+    try:
+        mapping = fazer_resolve(pid, re.sub(r"\s+x\d+$", "", str(label)), allow_fetch=False)
+        if mapping and mapping.get("stock") is not None:
+            return int(mapping["stock"])
+    except Exception:
+        pass
+    return None
+
+def _gift_ask_qty(call, product, pid, idx, label, price, lang):
+    stock = _gift_stock(pid, label)
+    maxq = GIFT_MAX_QTY if stock is None else min(GIFT_MAX_QTY, stock)
+    if maxq <= 1:
+        return False  # كمية واحدة فقط: المسار القديم مباشرة
+    mk = InlineKeyboardMarkup(row_width=1)
+    for q in range(1, maxq + 1):
+        total = (Decimal(price) * q).quantize(Decimal("0.01"))
+        mk.add(InlineKeyboardButton(text=f"{q} × {label} | ${total}", callback_data=f"gqt_{pid}_{idx}_{q}"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=f"buy_{pid}"))
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(
+        call.message.chat.id,
+        mt(lang, "choose_qty").format(product=html.escape(f"{tr(product, 'name', lang)} — {label}")),
+        parse_mode="HTML", reply_markup=mk,
+    )
+    bot.answer_callback_query(call.id)
+    return True
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("gqt_"))
+def handle_gift_qty(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    try:
+        head, q = call.data[4:].rsplit(chr(95), 1)
+        pid, idx = head.rsplit(chr(95), 1)
+        product = find_product(pid)
+        label, price = GIFT_VARIANTS[pid][int(idx)]
+        q = int(q)
+        if not product or not 1 <= q <= GIFT_MAX_QTY:
+            raise ValueError("bad qty")
+    except Exception:
+        bot.answer_callback_query(call.id)
+        return
+    stock = _gift_stock(pid, label)
+    if stock is not None and stock < q:
+        bot.answer_callback_query(call.id, t(lang, "out_variant"), show_alert=True)
+        return
+    total = str((Decimal(price) * q).quantize(Decimal("0.01")))
+    lab = f"{label} x{q}"
+    full_name = f"{product['name']} — {lab}"
+    if call.message.chat.type == "private":
+        register_user(uid)
+    notify_admin(call.from_user, {"name": full_name, "price": f"${total}"}, lang)
+    try:
+        invoice_id = create_invoice(uid, pid, lab, total, full_name)
+    except StorageError:
+        bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
+        return
+    invoice = get_invoice(invoice_id) or {"label": lab, "price_usdt": total}
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    sent = bot.send_message(
+        call.message.chat.id, build_invoice_text(lang, invoice, product), parse_mode="HTML",
+        reply_markup=build_invoice_markup(lang, invoice_id, _wallet_covers(uid, invoice.get("price_usdt"))),
+    )
+    attach_invoice_msg(invoice_id, sent)
+    bot.answer_callback_query(call.id)
 
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
