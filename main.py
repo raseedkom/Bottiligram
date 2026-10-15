@@ -270,6 +270,12 @@ patch(r"""    {
         "type": "separator",
         "id": "sep_gift_cards",""", "new_products")
 
+
+# 17) الرجوع من منتج تابع لمجموعة (Claude / Snapchat) يرجع لصفحة المجموعة
+patch(r"""    send_card(call.message.chat.id, selected_product, caption, markup)""",
+      r"""    _fix_group_back(selected_product["id"], markup)
+    send_card(call.message.chat.id, selected_product, caption, markup)""", "group_back")
+
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
 # ========== الطلبات اليدوية (A/B) + سجل الطلبات + جرس التوفر ==========
@@ -1164,7 +1170,7 @@ STORE_SLOTS = [
     ("chatgpt_plus_1m", "chatgpt_k12_edu"),
     ("office365_1y", "elevenlabs_3m"),
     "nordvpn_3m", "n8n_starter_12m",
-    "snapchat_3m", "snapchat_6m", "snapchat_12m",
+    "grp:snapchat",
     "canva_edu_500", "canva_edu_5000", "freefire_diamonds",
     "sep:sep_gift_cards", "apple_gift_tr", "apple_gift_in", "apple_gift_fr",
 ]
@@ -1172,6 +1178,7 @@ STORE_SLOTS = [
 # مجموعات: زر واحد طويل يفتح صفحة فيها أزرار المنتجات
 STORE_GROUPS = {
     "claude_api": {"name": "Claude API", "icon": "🧠", "members": ["claude_100_30d", "claude_10m_1d"]},
+    "snapchat": {"name": "Snapchat Plus+", "icon": "👻", "members": ["snapchat_3m", "snapchat_6m", "snapchat_12m"]},
 }
 
 # أسماء قصيرة للأزرار الجنبية (تيليغرام يقص الأسماء الطويلة)
@@ -1207,7 +1214,7 @@ def _pair_button(item, lang):
     return InlineKeyboardButton(text=f"{item['icon']} {label}", callback_data=f"buy_{item['id']}")
 
 def _group_range(gid):
-    prices, stock = [], 0
+    prices, stock, inf = [], 0, False
     for pid in STORE_GROUPS[gid]["members"]:
         p = find_product(pid)
         if not p:
@@ -1216,11 +1223,13 @@ def _group_range(gid):
             prices.append(Decimal(p["price"].lstrip("$")))
         except Exception:
             pass
-        if isinstance(p["stock"], int):
+        if p["stock"] == "♾️":
+            inf = True
+        elif isinstance(p["stock"], int):
             stock += p["stock"]
     if not prices:
-        return "-", "-", stock
-    return f"${min(prices):.2f}", f"${max(prices):.2f}", stock
+        return "-", "-", ("♾️" if inf else stock)
+    return f"${min(prices):.2f}", f"${max(prices):.2f}", ("♾️" if inf else stock)
 
 def generate_store_keyboard(lang):
     sync_stock()
@@ -1244,8 +1253,9 @@ def generate_store_keyboard(lang):
                 continue
             lo, hi, stock = _group_range(gid)
             price = lo if lo == hi else f"{lo} - {hi}"
+            stock_txt = stock if stock == "♾️" else f"📦 {stock}"
             markup.add(InlineKeyboardButton(
-                text=f"{g['icon']} {g['name']} | {price} | 📦 {stock}",
+                text=f"{g['icon']} {g['name']} | {price} | {stock_txt}",
                 callback_data=f"grp_{gid}",
             ))
         elif slot.startswith("sep:"):
@@ -1300,6 +1310,17 @@ def handle_store_group(call):
     )
     bot.answer_callback_query(call.id)
 
+
+def _fix_group_back(pid, markup):
+    """زر الرجوع في صفحة منتج تابع لمجموعة يرجع لصفحة المجموعة بدل القائمة الرئيسية."""
+    for gid, g in STORE_GROUPS.items():
+        if pid in g["members"]:
+            for row in markup.keyboard:
+                for btn in row:
+                    if getattr(btn, "callback_data", None) == "back_to_main":
+                        btn.callback_data = f"grp_{gid}"
+            break
+    return markup
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
