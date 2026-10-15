@@ -10,6 +10,109 @@ import os, sys
 GIFT_MAX_QTY = 3      # أقصى كمية في بطاقات الهداية
 GEMINI_MAX_QTY = 5    # أقصى كمية في Gemini (حسب المتوفر في المخزون)
 
+# ===== المنتجات الجديدة (تسليم يدوي) =====
+_CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
+_MIRAI_DOC = "https://docs.google.com/document/d/16smXXteTwJYdrxTfdZlJvOkSEFkVL_6UBxoXcXZH6Gc/edit?tab=t.tbg84q5rs9yi"
+
+NEW_PRODUCTS = [
+    {
+        "id": "prime_video_ultra_6m",
+        "name": "PRIME VIDEO ULTRA 6M 6 PROFILE",
+        "price": "$5.00",
+        "stock": 10,
+        "icon": "📺",
+        "description": "📺 PRIME VIDEO ULTRA 6 أشهر - 6 بروفايلات\n\nالمدة: 180 يوماً ⭐️\n\nالباقة: بدون إعلانات 4K ✅\n\nوصول كامل وخاص بالكامل 🔒\n\nممنوع الاستئجار أو شراء أي شيء ❌\n\nممنوع القيام بأي نشاط غير معتاد ❌\n\nبدون ضمان",
+    },
+    {
+        "id": "amazon_prime_6m",
+        "name": "Amazon prime 6 months video 6 profile",
+        "price": "$5.00",
+        "stock": 10,
+        "icon": "📦",
+        "description": "أمازون برايم فيديو – 6 أشهر\n\nاستمتع بـ 6 أشهر من Amazon Prime Video وشاهد آلاف الأفلام الشهيرة والبرامج التلفزيونية وإنتاجات Amazon Originals والمحتوى الحصري.\n\nالميزات:\n\n- 🎬 وصول غير محدود إلى مكتبة Prime Video الواسعة\n- ⭐ مسلسلات وأفلام Amazon Original الحصرية\n- 👥 6 ملفات تعريف – إنشاء وإدارة ما يصل إلى 6 ملفات تعريف فردية\n- 🔒 تغيير أسماء ملفات التعريف وإعداد حماية برمز PIN لكل ملف تعريف\n- 📱 المشاهدة على أجهزة متعددة مدعومة\n- ⬇️ تنزيل المحتوى للمشاهدة دون اتصال بالإنترنت\n- 🎥 البث بدقة HD و 4K Ultra HD (حيثما يتوفر)\n- 🌍 شاهد في أي وقت وفي أي مكان باستخدام حساب Amazon الخاص بك",
+    },
+    {
+        "id": "claude_100_30d",
+        "name": "Claude 100$ Api 30 D warranty",
+        "price": "$3.10",
+        "stock": 10,
+        "icon": "🧠",
+        "description": "🔑 100$ API Claude - 30 يوماً\n• يعمل مع جميع التطبيقات: 9router، claude code، codex، cursor، إلخ.\n• ضمان كامل (BHF).\nالتفعيل ومفتاح API: https://api.mwapi.dev/\n• دليل مفصل: " + _CLAUDE_URL,
+    },
+    {
+        "id": "claude_10m_1d",
+        "name": "API 10M Token Claude 1Day Warranty",
+        "price": "$2.25",
+        "stock": 10,
+        "icon": "🧠",
+        "description": "🔑 API CLAUDE - 10 مليون رمز - يوم واحد\n⚡ متوافق بسلاسة مع جميع الأدوات وبيئات التطوير: 9router، Claude Dev، Cursor، VS Code، إلخ.\n⏳ الصلاحية: يوم واحد\n\n📋 تعليمات الإعداد السريع:\n🔹 الخطوة 1: قم بزيارة 👉 https://miraiapi.com/usage/#redeem لاسترداد رمزك (أدخل الرمز المقدم في تفاصيل طلبك).\n🔹 الخطوة 2: قم بزيارة 👉 https://miraiapi.com/usage/#config لتكوين مفتاح API الخاص بك، واختيار التطبيق المستهدف، وتحديد النموذج المثالي.\n✨ كل شيء جاهز للبرمجة!\n\n🌐 عنوان URL الأساسي: https://api.miraiapi.com/v1\n🔑 مفتاح API: sk-...\n🤖 النماذج المتاحة:\n  ⚡ claude-opus-4.6\n  ⚡ claude-opus-4.7\n  ⚡ claude-opus-4.8\n  👑 claude-opus-5\n  🚀 claude-sonnet-5\n📊 تحقق من رصيد حصتك وتاريخ انتهاء الصلاحية على: 🔗 https://miraiapi.com/usage/\n\n📖 الوثائق والدليل المفصل: 🔗 " + _MIRAI_DOC + "\n\n⚠️ ملاحظة مهمة: تبدأ فترة الصلاحية فقط بمجرد تفعيل رمز الاسترداد. يمكنك تخزين الرمز أو إعادة بيعه لمدة تصل إلى 30 يوماً.",
+    },
+    {
+        "id": "chatgpt_plus_1m",
+        "name": "Chatgpt plus 1M (Google pay)Gmail NW",
+        "price": "$9.00",
+        "stock": 10,
+        "icon": "🤖",
+        "description": "ChatGPT Plus لمدة شهر - حساب خاص\nكل الحسابات مجرّبة وتعمل\nGmail أو @googlemail.com\nبدون ضمان\nتسجيل الدخول إلى ChatGPT\nالصيغة: الإيميل / كلمة المرور / 2FA\nموقع 2FA: https://2fa-auth.com\n⁉️ ملاحظة: يجب على الزبون تثبيت مفتاح مرور (passkey) وتغيير كلمة المرور و2FA وإيميل الحساب مباشرة بعد الشراء.\nغيّر 2FA خلال ساعة واحدة\nتحقق من حسابك خلال ساعة واحدة",
+    },
+    {
+        "id": "chatgpt_k12_edu",
+        "name": "ChatGPT - GPT K12 Edu (W5H)",
+        "price": "$5.00",
+        "stock": 10,
+        "icon": "🎓",
+        "description": "N/A",
+    },
+    {
+        "id": "office365_1y",
+        "name": "Microsoft Office 365 Plus 1 year",
+        "price": "$2.00",
+        "stock": 10,
+        "icon": "🛍️",
+        "description": "🛍️ مايكروسوفت أوفيس 365 بلس لمدة سنة واحدة\n\nالتطبيقات المشمولة:\n\nWord · Excel · PowerPoint · OneNote · Forms\nالتخزين السحابي:\n\n100 جيجابايت ون درايف متضمنة\nالتوافق:\n\nWindows · macOS · Android · iOS\nطريقة العمل:\n\nبعد الدفع، ستتلقى بيانات تسجيل الدخول (اسم المستخدم / كلمة المرور) لتفعيل أوفيس 365 على أجهزتك.\nمدة الاشتراك: 12 شهراً\n⚠️ قم بتغيير كلمة المرور عند تسجيل الدخول لأول مرة\n🔗 تسجيل الدخول: https://portal.office.com",
+    },
+    {
+        "id": "elevenlabs_3m",
+        "name": "ElevenLabs Creator 3 Months",
+        "price": "$16.00",
+        "stock": 10,
+        "icon": "🎙️",
+        "description": "• يتم استرداد القسيمة على صفحة دفع Stripe\n• تُسترد على حسابك الخاص\n• تمنح 121 ألف رصيد شهرياً\n• الضمان بعد التفعيل - شهر واحد\n• يجب استردادها خلال 7 أيام من الشراء\n• يمكنك أيضاً استردادها عبر: https://elevenlabs.io/signup?coupon=YOURCODE",
+    },
+]
+
+NEW_TRANSLATIONS = {
+    "prime_video_ultra_6m": {
+        "en": {"description": "📺PRIME VIDEO ULTRA 6M 6 PROFILE\n\nDURATION : 180 DAYS⭐️\n\nPLAN : ADS FREE 4K ✅\n\nFULL ACCESS FULL PRIVATE🔒\n\nDO NOT RENT OR PURCHASE ANYTHING ❌\n\nDO NOT DO ANY UNSUAL ACTIVITIES ❌\n\n No warranty"},
+        "fr": {"description": "📺 PRIME VIDEO ULTRA 6 mois - 6 profils\n\nDURÉE : 180 JOURS ⭐️\n\nFORFAIT : SANS PUB 4K ✅\n\nACCÈS COMPLET ET 100 % PRIVÉ 🔒\n\nNE LOUEZ NI N'ACHETEZ RIEN ❌\n\nN'EFFECTUEZ AUCUNE ACTIVITÉ INHABITUELLE ❌\n\nSans garantie"},
+    },
+    "amazon_prime_6m": {
+        "en": {"description": "Amazon Prime Video – 6 months\n\nEnjoy 6 months of Amazon Prime Video and watch thousands of popular movies, TV shows, Amazon Originals and exclusive content.\n\nFeatures:\n\n- 🎬 Unlimited access to the vast Prime Video library\n- ⭐ Exclusive Amazon Original series and movies\n- 👥 6 profiles – create and manage up to 6 individual profiles\n- 🔒 Rename profiles and protect each profile with a PIN\n- 📱 Watch on multiple supported devices\n- ⬇️ Download content to watch offline\n- 🎥 Stream in HD and 4K Ultra HD (where available)\n- 🌍 Watch anytime, anywhere with your Amazon account"},
+        "fr": {"description": "Amazon Prime Video – 6 mois\n\nProfitez de 6 mois d'Amazon Prime Video et regardez des milliers de films populaires, d'émissions TV, de productions Amazon Originals et de contenus exclusifs.\n\nCaractéristiques :\n\n- 🎬 Accès illimité à la vaste bibliothèque Prime Video\n- ⭐ Séries et films exclusifs Amazon Original\n- 👥 6 profils – créez et gérez jusqu'à 6 profils individuels\n- 🔒 Renommez les profils et protégez chaque profil par un code PIN\n- 📱 Visionnage sur plusieurs appareils compatibles\n- ⬇️ Téléchargement du contenu pour un visionnage hors ligne\n- 🎥 Streaming en HD et 4K Ultra HD (selon disponibilité)\n- 🌍 Regardez à tout moment et en tout lieu avec votre compte Amazon"},
+    },
+    "claude_100_30d": {
+        "en": {"description": "🔑 100$ Claude API - 30 days\n• Works with all apps: 9router, claude code, codex, cursor, etc.\n• Full warranty (BHF).\nActivation and API key: https://api.mwapi.dev/\n• Detailed guide: " + _CLAUDE_URL},
+        "fr": {"description": "🔑 API Claude 100$ - 30 jours\n• Fonctionne avec toutes les applications : 9router, claude code, codex, cursor, etc.\n• Garantie complète (BHF).\nActivation et clé API : https://api.mwapi.dev/\n• Guide détaillé : " + _CLAUDE_URL},
+    },
+    "claude_10m_1d": {
+        "en": {"description": "🔑 CLAUDE API - 10 million tokens - 1 day\n⚡ Works seamlessly with all tools and development environments: 9router, Claude Dev, Cursor, VS Code, etc.\n⏳ Validity: 1 day\n\n📋 Quick setup instructions:\n🔹 Step 1: Visit 👉 https://miraiapi.com/usage/#redeem to redeem your token (enter the code provided in your order details).\n🔹 Step 2: Visit 👉 https://miraiapi.com/usage/#config to configure your API key, choose the target application and select the ideal model.\n✨ Everything is ready for coding!\n\n🌐 Base URL: https://api.miraiapi.com/v1\n🔑 API key: sk-...\n🤖 Available models:\n  ⚡ claude-opus-4.6\n  ⚡ claude-opus-4.7\n  ⚡ claude-opus-4.8\n  👑 claude-opus-5\n  🚀 claude-sonnet-5\n📊 Check your quota balance and expiry date at: 🔗 https://miraiapi.com/usage/\n\n📖 Documentation and detailed guide: 🔗 " + _MIRAI_DOC + "\n\n⚠️ Important note: the validity period only starts once the redeem code is activated. You can store the code or resell it for up to 30 days."},
+        "fr": {"description": "🔑 API CLAUDE - 10 millions de tokens - 1 jour\n⚡ Compatible avec tous les outils et environnements de développement : 9router, Claude Dev, Cursor, VS Code, etc.\n⏳ Validité : 1 jour\n\n📋 Instructions de configuration rapide :\n🔹 Étape 1 : Rendez-vous sur 👉 https://miraiapi.com/usage/#redeem pour utiliser votre jeton (saisissez le code fourni dans les détails de votre commande).\n🔹 Étape 2 : Rendez-vous sur 👉 https://miraiapi.com/usage/#config pour configurer votre clé API, choisir l'application cible et sélectionner le modèle idéal.\n✨ Tout est prêt pour coder !\n\n🌐 URL de base : https://api.miraiapi.com/v1\n🔑 Clé API : sk-...\n🤖 Modèles disponibles :\n  ⚡ claude-opus-4.6\n  ⚡ claude-opus-4.7\n  ⚡ claude-opus-4.8\n  👑 claude-opus-5\n  🚀 claude-sonnet-5\n📊 Vérifiez le solde de votre quota et la date d'expiration sur : 🔗 https://miraiapi.com/usage/\n\n📖 Documentation et guide détaillé : 🔗 " + _MIRAI_DOC + "\n\n⚠️ Remarque importante : la période de validité ne commence qu'à l'activation du code de remboursement (redeem). Vous pouvez conserver le code ou le revendre pendant 30 jours maximum."},
+    },
+    "chatgpt_plus_1m": {
+        "en": {"description": "Chat gpt plus 1 month  private \nall tested and working\nGmail or @googlemail.com\nNo warranty \nLogin chatgpt \nFormat:Email/password/2fe\n2fe:https://2fa-auth.com\n⁉️ Note: Customers are required to install a passkey to change their password, 2FA, and email account immediately after purchase.\nChange your 2fe within 1 h\nCheck your account within 1 h"},
+        "fr": {"description": "ChatGPT Plus 1 mois - compte privé\nTous les comptes sont testés et fonctionnels\nGmail ou @googlemail.com\nSans garantie\nConnexion à ChatGPT\nFormat : e-mail / mot de passe / 2FA\nSite 2FA : https://2fa-auth.com\n⁉️ Remarque : le client doit installer une clé d'accès (passkey) et changer immédiatement après l'achat son mot de passe, son 2FA et l'e-mail du compte.\nChangez votre 2FA dans l'heure qui suit\nVérifiez votre compte dans l'heure qui suit"},
+    },
+    "office365_1y": {
+        "en": {"description": "🛍️ Microsoft Office 365 Plus for 1 year\n\nIncluded apps:\n\nWord · Excel · PowerPoint · OneNote · Forms\nCloud storage:\n\n100 GB OneDrive included\nCompatibility:\n\nWindows · macOS · Android · iOS\nHow it works:\n\nAfter payment, you will receive your login details (username / password) to activate Office 365 on your devices.\nSubscription duration: 12 months\n⚠️ Change the password when you log in for the first time\n🔗 Login: https://portal.office.com"},
+        "fr": {"description": "🛍️ Microsoft Office 365 Plus pour 1 an\n\nApplications incluses :\n\nWord · Excel · PowerPoint · OneNote · Forms\nStockage cloud :\n\n100 Go OneDrive inclus\nCompatibilité :\n\nWindows · macOS · Android · iOS\nFonctionnement :\n\nAprès le paiement, vous recevrez vos identifiants (nom d'utilisateur / mot de passe) pour activer Office 365 sur vos appareils.\nDurée de l'abonnement : 12 mois\n⚠️ Changez le mot de passe lors de la première connexion\n🔗 Connexion : https://portal.office.com"},
+    },
+    "elevenlabs_3m": {
+        "en": {"description": "• The voucher is redeemed on the Stripe checkout page\n• It is redeemed on your own account\n• Gives 121K credits per month\n• Warranty after activation - 1 month\n• Must be redeemed within 7 days of purchase\n• You can also redeem it via: https://elevenlabs.io/signup?coupon=YOURCODE"},
+        "fr": {"description": "• Le bon est utilisé sur la page de paiement Stripe\n• Il est utilisé sur votre propre compte\n• Donne 121 000 crédits par mois\n• Garantie après activation - 1 mois\n• À utiliser dans les 7 jours suivant l'achat\n• Vous pouvez aussi l'utiliser via : https://elevenlabs.io/signup?coupon=YOURCODE"},
+    },
+}
+
+
 BASE_FILE = os.environ.get("BOT_BASE_FILE", "bot_base.py")
 if not os.path.exists(BASE_FILE):
     sys.exit("❌ لم أجد bot_base.py — أعد تسمية main.py القديم إلى bot_base.py ثم ضع هذا الملف باسم main.py")
@@ -147,6 +250,26 @@ patch(r"""    # إشعار الأدمن بالقيمة المختارة""",
 
     # إشعار الأدمن بالقيمة المختارة""", "gift_qty_step")
 
+
+# 16) منتجات جديدة: ترجماتها + إدراجها في قائمة products
+patch(r"""
+products = [
+    {
+        "id": "gemini_18m",""",
+      r"""
+TRANSLATIONS.update(NEW_TRANSLATIONS)
+
+products = [
+    {
+        "id": "gemini_18m",""", "new_translations")
+patch(r"""    {
+        "type": "separator",
+        "id": "sep_gift_cards",""",
+      r"""    *NEW_PRODUCTS,
+    {
+        "type": "separator",
+        "id": "sep_gift_cards",""", "new_products")
+
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
 # ========== الطلبات اليدوية (A/B) + سجل الطلبات + جرس التوفر ==========
@@ -161,6 +284,8 @@ MANUAL_A = {  # منتجات تحتاج بيانات من الزبون بعد ا
 MANUAL_B = {  # منتجات يسلّمها الأدمن (حساب / كود) من لوحة الطلبات المعلقة
     "netflix_full", "netflix_profile", "capcut_1m", "duolingo_12m",
     "duolingo_link_12m", "nordvpn_3m", "n8n_starter_12m", "canva_edu_500",
+    "prime_video_ultra_6m", "amazon_prime_6m", "claude_100_30d", "claude_10m_1d",
+    "chatgpt_plus_1m", "chatgpt_k12_edu", "office365_1y", "elevenlabs_3m",
 }
 MANUAL_IDS = set(MANUAL_A) | set(MANUAL_B)
 FREEFIRE_ID = "freefire_diamonds"
@@ -1023,6 +1148,156 @@ def handle_gift_qty(call):
         reply_markup=build_invoice_markup(lang, invoice_id, _wallet_covers(uid, invoice.get("price_usdt"))),
     )
     attach_invoice_msg(invoice_id, sent)
+    bot.answer_callback_query(call.id)
+
+
+# ============================================================
+# ========== ترتيب القائمة الرئيسية: أزواج + مجموعة Claude ==========
+# ============================================================
+# كل عنصر: معرّف منتج (زر طويل) | tuple من منتجين (جنب بعض) | "grp:..." مجموعة | "sep:..." فاصل
+STORE_SLOTS = [
+    "gemini_18m", "capcut_1m",
+    ("duolingo_12m", "duolingo_link_12m"),
+    ("netflix_full", "netflix_profile"),
+    ("prime_video_ultra_6m", "amazon_prime_6m"),
+    "grp:claude_api",
+    ("chatgpt_plus_1m", "chatgpt_k12_edu"),
+    ("office365_1y", "elevenlabs_3m"),
+    "nordvpn_3m", "n8n_starter_12m",
+    "snapchat_3m", "snapchat_6m", "snapchat_12m",
+    "canva_edu_500", "canva_edu_5000", "freefire_diamonds",
+    "sep:sep_gift_cards", "apple_gift_tr", "apple_gift_in", "apple_gift_fr",
+]
+
+# مجموعات: زر واحد طويل يفتح صفحة فيها أزرار المنتجات
+STORE_GROUPS = {
+    "claude_api": {"name": "Claude API", "icon": "🧠", "members": ["claude_100_30d", "claude_10m_1d"]},
+}
+
+# أسماء قصيرة للأزرار الجنبية (تيليغرام يقص الأسماء الطويلة)
+SHORT_NAMES = {
+    "duolingo_12m": {"ar": "Duolingo سلوت", "en": "Duolingo Slot", "fr": "Duolingo Slot"},
+    "duolingo_link_12m": {"ar": "Duolingo رابط", "en": "Duolingo Link", "fr": "Duolingo Lien"},
+    "netflix_full": {"ar": "Netflix كامل", "en": "Netflix Full", "fr": "Netflix Complet"},
+    "netflix_profile": {"ar": "Netflix بروفيل", "en": "Netflix Profile", "fr": "Netflix Profil"},
+    "prime_video_ultra_6m": {"ar": "Prime Video 6M", "en": "Prime Video 6M", "fr": "Prime Video 6M"},
+    "amazon_prime_6m": {"ar": "Amazon Prime 6M", "en": "Amazon Prime 6M", "fr": "Amazon Prime 6M"},
+    "chatgpt_plus_1m": {"ar": "ChatGPT Plus 1M", "en": "ChatGPT Plus 1M", "fr": "ChatGPT Plus 1M"},
+    "chatgpt_k12_edu": {"ar": "ChatGPT K12 Edu", "en": "ChatGPT K12 Edu", "fr": "ChatGPT K12 Edu"},
+    "office365_1y": {"ar": "Office 365 1Y", "en": "Office 365 1Y", "fr": "Office 365 1A"},
+    "elevenlabs_3m": {"ar": "ElevenLabs 3M", "en": "ElevenLabs 3M", "fr": "ElevenLabs 3M"},
+}
+
+GROUP_TEXTS = {
+    "ar": "📁 <b>{name}</b>\n\n💰 السعر: {lo} — {hi}\n👇 اختر النسخة:",
+    "en": "📁 <b>{name}</b>\n\n💰 Price: {lo} — {hi}\n👇 Choose your variant:",
+    "fr": "📁 <b>{name}</b>\n\n💰 Prix : {lo} — {hi}\n👇 Choisissez votre variante :",
+}
+
+def _slot_button(item, lang):
+    stock_display = item["stock"] if item["stock"] == "♾️" else f"📦 {item['stock']}"
+    return InlineKeyboardButton(
+        text=f"{item['icon']} {tr(item, 'name', lang)} | {item['price']} | {stock_display}",
+        callback_data=f"buy_{item['id']}",
+    )
+
+def _pair_button(item, lang):
+    names = SHORT_NAMES.get(item["id"], {})
+    label = names.get(lang) or names.get("en") or tr(item, "name", lang)
+    return InlineKeyboardButton(text=f"{item['icon']} {label}", callback_data=f"buy_{item['id']}")
+
+def _group_range(gid):
+    prices, stock = [], 0
+    for pid in STORE_GROUPS[gid]["members"]:
+        p = find_product(pid)
+        if not p:
+            continue
+        try:
+            prices.append(Decimal(p["price"].lstrip("$")))
+        except Exception:
+            pass
+        if isinstance(p["stock"], int):
+            stock += p["stock"]
+    if not prices:
+        return "-", "-", stock
+    return f"${min(prices):.2f}", f"${max(prices):.2f}", stock
+
+def generate_store_keyboard(lang):
+    sync_stock()
+    markup = InlineKeyboardMarkup(row_width=2)
+    shown = set()
+    group_members = {m for g in STORE_GROUPS.values() for m in g["members"]}
+
+    for slot in STORE_SLOTS:
+        if isinstance(slot, tuple):
+            items = [find_product(pid) for pid in slot]
+            items = [i for i in items if i]
+            shown.update(i["id"] for i in items)
+            if len(items) == 2:
+                markup.row(_pair_button(items[0], lang), _pair_button(items[1], lang))
+            elif items:
+                markup.add(_slot_button(items[0], lang))
+        elif slot.startswith("grp:"):
+            gid = slot[4:]
+            g = STORE_GROUPS.get(gid)
+            if not g:
+                continue
+            lo, hi, stock = _group_range(gid)
+            price = lo if lo == hi else f"{lo} - {hi}"
+            markup.add(InlineKeyboardButton(
+                text=f"{g['icon']} {g['name']} | {price} | 📦 {stock}",
+                callback_data=f"grp_{gid}",
+            ))
+        elif slot.startswith("sep:"):
+            item = find_product(slot[4:])
+            if item:
+                shown.add(item["id"])
+                markup.add(InlineKeyboardButton(text=tr(item, "text", lang), callback_data="noop"))
+        else:
+            item = find_product(slot)
+            if item:
+                shown.add(item["id"])
+                markup.add(_slot_button(item, lang))
+
+    # أي منتج يضيفه الأدمن لاحقاً ولم يوضع في الترتيب يظهر في الآخر
+    for item in products:
+        if item.get("type") == "separator" or item["id"] in shown or item["id"] in group_members:
+            continue
+        markup.add(_slot_button(item, lang))
+
+    markup.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="change_lang"))
+    markup.row(
+        InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"),
+        InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"),
+    )
+    markup.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
+    return markup
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("grp_"))
+def handle_store_group(call):
+    gid = call.data[4:]
+    g = STORE_GROUPS.get(gid)
+    if not g:
+        bot.answer_callback_query(call.id)
+        return
+    lang = get_lang(call.from_user.id)
+    sync_stock()
+    lo, hi, _ = _group_range(gid)
+    mk = InlineKeyboardMarkup(row_width=1)
+    for pid in g["members"]:
+        item = find_product(pid)
+        if item:
+            mk.add(_slot_button(item, lang))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(
+        call.message.chat.id,
+        GROUP_TEXTS.get(lang, GROUP_TEXTS["ar"]).format(name=html.escape(g["name"]), lo=lo, hi=hi),
+        parse_mode="HTML", reply_markup=mk,
+    )
     bot.answer_callback_query(call.id)
 
 '''
