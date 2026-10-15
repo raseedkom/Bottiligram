@@ -276,6 +276,15 @@ patch(r"""    send_card(call.message.chat.id, selected_product, caption, markup)
       r"""    _fix_group_back(selected_product["id"], markup)
     send_card(call.message.chat.id, selected_product, caption, markup)""", "group_back")
 
+
+# 18) رسالة الترحيب مع عرض الكاش باك
+patch(r""""welcome": "👋 مرحباً بك في متجر RASEEDKOM!\nاختر المنتج الذي تريده من القائمة أدناه:",""",
+      r""""welcome": "👋 مرحباً بك في متجر RASEEDKOM!\nاختر المنتج الذي تريده من القائمة أدناه:\n🎁 و إستفد من عرض خاص :5% كاش باك في محفظتك على كل عملية شراء 🎉",""", "welcome_ar")
+patch(r""""welcome": "👋 Welcome to the RASEEDKOM store!\nChoose the product you want from the list below:",""",
+      r""""welcome": "👋 Welcome to the RASEEDKOM store!\nChoose the product you want from the list below:\n🎁 And enjoy a special offer: 5% cashback in your wallet on every purchase 🎉",""", "welcome_en")
+patch(r""""welcome": "👋 Bienvenue dans la boutique RASEEDKOM !\nChoisissez le produit souhaité dans la liste ci-dessous :",""",
+      r""""welcome": "👋 Bienvenue dans la boutique RASEEDKOM !\nChoisissez le produit souhaité dans la liste ci-dessous :\n🎁 Et profitez d'une offre spéciale : 5 % de cashback dans votre portefeuille sur chaque achat 🎉",""", "welcome_fr")
+
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
 # ========== الطلبات اليدوية (A/B) + سجل الطلبات + جرس التوفر ==========
