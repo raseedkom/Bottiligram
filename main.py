@@ -9,6 +9,9 @@ import os, sys
 # ===== إعدادات يمكنك تعديلها =====
 GIFT_MAX_QTY = 3      # أقصى كمية في بطاقات الهداية
 GEMINI_MAX_QTY = 5    # أقصى كمية في Gemini (حسب المتوفر في المخزون)
+REF_NEED_USERS = 20   # عدد المحالين النشطين المطلوب
+REF_NEED_USD = 10     # مجموع مشتريات المحالين المطلوب ($)
+REF_REWARD_USD = 1    # مكافأة الإحالة ($)
 
 # ===== المنتجات الجديدة (تسليم يدوي) =====
 _CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
@@ -314,6 +317,31 @@ patch(r"""    _adm_wait.pop(message.from_user.id, None)
     _price_wait.pop(message.from_user.id, None)
     _ap_wait.pop(message.from_user.id, None)
     markup = InlineKeyboardMarkup()""", "admin_clear_ap")
+
+
+# 20) بوابة القناة + قائمة ابدأ + الإحالة
+patch(r"""def send_welcome(message):
+    register_user(message.from_user.id)""",
+      r"""def send_welcome(message):
+    if start_gate(message):
+        return
+    register_user(message.from_user.id)""", "gate_start")
+patch(r"""def handle_kb_products(message):
+    register_user(message.from_user.id)""",
+      r"""def handle_kb_products(message):
+    if not gate_ok(message.chat.id, message.from_user.id):
+        return
+    register_user(message.from_user.id)""", "gate_products")
+patch(r"""    bot.send_message(message.chat.id, t(lang, "start_guide"))""",
+      r"""    if not gate_ok(message.chat.id, message.from_user.id):
+        return
+    send_start_menu(message.chat.id, lang)""", "start_menu")
+patch(r"""def refresh_for_user(chat_id, user_id):
+    register_user(user_id)""",
+      r"""def refresh_for_user(chat_id, user_id):
+    if not gate_ok(chat_id, user_id):
+        return
+    register_user(user_id)""", "gate_refresh")
 
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
@@ -1320,6 +1348,7 @@ def generate_store_keyboard(lang):
         InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"),
     )
     markup.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
+    markup.add(InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_m"))
     return markup
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("grp_"))
@@ -1365,7 +1394,7 @@ def _fix_group_back(pid, markup):
 # ============================================================
 # ========== طرق الدفع: بريدي موب + Flixy (+ RedotPay/Bybit قريباً) ==========
 # ============================================================
-from decimal import ROUND_CEILING
+from decimal import ROUND_CEILING, ROUND_DOWN
 
 SEP = chr(95)
 BARIDI_RIP = "00799999002013573542"
@@ -1399,7 +1428,7 @@ PM_TEXTS = {
         "proof_ok": "✅ تم استلام الوصل. سيتم التحقق وإضافة الرصيد في أقرب وقت، وسيصلك إشعار هنا.",
         "proof_dup": "ℹ️ وصلك قيد المراجعة، يرجى الانتظار.",
         "proof_hint_bd": "📸 ابعث <b>لقطة شاشة</b> لوصل التحويل.",
-        "proof_hint_fx": "✉️ ابعث رسالة الفليكسي بالشكل المطلوب (فليكسي، المبلغ، الوقت) أو لقطة شاشة.",
+        "proof_hint_fx": "✉️ ابعث رسالة نصية بهذا الشكل (يجب أن تحتوي على المبلغ والوقت):\n<code>فليكسي\nالمبلغ : 1000Da\nالوقت : 12:33</code>",
         "busy": "ℹ️ لديك دفعة قيد المراجعة بالفعل. انتظر تأكيدها قبل بدء دفعة جديدة.",
         "approved": "✅ <b>تم شحن رصيدك في محفظتك بنجاح!</b>\n\n💵 +{amount}$\n💼 الرصيد المتاح: <b>${avail}</b>\n\n🛍️ يمكنك الآن اختيار منتجك والدفع من المحفظة.",
         "rejected": "❌ <b>دفعة خاطئة</b>\n\nلم نتمكن من التحقق من دفعتك. إذا كنت تعتقد أن هذا خطأ، تواصل مع الدعم.",
@@ -1425,7 +1454,7 @@ PM_TEXTS = {
         "proof_ok": "✅ Receipt received. We will verify and add the balance as soon as possible, and you will get a notification here.",
         "proof_dup": "ℹ️ Your receipt is under review, please wait.",
         "proof_hint_bd": "📸 Please send a <b>screenshot</b> of the transfer receipt.",
-        "proof_hint_fx": "✉️ Send the Flexy message in the required format (Flexy, amount, time) or a screenshot.",
+        "proof_hint_fx": "✉️ Send a text message in this format (it must contain the amount and the time):\n<code>Flexy\nAmount : 1000Da\nTime : 12:33</code>",
         "busy": "ℹ️ You already have a payment under review. Wait for its confirmation before starting a new one.",
         "approved": "✅ <b>Your wallet has been topped up successfully!</b>\n\n💵 +{amount}$\n💼 Available balance: <b>${avail}</b>\n\n🛍️ You can now pick your product and pay from the wallet.",
         "rejected": "❌ <b>Incorrect payment</b>\n\nWe couldn't verify your payment. If you think this is a mistake, contact support.",
@@ -1451,7 +1480,7 @@ PM_TEXTS = {
         "proof_ok": "✅ Reçu reçu. Nous vérifierons et ajouterons le solde dans les meilleurs délais, vous recevrez une notification ici.",
         "proof_dup": "ℹ️ Votre reçu est en cours de vérification, veuillez patienter.",
         "proof_hint_bd": "📸 Envoyez une <b>capture d'écran</b> du reçu de virement.",
-        "proof_hint_fx": "✉️ Envoyez le message Flexy au format demandé (Flexy, montant, heure) ou une capture d'écran.",
+        "proof_hint_fx": "✉️ Envoyez un message texte sous cette forme (il doit contenir le montant et l'heure) :\n<code>Flexy\nMontant : 1000Da\nHeure : 12:33</code>",
         "busy": "ℹ️ Vous avez déjà un paiement en cours de vérification. Attendez sa confirmation avant d'en démarrer un nouveau.",
         "approved": "✅ <b>Votre portefeuille a été rechargé avec succès !</b>\n\n💵 +{amount}$\n💼 Solde disponible : <b>${avail}</b>\n\n🛍️ Vous pouvez maintenant choisir votre produit et payer avec le portefeuille.",
         "rejected": "❌ <b>Paiement incorrect</b>\n\nNous n'avons pas pu vérifier votre paiement. Si vous pensez qu'il s'agit d'une erreur, contactez l'assistance.",
@@ -1581,12 +1610,12 @@ def _pm_busy(uid):
     req = _pp_active(uid)
     return bool(req and req.get("status") == "pending")
 
-def _create_pp(uid, m, kind, what, usd):
+def _create_pp(uid, m, kind, what, usd, inv=None):
     usd = f"{Decimal(str(usd)):.2f}"
     req = {
         "id": uuid.uuid4().hex[:8], "uid": uid, "m": m, "kind": kind, "what": what,
         "usd": usd, "da": pm_da(usd, m), "rate": str(pm_rate(m)),
-        "status": "awaiting", "ts": int(time.time()),
+        "status": "awaiting", "ts": int(time.time()), "inv": inv,
     }
     pp_save(req)
     kv_set(f"rk:ppu:{uid}", req["id"], ex=6 * 3600)
@@ -1671,12 +1700,21 @@ def _pm_pay_text(lang, req):
 def _pm_pay_markup(lang, req, dest):
     mk = InlineKeyboardMarkup(row_width=1)
     mk.add(_pm_copy_button(lang, req["m"], dest))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=f"pm_rb_{req['id']}"))
     mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data=f"pmx_{req['id']}"))
     return mk
 
 def _pm_show_pay(call, lang, req):
     text, dest = _pm_pay_text(lang, req)
     _pf_show(call, text, _pm_pay_markup(lang, req, dest))
+
+def _pm_restore_invoice(uid, inv_id):
+    """يعيد تفعيل الفاتورة (انتظار رقم عملية Binance + مراقبة الانتهاء) بعد الرجوع."""
+    try:
+        kv_set(f"rk:pend:{uid}", inv_id, ex=INVOICE_TTL + INVOICE_GRACE + 600)
+        inv_live_add(inv_id)
+    except Exception as e:
+        print(f"restore invoice error: {e}")
 
 def _pm_inv(call, inv_id, lang):
     try:
@@ -1755,11 +1793,41 @@ def handle_pm(call):
         bot.answer_callback_query(call.id)
         return
 
+    if cmd == "rb":  # رجوع من شاشة بريدي موب/Flixy إلى اختيار الطريقة
+        req = pp_get(arg)
+        if not req or str(req.get("uid")) != str(uid):
+            bot.answer_callback_query(call.id)
+            return
+        if req.get("status") == "pending":
+            bot.answer_callback_query(call.id, pmt(lang, "proof_dup"), show_alert=True)
+            return
+        req["status"] = "cancelled"
+        try:
+            pp_save(req)
+            kv_del(f"rk:ppu:{uid}")
+        except StorageError:
+            pass
+        inv_id = req.get("inv")
+        if inv_id:
+            inv = _pm_inv(call, inv_id, lang)
+            if not inv:
+                return
+            _pm_restore_invoice(uid, inv_id)
+            product = find_product(inv["product_id"])
+            _pf_show(call, build_invoice_text(lang, inv, product), build_invoice_markup(lang, inv_id, False))
+        else:
+            topup_method_picker(call, lang)
+        bot.answer_callback_query(call.id)
+        return
+
     if cmd == "bn":
         inv = _pm_inv(call, arg, lang)
         if inv:
             product = find_product(inv["product_id"])
-            _pf_show(call, _bn_invoice_text(lang, inv, product), _bn_invoice_markup(lang, arg, False))
+            _pm_restore_invoice(uid, arg)
+            mk = _bn_invoice_markup(lang, arg, False)
+            mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=f"pm_back_{arg}"))
+            _pf_show(call, _bn_invoice_text(lang, inv, product), mk)
             bot.answer_callback_query(call.id)
         return
 
@@ -1775,7 +1843,7 @@ def handle_pm(call):
             bot.answer_callback_query(call.id, pmt(lang, "busy"), show_alert=True)
             return
         try:
-            req = _create_pp(uid, cmd, "buy", inv["product_name"], inv["price_usdt"])
+            req = _create_pp(uid, cmd, "buy", inv["product_name"], inv["price_usdt"], arg)
         except StorageError:
             bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
             return
@@ -1899,6 +1967,23 @@ def _pp_notify(req):
     alert_admin(txt)
     monitor_send(txt)
 
+def _parse_flexy(txt):
+    """يستخرج (المبلغ، الوقت) من رسالة Flixy. يرجع None إذا ناقص أحدهما."""
+    tm = re.search(r"(?<!\d)([01]?\d|2[0-3])\s*[:hH]\s*([0-5]\d)(?!\d)", txt)
+    if not tm:
+        return None
+    rest = txt[:tm.start()] + " " + txt[tm.end():]
+    nums = re.findall(r"\d+(?:[.,]\d+)?", rest)
+    if not nums:
+        return None
+    try:
+        da = Decimal(nums[0].replace(",", "."))
+    except InvalidOperation:
+        return None
+    if da <= 0:
+        return None
+    return da, f"{int(tm.group(1)):02d}:{tm.group(2)}"
+
 def _pp_submit(message, photo):
     uid = message.from_user.id
     lang = get_lang(uid)
@@ -1909,13 +1994,22 @@ def _pp_submit(message, photo):
         bot.send_message(message.chat.id, pmt(lang, "proof_dup"))
         return True
     if photo:
+        if req["m"] == "fx":  # Flixy: نص فقط (مبلغ + وقت)
+            bot.send_message(message.chat.id, pmt(lang, "proof_hint_fx"), parse_mode="HTML")
+            return True
         req["file_id"] = message.photo[-1].file_id
     else:
         txt = (message.text or "").strip()
-        if req["m"] == "bd" or not re.search(r"\d", txt):
-            bot.send_message(message.chat.id, pmt(lang, "proof_hint_" + req["m"]), parse_mode="HTML")
+        if req["m"] == "bd":
+            bot.send_message(message.chat.id, pmt(lang, "proof_hint_bd"), parse_mode="HTML")
+            return True
+        parsed = _parse_flexy(txt)
+        if not parsed:
+            bot.send_message(message.chat.id, pmt(lang, "proof_hint_fx"), parse_mode="HTML")
             return True
         req["text"] = txt[:500]
+        req["claimed_da"] = str(parsed[0])
+        req["claimed_time"] = parsed[1]
     req["status"] = "pending"
     req["sub_ts"] = int(time.time())
     try:
@@ -1943,6 +2037,23 @@ def proof_photo(message):
 # ============================================================
 _ap_wait = {}  # admin_id -> حالة المعالج
 
+def _parse_amount_input(text, rate):
+    """نص الأدمن: رقم عادي = دينار، أو مع $ = دولار. يرجع (usd, da|None) أو None."""
+    s = text.strip().lower().replace(",", ".").replace("،", ".")
+    m = re.search(r"\d+(?:\.\d+)?", s)
+    if not m:
+        return None
+    v = Decimal(m.group(0))
+    if v <= 0:
+        return None
+    if "$" in s or "usd" in s or "دولار" in s:
+        usd, da = v.quantize(Decimal("0.01"), rounding=ROUND_DOWN), None
+    else:
+        usd, da = (v / rate).quantize(Decimal("0.01"), rounding=ROUND_DOWN), v
+    if usd <= 0:
+        return None
+    return usd, da
+
 def _ap_set(aid, **kw):
     kw["t"] = time.time()
     _ap_wait[aid] = kw
@@ -1967,6 +2078,13 @@ def _pp_detail_text(req):
         f"📦 {html.escape(req['what'])}\n💵 ${req['usd']} = <b>{req['da']} DA</b> (1$ = {_fmt_rate(req['rate'])})\n"
         f"🕒 {_fmt_date(req.get('sub_ts', 0))}"
     )
+    if req.get("claimed_da"):
+        try:
+            low = Decimal(req["claimed_da"]) < Decimal(str(req["da"]))
+        except InvalidOperation:
+            low = False
+        s += (f"\n\n🔎 المطلوب: <b>{req['da']} DA</b> | كتب الزبون: <b>{html.escape(req['claimed_da'])} DA</b>"
+              f"{' ⚠️ أقل من المطلوب' if low else ''}\n🕒 الوقت المكتوب: <b>{html.escape(req.get('claimed_time', ''))}</b>")
     if req.get("text"):
         s += f"\n\n📝 رسالة الزبون:\n<code>{html.escape(req['text'])}</code>"
     return s
@@ -2174,14 +2292,24 @@ def handle_ap(call):
             return
         _ap_set(aid, op="credit", rid=arg)
         mk = InlineKeyboardMarkup(row_width=1)
-        mk.add(InlineKeyboardButton(text=f"✅ {req['usd']}$ (مبلغ الطلب)", callback_data=f"ap_amt_{arg}_{req['usd']}"))
+        mk.add(InlineKeyboardButton(text=f"✅ مبلغ الطلب كاملاً: {req['da']} DA = {req['usd']}$",
+                                    callback_data=f"ap_amt_{arg}_{req['usd']}"))
         mk.add(InlineKeyboardButton(text="❌ إلغاء", callback_data="ap_l"))
         bot.send_message(
             chat_id,
-            f"💵 أرسل المبلغ بالدولار لإضافته إلى محفظة الزبون <code>{req['uid']}</code>\n(مثال: <code>5</code>)",
+            f"💵 أرسل المبلغ الذي وصلك لشحن محفظة الزبون <code>{req['uid']}</code>:\n"
+            f"• بالدينار: <code>500</code>\n• أو بالدولار: <code>5$</code>\n\n"
+            f"💱 سعر الصرف المعتمد: 1$ = {_fmt_rate(req['rate'])} DA",
             parse_mode="HTML", reply_markup=mk,
         )
     elif cmd == "amt":
+        try:
+            rid, usd = arg.rsplit(SEP, 1)
+            ok, msg = _ap_approve(rid, Decimal(usd))
+        except Exception as e:
+            ok, msg = False, f"❌ خطأ: {str(e)[:150]}"
+        bot.send_message(chat_id, msg, parse_mode="HTML")
+    elif cmd == "cf":
         try:
             rid, usd = arg.rsplit(SEP, 1)
             ok, msg = _ap_approve(rid, Decimal(usd))
@@ -2273,13 +2401,27 @@ def handle_ap_text(message):
     op = st["op"]
 
     if op == "credit":
-        amount = _parse_price(text)
-        if amount is None:
-            bot.reply_to(message, "❌ مبلغ غير صالح. أرسل مثلاً: 5")
+        req = pp_get(st["rid"])
+        if not req or req.get("status") != "pending":
+            _ap_wait.pop(aid, None)
+            bot.reply_to(message, "⚠️ هذه الدفعة تمت معالجتها.")
             return
+        rate = Decimal(str(req.get("rate") or pm_rate(req["m"])))
+        parsed = _parse_amount_input(text, rate)
+        if not parsed:
+            bot.reply_to(message, "❌ مبلغ غير صالح. أرسل مثلاً: 500 (دينار) أو 5$ (دولار)")
+            return
+        usd, da = parsed
         _ap_wait.pop(aid, None)
-        ok, msg = _ap_approve(st["rid"], amount)
-        bot.send_message(message.chat.id, msg, parse_mode="HTML")
+        calc = (f"{da} DA ÷ {_fmt_rate(rate)} = <b>{usd}$</b>" if da is not None else f"<b>{usd}$</b>")
+        mk = InlineKeyboardMarkup(row_width=1)
+        mk.add(InlineKeyboardButton(text=f"✅ تأكيد شحن {usd}$", callback_data=f"ap_cf_{st['rid']}_{usd}"))
+        mk.add(InlineKeyboardButton(text="❌ إلغاء", callback_data=f"ap_v_{st['rid']}"))
+        bot.send_message(
+            message.chat.id,
+            f"🧮 {calc}\n\nسيُضاف <b>{usd}$</b> إلى محفظة الزبون <code>{req['uid']}</code>. تأكيد؟",
+            parse_mode="HTML", reply_markup=mk,
+        )
         return
 
     if op == "wtop":
@@ -2345,6 +2487,376 @@ def _awaiting_proof_text(m):
 def handle_proof_text(message):
     _pp_submit(message, False)
 
+
+
+# ============================================================
+# ========== بوابة القناة + قائمة "ابدأ" + نظام الإحالة ==========
+# ============================================================
+CHANNEL_NAME = "Raseedkom store"
+REF_NEED_U = int(REF_NEED_USERS)
+REF_NEED_C = int(Decimal(str(REF_NEED_USD)) * 100)       # بالسنت
+REF_REWARD_C = int(Decimal(str(REF_REWARD_USD)) * 100)   # بالسنت
+
+GATE_TEXT = (
+    "👋 Welcome to RASEEDKOM store!\n\n"
+    "📢 To use the bot, you must join our official channel first.\n\n"
+    "1️⃣ Tap «Raseedkom store» below and join the channel\n"
+    "2️⃣ Come back here and tap «✅ Verify»"
+)
+GATE_FAIL = "❌ You haven't joined the channel yet. Please join it first, then tap Verify."
+
+def channel_id():
+    try:
+        v = kv_get("rk:channel_id")
+        return int(v) if v else None
+    except Exception:
+        return None
+
+def gate_enabled():
+    try:
+        return str(kv_get("rk:gate:off")) != "1"
+    except Exception:
+        return True
+
+def _is_member(chat_id, uid):
+    """True / False، أو None عند تعذر التحقق (البوت ليس أدمن مثلاً)."""
+    try:
+        st = bot.get_chat_member(chat_id, uid)
+        if st.status in ("member", "administrator", "creator"):
+            return True
+        if st.status == "restricted" and getattr(st, "is_member", False):
+            return True
+        return False
+    except Exception as e:
+        print(f"get_chat_member error: {e}")
+        monitor_send(
+            "🚨 <b>تعذر التحقق من اشتراك القناة</b>\nتأكد أن البوت أدمن في القناة.\n"
+            f"<code>{html.escape(str(e))[:200]}</code>", key="gate_err", cooldown=3600)
+        return None
+
+def _gate_markup():
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=f"📢 {CHANNEL_NAME}", url=CHANNEL_LINK))
+    mk.add(InlineKeyboardButton(text="✅ Verify", callback_data="gate_verify"))
+    return mk
+
+def gate_ok(chat_id, uid):
+    """True = يُسمح له بالمتابعة. وإلا نرسل رسالة الاشتراك."""
+    try:
+        if str(uid) == str(ADMIN_CHAT_ID) or not gate_enabled():
+            return True
+        cid = channel_id()
+        if not cid:
+            return True
+        res = _is_member(cid, uid)
+        if res is None or res:
+            return True
+        bot.send_message(chat_id, GATE_TEXT, reply_markup=_gate_markup())
+        return False
+    except Exception as e:
+        print(f"gate_ok error: {e}")
+        return True
+
+# ---------- الإحالة: التسجيل ----------
+def _ref_capture(message):
+    """يحفظ المُحيل لزبون جديد فقط (أول رابط فقط، ولا يتبدل)."""
+    try:
+        uid = message.from_user.id
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) < 2 or not parts[1].startswith("ref" + SEP):
+            return
+        rid = parts[1][4:]
+        if not rid.isdigit() or int(rid) == uid:
+            return
+        if str(uid) in known_users or str(uid) in user_lang:
+            return  # ليس جديداً
+        if str(rid) not in known_users and str(rid) not in user_lang:
+            return
+        kv_set(f"rk:refp:{uid}", rid, ex=30 * 86400, nx=True)
+    except Exception as e:
+        print(f"ref capture error: {e}")
+
+def _ref_finalize(uid):
+    try:
+        rid = kv_get(f"rk:refp:{uid}")
+        if not rid:
+            return
+        rid = str(rid)
+        if kv_set(f"rk:ref:of:{uid}", rid, nx=True):
+            _sadd(f"rk:ref:list:{rid}", str(uid))
+        kv_del(f"rk:refp:{uid}")
+    except Exception as e:
+        print(f"ref finalize error: {e}")
+
+def start_gate(message):
+    """يُستدعى أول /start: True = أوقف المعالجة (ظهرت رسالة الاشتراك)."""
+    uid = message.from_user.id
+    _ref_capture(message)
+    ok = gate_ok(message.chat.id, uid)
+    if ok:
+        _ref_finalize(uid)
+    return not ok
+
+@bot.callback_query_handler(func=lambda c: c.data == "gate_verify")
+def handle_gate_verify(call):
+    uid = call.from_user.id
+    cid = channel_id()
+    res = _is_member(cid, uid) if cid else True
+    if res is False and str(uid) != str(ADMIN_CHAT_ID):
+        bot.answer_callback_query(call.id, GATE_FAIL, show_alert=True)
+        return
+    _ref_finalize(uid)
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.answer_callback_query(call.id)
+    refresh_for_user(call.message.chat.id, uid)
+
+# ---------- ضبط القناة تلقائياً + حظر البوت ----------
+try:
+    @bot.channel_post_handler(func=lambda m: True)
+    def handle_channel_post(message):
+        try:
+            txt = (message.text or "").strip()
+            if channel_id() is None or txt.startswith("/setchannel"):
+                kv_set("rk:channel_id", str(message.chat.id))
+                alert_admin(f"✅ <b>تم ضبط القناة</b>\n{html.escape(message.chat.title or '')}\n<code>{message.chat.id}</code>\n"
+                            "بوابة الاشتراك والإحالات تعمل الآن.")
+        except Exception as e:
+            print(f"channel post error: {e}")
+except AttributeError:
+    print("channel_post_handler unavailable")
+
+try:
+    @bot.my_chat_member_handler(func=lambda m: True)
+    def handle_my_chat_member(update):
+        try:
+            if update.chat.type != "private":
+                return
+            uid = update.from_user.id
+            st = update.new_chat_member.status
+            if st in ("kicked", "left"):
+                kv_set(f"rk:blocked:{uid}", "1")
+            elif st == "member":
+                kv_del(f"rk:blocked:{uid}")
+        except Exception as e:
+            print(f"my_chat_member error: {e}")
+except AttributeError:
+    print("my_chat_member_handler unavailable")
+
+@bot.message_handler(commands=["gate", "gateon", "gateoff"])
+def gate_command(message):
+    if not is_admin_msg(message):
+        return
+    cmd = message.text.split()[0].lstrip("/").split("@")[0]
+    if cmd == "gateon":
+        kv_set("rk:gate:off", "0")
+    elif cmd == "gateoff":
+        kv_set("rk:gate:off", "1")
+    bot.reply_to(message, f"🚪 البوابة: {'✅ مفعّلة' if gate_enabled() else '⛔ موقوفة'}\n📢 القناة: {channel_id() or 'غير مضبوطة (أرسل أي رسالة في القناة)'}")
+
+# ---------- نصوص ----------
+SM_TEXTS = {
+    "ar": {
+        "menu": "🎉 مرحباً بك! 🎉\n\n🎯 دليل سريع:\n1. اضغط على «🛒 شراء»\n2. اختر المنتج الذي تريده\n3. أكمل الدفع\n4. بعد الدفع، أرسل رقم الطلب للتحقق\n\n🎯 اختر خياراً:",
+        "buy": "🏪 شراء", "game": "🎮 لعبة · من سيفوز؟", "ref": "👥 الإحالة", "api": "🔌 API", "channel": "📢 القناة الرئيسية",
+    },
+    "en": {
+        "menu": "🎉 Welcome! 🎉\n\n🎯 Quick guide:\n1. Tap «🛒 Buy»\n2. Choose the product you want\n3. Complete the payment\n4. After payment, send the order number for verification\n\n🎯 Choose an option:",
+        "buy": "🏪 Buy", "game": "🎮 Game · Who will win?", "ref": "👥 Referral", "api": "🔌 API", "channel": "📢 Main channel",
+    },
+    "fr": {
+        "menu": "🎉 Bienvenue ! 🎉\n\n🎯 Guide rapide :\n1. Appuyez sur « 🛒 Acheter »\n2. Choisissez le produit souhaité\n3. Effectuez le paiement\n4. Après le paiement, envoyez le numéro de commande pour vérification\n\n🎯 Choisissez une option :",
+        "buy": "🏪 Acheter", "game": "🎮 Jeu · Qui va gagner ?", "ref": "👥 Parrainage", "api": "🔌 API", "channel": "📢 Canal principal",
+    },
+}
+
+def smt(lang, key):
+    return SM_TEXTS.get(lang, SM_TEXTS["ar"])[key]
+
+REF_TEXTS = {
+    "ar": {
+        "page": "👥 <b>برنامج الإحالة</b>\n\nادعُ أصدقاءك عبر رابطك الخاص، واحصل على <b>{reward}$</b> في محفظتك عند استيفاء الشرطين التاليين:\n• أن يبلغ عدد المُحالين النشطين <b>{need_u}</b> عضواً.\n• أن يبلغ مجموع مشترياتهم <b>{need_usd}$</b>.\n\n🔗 رابطك الخاص:\n<code>{link}</code>\n\n📊 <b>إحصائياتك:</b>\n👥 عدد المُحالين: <b>{total}</b>\n✅ المُحالون النشطون: <b>{active} / {need_u}</b>\n💵 مجموع مشترياتهم: <b>{spent}$ / {need_usd}$</b>\n\nℹ️ المُحال النشط هو من بقي مشتركاً في القناة ولم يحظر البوت. تُمنح المكافأة مرة واحدة فقط لكل مستخدم.",
+        "claimed": "\n\n✅ تم استلام المكافأة.",
+        "copy": "📋 نسخ الرابط",
+        "claim": "🎁 إضافة {reward}$ إلى المحفظة",
+        "ok": "✅ تمت إضافة {reward}$ إلى محفظتك بنجاح.",
+        "already": "ℹ️ سبق أن استلمت هذه المكافأة.",
+        "missing": "⚠️ لم تكتمل الشروط بعد.",
+        "m_users": "• ينقصك {n} إحالة نشطة",
+        "m_spent": "• ينقصك {x}$ من مشتريات المُحالين",
+        "error": "⚠️ حدث خطأ مؤقت، حاول لاحقاً.",
+    },
+    "en": {
+        "page": "👥 <b>Referral program</b>\n\nInvite your friends with your personal link and get <b>{reward}$</b> in your wallet once both conditions are met:\n• Your active referrals reach <b>{need_u}</b> members.\n• Their total purchases reach <b>{need_usd}$</b>.\n\n🔗 Your personal link:\n<code>{link}</code>\n\n📊 <b>Your stats:</b>\n👥 Referred users: <b>{total}</b>\n✅ Active referrals: <b>{active} / {need_u}</b>\n💵 Their total purchases: <b>{spent}$ / {need_usd}$</b>\n\nℹ️ An active referral is someone who is still subscribed to the channel and has not blocked the bot. The reward is granted only once per user.",
+        "claimed": "\n\n✅ Reward claimed.",
+        "copy": "📋 Copy link",
+        "claim": "🎁 Add {reward}$ to wallet",
+        "ok": "✅ {reward}$ has been added to your wallet.",
+        "already": "ℹ️ You have already claimed this reward.",
+        "missing": "⚠️ The conditions are not met yet.",
+        "m_users": "• You need {n} more active referrals",
+        "m_spent": "• You need {x}$ more in referral purchases",
+        "error": "⚠️ Temporary error, try again later.",
+    },
+    "fr": {
+        "page": "👥 <b>Programme de parrainage</b>\n\nInvitez vos amis avec votre lien personnel et recevez <b>{reward}$</b> dans votre portefeuille lorsque les deux conditions sont remplies :\n• Vos filleuls actifs atteignent <b>{need_u}</b> membres.\n• Le total de leurs achats atteint <b>{need_usd}$</b>.\n\n🔗 Votre lien personnel :\n<code>{link}</code>\n\n📊 <b>Vos statistiques :</b>\n👥 Filleuls : <b>{total}</b>\n✅ Filleuls actifs : <b>{active} / {need_u}</b>\n💵 Total de leurs achats : <b>{spent}$ / {need_usd}$</b>\n\nℹ️ Un filleul actif est une personne toujours abonnée au canal et n'ayant pas bloqué le bot. La récompense n'est accordée qu'une seule fois par utilisateur.",
+        "claimed": "\n\n✅ Récompense récupérée.",
+        "copy": "📋 Copier le lien",
+        "claim": "🎁 Ajouter {reward}$ au portefeuille",
+        "ok": "✅ {reward}$ ont été ajoutés à votre portefeuille.",
+        "already": "ℹ️ Vous avez déjà récupéré cette récompense.",
+        "missing": "⚠️ Les conditions ne sont pas encore remplies.",
+        "m_users": "• Il vous manque {n} filleuls actifs",
+        "m_spent": "• Il vous manque {x}$ d'achats de vos filleuls",
+        "error": "⚠️ Erreur temporaire, réessayez plus tard.",
+    },
+}
+
+def rft(lang, key):
+    return REF_TEXTS.get(lang, REF_TEXTS["ar"])[key]
+
+# ---------- قائمة "ابدأ" ----------
+def start_menu_markup(lang):
+    mk = InlineKeyboardMarkup(row_width=2)
+    mk.add(InlineKeyboardButton(text=smt(lang, "buy"), callback_data="back_to_main"))
+    mk.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
+    mk.add(InlineKeyboardButton(text=smt(lang, "game"), callback_data="sm_game"))
+    mk.row(InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"),
+           InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"))
+    mk.row(InlineKeyboardButton(text=t(lang, "kb_support"), url=MY_PRIVATE_CHAT_LINK),
+           InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_s"))
+    mk.add(InlineKeyboardButton(text=smt(lang, "api"), callback_data="sm_api"))
+    mk.add(InlineKeyboardButton(text=smt(lang, "channel"), url=CHANNEL_LINK))
+    mk.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="change_lang"))
+    return mk
+
+def send_start_menu(chat_id, lang):
+    bot.send_message(chat_id, smt(lang, "menu"), reply_markup=start_menu_markup(lang))
+
+@bot.callback_query_handler(func=lambda c: c.data in ("sm_home", "sm_game", "sm_api"))
+def handle_sm(call):
+    lang = get_lang(call.from_user.id)
+    if call.data == "sm_home":
+        _pf_show(call, smt(lang, "menu"), start_menu_markup(lang))
+    else:
+        mk = InlineKeyboardMarkup(row_width=1)
+        mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="sm_home"))
+        _pf_show(call, pmt(lang, "soon"), mk)
+    bot.answer_callback_query(call.id)
+
+# ---------- الإحالة: الإحصائيات والصفحة ----------
+_act_cache = {}
+
+def _ref_active(r):
+    try:
+        if str(kv_get(f"rk:blocked:{r}")) == "1":
+            return False
+    except Exception:
+        pass
+    cid = channel_id()
+    if not cid or not gate_enabled():
+        return True
+    c = _act_cache.get(r)
+    if c and time.time() - c[0] < 120:
+        return c[1]
+    res = _is_member(cid, int(r))
+    ok = True if res is None else bool(res)  # عند الخطأ لا نظلم المُحيل
+    _act_cache[r] = (time.time(), ok)
+    return ok
+
+def _spent_c(r):
+    if not db:
+        return 0
+    try:
+        return int(float(db.hget(_prof_key(r), "spent_c") or 0))
+    except Exception:
+        return 0
+
+def ref_stats(uid):
+    members = sorted(_smembers(f"rk:ref:list:{uid}"))[:300]
+    active = spent = 0
+    for r in members:
+        if _ref_active(r):
+            active += 1
+        spent += _spent_c(r)
+    return len(members), active, spent
+
+def _ref_link(uid):
+    return f"{BOT_LINK}?start=ref{SEP}{uid}"
+
+def _ref_show(call, lang, src):
+    uid = call.from_user.id
+    total, active, spent_c = ref_stats(uid)
+    claimed = kv_get(f"rk:ref:claimed:{uid}") is not None
+    text = rft(lang, "page").format(
+        reward=_money(REF_REWARD_C), need_u=REF_NEED_U, need_usd=_money(REF_NEED_C),
+        link=_ref_link(uid), total=total, active=active, spent=_money(spent_c),
+    )
+    if claimed:
+        text += rft(lang, "claimed")
+    mk = InlineKeyboardMarkup(row_width=1)
+    link = _ref_link(uid)
+    btn = None
+    if CopyTextButton is not None:
+        try:
+            btn = InlineKeyboardButton(text=rft(lang, "copy"), copy_text=CopyTextButton(text=link))
+        except Exception:
+            btn = None
+    mk.add(btn or InlineKeyboardButton(text=rft(lang, "copy"), callback_data="rf_cp"))
+    mk.add(InlineKeyboardButton(text=rft(lang, "claim").format(reward=_money(REF_REWARD_C)), callback_data=f"rf_c_{src}"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main" if src == "m" else "sm_home"))
+    _pf_show(call, text, mk)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("rf_"))
+def handle_referral(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    parts = call.data.split(SEP, 2)
+    cmd = parts[1] if len(parts) > 1 else ""
+    src = parts[2] if len(parts) > 2 and parts[2] in ("m", "s") else "m"
+    if not db:
+        bot.answer_callback_query(call.id, wt(lang, "unavailable"), show_alert=True)
+        return
+    register_user(uid)
+    ensure_profile(uid, call.from_user.first_name)
+
+    if cmd == "cp":
+        bot.answer_callback_query(call.id, _ref_link(uid), show_alert=True)
+        return
+    if cmd == "o":
+        _ref_show(call, lang, src)
+        bot.answer_callback_query(call.id)
+        return
+    if cmd == "c":
+        if kv_get(f"rk:ref:claimed:{uid}") is not None:
+            bot.answer_callback_query(call.id, rft(lang, "already"), show_alert=True)
+            return
+        total, active, spent_c = ref_stats(uid)
+        miss = []
+        if active < REF_NEED_U:
+            miss.append(rft(lang, "m_users").format(n=REF_NEED_U - active))
+        if spent_c < REF_NEED_C:
+            miss.append(rft(lang, "m_spent").format(x=_money(REF_NEED_C - spent_c)))
+        if miss:
+            bot.answer_callback_query(call.id, rft(lang, "missing") + "\n" + "\n".join(miss), show_alert=True)
+            return
+        if not kv_set(f"rk:ref:claimed:{uid}", "1", nx=True):
+            bot.answer_callback_query(call.id, rft(lang, "already"), show_alert=True)
+            return
+        try:
+            wallet_credit(uid, REF_REWARD_C, "referral", "referral")
+        except Exception as e:
+            print(f"referral credit error: {e}")
+            kv_del(f"rk:ref:claimed:{uid}")
+            bot.answer_callback_query(call.id, rft(lang, "error"), show_alert=True)
+            return
+        bot.answer_callback_query(call.id, rft(lang, "ok").format(reward=_money(REF_REWARD_C)), show_alert=True)
+        monitor_send(f"🎁 <b>مكافأة إحالة</b>\n\n👤 {_user_link(uid)}\n👥 نشطون: {active} | 💵 مشتريات: ${_money(spent_c)}\n➕ ${_money(REF_REWARD_C)} في المحفظة")
+        _ref_show(call, lang, src)
+        return
+    bot.answer_callback_query(call.id)
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
