@@ -12,6 +12,7 @@ GEMINI_MAX_QTY = 5    # أقصى كمية في Gemini (حسب المتوفر ف�
 REF_NEED_USERS = 20   # عدد المحالين النشطين المطلوب
 REF_NEED_USD = 10     # مجموع مشتريات المحالين المطلوب ($)
 REF_REWARD_USD = 1    # مكافأة الإحالة ($)
+DAILY_GIFT_COINS = 10  # هدية Raseedkom Coins اليومية
 
 # ===== المنتجات الجديدة (تسليم يدوي) =====
 _CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
@@ -2801,6 +2802,12 @@ def handle_sm(call):
     lang = get_lang(call.from_user.id)
     if call.data == "sm_home":
         _pf_show(call, smt(lang, "menu"), start_menu_markup(lang))
+    elif call.data == "sm_game" and db:
+        try:
+            register_user(call.from_user.id)
+            gm_hub(call, lang)
+        except Exception as e:
+            print(f"hub error: {e}")
     else:
         mk = InlineKeyboardMarkup(row_width=1)
         mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="sm_home"))
@@ -2997,6 +3004,338 @@ def build_reply_keyboard(lang):
     markup.row(KeyboardButton(t(lang, "kb_update")), KeyboardButton(t(lang, "kb_lang")))
     markup.row(KeyboardButton(t(lang, "kb_support")))
     return markup
+
+
+# ============================================================
+# ========== الألعاب: Raseedkom Coins + الهدية اليومية + الترتيب الشهري ==========
+# ============================================================
+LB_TOP_N = 20
+LB_MASK_NAMES = False   # True = إخفاء جزء من الأسماء (مثل Ah***)
+
+def _now_dz():
+    return time.time() + 3600   # توقيت الجزائر UTC+1
+
+def _day_key():
+    return time.strftime("%Y-%m-%d", time.gmtime(_now_dz()))
+
+def _month_key(back=0):
+    g = time.gmtime(_now_dz())
+    y, m = g.tm_year, g.tm_mon - back
+    while m < 1:
+        m += 12
+        y -= 1
+    return f"{y}-{m:02d}"
+
+def _secs_to_midnight():
+    return int(86400 - (_now_dz() % 86400))
+
+# ---------- محفظة الكوينز (Upstash) ----------
+def _ck(uid):
+    return f"rk:coin:{uid}"
+
+def coins_get(uid):
+    try:
+        return int(float(db.hget(_ck(uid), "bal") or 0))
+    except Exception:
+        return 0
+
+def lb_score_add(uid, n):
+    """يضيف نقاطاً إلى ترتيب الشهر الحالي (الألعاب تمرر صافي الربح)."""
+    if n and int(n) > 0:
+        db.zincrby(f"rk:lb:{_month_key()}", int(n), str(uid))
+
+def _coin_log(uid, n, note):
+    try:
+        key = f"rk:coinlog:{uid}"
+        db.lpush(key, json.dumps({"n": int(n), "w": note, "t": int(time.time())}, ensure_ascii=False))
+        db.ltrim(key, 0, 29)
+    except Exception as e:
+        print(f"coin log error: {e}")
+
+def coins_add(uid, n, note="", score=True):
+    """يضيف كوينز (ويرفع نقاط الشهر إن score). يرجع الرصيد الجديد."""
+    n = int(n)
+    new = int(db.hincrby(_ck(uid), "bal", n))
+    if n > 0:
+        db.hincrby(_ck(uid), "earned", n)
+        if score:
+            lb_score_add(uid, n)
+    _coin_log(uid, n, note)
+    return new
+
+def coins_take(uid, n, note=""):
+    """يخصم كوينز إن كان الرصيد يكفي. يرجع True/False."""
+    n = int(n)
+    new = int(db.hincrby(_ck(uid), "bal", -n))
+    if new < 0:
+        db.hincrby(_ck(uid), "bal", n)
+        return False
+    _coin_log(uid, -n, note)
+    return True
+
+def _gift_claim(uid):
+    """يرجع (True, الرصيد الجديد) أو (False, None) إذا استلمها اليوم."""
+    key = f"rk:coin:gift:{uid}:{_day_key()}"
+    if not kv_set(key, "1", ex=3 * 86400, nx=True):
+        return False, None
+    try:
+        return True, coins_add(uid, DAILY_GIFT_COINS, "daily")
+    except Exception as e:
+        print(f"gift error: {e}")
+        kv_del(key)
+        raise
+
+def _gift_claimed_today(uid):
+    try:
+        return kv_get(f"rk:coin:gift:{uid}:{_day_key()}") is not None
+    except Exception:
+        return False
+
+# ---------- الترتيب الشهري ----------
+def _parse_zr(res):
+    out = []
+    if not res:
+        return out
+    if isinstance(res[0], (list, tuple)):
+        for it in res:
+            out.append((str(it[0]), float(it[1])))
+    else:
+        for i in range(0, len(res) - 1, 2):
+            out.append((str(res[i]), float(res[i + 1])))
+    return out
+
+def lb_all(month):
+    pairs = _parse_zr(db.zrange(f"rk:lb:{month}", 0, -1, withscores=True))
+    pairs.sort(key=lambda p: (-p[1], p[0]))
+    return pairs
+
+def _lb_touch(user):
+    try:
+        db.hset("rk:lbname", str(user.id), (user.first_name or "Player")[:24])
+    except Exception:
+        pass
+
+def _lb_name(uid):
+    try:
+        n = db.hget("rk:lbname", str(uid)) or "Player"
+    except Exception:
+        n = "Player"
+    n = str(n)
+    if LB_MASK_NAMES:
+        n = n[:2] + "***"
+    return html.escape(n)
+
+G_MONTHS = {
+    "ar": ["يناير", "فبراير", "مارس", "أبريل", "ماي", "جوان", "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
+    "en": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    "fr": ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"],
+}
+
+def _month_label(month, lang):
+    y, m = month.split("-")
+    return f"{G_MONTHS.get(lang, G_MONTHS['ar'])[int(m) - 1]} {y}"
+
+G_TEXTS = {
+    "ar": {
+        "hub": "🎮 <b>ساحة الألعاب</b>\n\nتنافس واجمع <b>Raseedkom Coins</b> 🪙 وتصدّر الترتيب الشهري!\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🎁 الهدية اليومية: {gift}\n\n⚽ <b>ساحة المباريات</b> — توقّع نتائج المباريات وشارك بكوينزك. <i>(قريباً)</i>\n⏱️ <b>أوقف الوقت</b> — أوقف العداد عند 10:00 بالضبط واربح. <i>(قريباً)</i>\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
+        "gift_yes": "✅ متاحة الآن (+{n} 🪙)",
+        "gift_no": "⏳ تم استلامها — عد بعد {h}س {m}د",
+        "btn_gift": "🎁 استلام الهدية اليومية (+{n})",
+        "btn_wallet": "🪙 محفظة الكوينز",
+        "btn_lb": "🏆 الترتيب الشهري",
+        "btn_soon_pred": "⚽ ساحة المباريات (قريباً)",
+        "btn_soon_sw": "⏱️ أوقف الوقت (قريباً)",
+        "btn_hub": "🎮 ساحة الألعاب",
+        "btn_prev": "📅 الشهر الماضي",
+        "btn_cur": "📅 هذا الشهر",
+        "gift_ok": "✅ تمت إضافة {n} Raseedkom Coins إلى رصيدك!",
+        "gift_done": "ℹ️ استلمت هديتك اليوم. عد بعد {h}س {m}د.",
+        "wallet": "🪙 <b>محفظة Raseedkom Coins</b>\n\n💰 الرصيد: <b>{bal}</b> 🪙\n📈 نقاطك هذا الشهر: <b>{pts}</b>\n🏅 ترتيبك: <b>{rank}</b>\n🎁 الهدية اليومية: {gift}\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
+        "lb": "🏆 <b>الترتيب الشهري — {month}</b>\n\n{rows}\n\n📍 ترتيبك: <b>{rank}</b> | نقاطك: <b>{pts}</b>\nيُعاد ضبط الترتيب مطلع كل شهر.",
+        "lb_empty": "لا يوجد مشاركون بعد. كن أول المتصدرين!",
+        "soon": "🔄 جاري التحديث، ستتوفر هذه اللعبة قريباً",
+        "unavailable": "⚠️ الخدمة غير متاحة حالياً، حاول لاحقاً.",
+    },
+    "en": {
+        "hub": "🎮 <b>Games Arena</b>\n\nCompete, collect <b>Raseedkom Coins</b> 🪙 and top the monthly leaderboard!\n\n💰 Your balance: <b>{bal}</b> 🪙\n🎁 Daily gift: {gift}\n\n⚽ <b>Match Arena</b> — predict match results and stake your coins. <i>(soon)</i>\n⏱️ <b>Stop the Time</b> — stop the counter at exactly 10:00 and win. <i>(soon)</i>\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
+        "gift_yes": "✅ available now (+{n} 🪙)",
+        "gift_no": "⏳ claimed — come back in {h}h {m}m",
+        "btn_gift": "🎁 Claim daily gift (+{n})",
+        "btn_wallet": "🪙 Coins wallet",
+        "btn_lb": "🏆 Monthly leaderboard",
+        "btn_soon_pred": "⚽ Match Arena (soon)",
+        "btn_soon_sw": "⏱️ Stop the Time (soon)",
+        "btn_hub": "🎮 Games Arena",
+        "btn_prev": "📅 Last month",
+        "btn_cur": "📅 This month",
+        "gift_ok": "✅ {n} Raseedkom Coins were added to your balance!",
+        "gift_done": "ℹ️ You already claimed today's gift. Come back in {h}h {m}m.",
+        "wallet": "🪙 <b>Raseedkom Coins wallet</b>\n\n💰 Balance: <b>{bal}</b> 🪙\n📈 Your points this month: <b>{pts}</b>\n🏅 Your rank: <b>{rank}</b>\n🎁 Daily gift: {gift}\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
+        "lb": "🏆 <b>Monthly leaderboard — {month}</b>\n\n{rows}\n\n📍 Your rank: <b>{rank}</b> | Your points: <b>{pts}</b>\nThe leaderboard resets at the start of every month.",
+        "lb_empty": "No players yet. Be the first on the board!",
+        "soon": "🔄 Updating, this game will be available soon",
+        "unavailable": "⚠️ Service unavailable right now, try again later.",
+    },
+    "fr": {
+        "hub": "🎮 <b>Espace Jeux</b>\n\nParticipez, gagnez des <b>Raseedkom Coins</b> 🪙 et prenez la tête du classement mensuel !\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🎁 Cadeau quotidien : {gift}\n\n⚽ <b>Arène des matchs</b> — pronostiquez les résultats et misez vos coins. <i>(bientôt)</i>\n⏱️ <b>Arrêtez le temps</b> — stoppez le compteur à 10:00 pile et gagnez. <i>(bientôt)</i>\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
+        "gift_yes": "✅ disponible (+{n} 🪙)",
+        "gift_no": "⏳ récupéré — revenez dans {h}h {m}min",
+        "btn_gift": "🎁 Récupérer le cadeau quotidien (+{n})",
+        "btn_wallet": "🪙 Portefeuille de coins",
+        "btn_lb": "🏆 Classement mensuel",
+        "btn_soon_pred": "⚽ Arène des matchs (bientôt)",
+        "btn_soon_sw": "⏱️ Arrêtez le temps (bientôt)",
+        "btn_hub": "🎮 Espace Jeux",
+        "btn_prev": "📅 Mois dernier",
+        "btn_cur": "📅 Ce mois-ci",
+        "gift_ok": "✅ {n} Raseedkom Coins ont été ajoutés à votre solde !",
+        "gift_done": "ℹ️ Vous avez déjà récupéré le cadeau du jour. Revenez dans {h}h {m}min.",
+        "wallet": "🪙 <b>Portefeuille Raseedkom Coins</b>\n\n💰 Solde : <b>{bal}</b> 🪙\n📈 Vos points ce mois-ci : <b>{pts}</b>\n🏅 Votre rang : <b>{rank}</b>\n🎁 Cadeau quotidien : {gift}\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
+        "lb": "🏆 <b>Classement mensuel — {month}</b>\n\n{rows}\n\n📍 Votre rang : <b>{rank}</b> | Vos points : <b>{pts}</b>\nLe classement est remis à zéro au début de chaque mois.",
+        "lb_empty": "Aucun joueur pour le moment. Soyez le premier du classement !",
+        "soon": "🔄 Mise à jour en cours, ce jeu sera bientôt disponible",
+        "unavailable": "⚠️ Service indisponible pour le moment, réessayez plus tard.",
+    },
+}
+
+def gt(lang, key):
+    return G_TEXTS.get(lang, G_TEXTS["ar"])[key]
+
+def _gift_state(lang, uid):
+    if _gift_claimed_today(uid):
+        left = _secs_to_midnight()
+        return gt(lang, "gift_no").format(h=left // 3600, m=(left % 3600) // 60)
+    return gt(lang, "gift_yes").format(n=DAILY_GIFT_COINS)
+
+def _my_rank(pairs, uid):
+    for i, (u, s) in enumerate(pairs, 1):
+        if u == str(uid):
+            return f"#{i}", int(s)
+    return "—", 0
+
+def gm_hub(call, lang):
+    uid = call.from_user.id
+    _lb_touch(call.from_user)
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_gift").format(n=DAILY_GIFT_COINS), callback_data="gm_gift"))
+    mk.row(InlineKeyboardButton(text=gt(lang, "btn_wallet"), callback_data="gm_wallet"),
+           InlineKeyboardButton(text=gt(lang, "btn_lb"), callback_data="gm_lb_cur"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_pred"), callback_data="gm_soon"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_soon"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="sm_home"))
+    _pf_show(call, gt(lang, "hub").format(bal=coins_get(uid), gift=_gift_state(lang, uid)), mk)
+
+def gm_wallet(call, lang):
+    uid = call.from_user.id
+    pairs = lb_all(_month_key())
+    rank, pts = _my_rank(pairs, uid)
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_gift").format(n=DAILY_GIFT_COINS), callback_data="gm_gift"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_lb"), callback_data="gm_lb_cur"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_hub"), callback_data="gm_hub"))
+    _pf_show(call, gt(lang, "wallet").format(bal=coins_get(uid), pts=pts, rank=rank, gift=_gift_state(lang, uid)), mk)
+
+def gm_leaderboard(call, lang, which):
+    uid = call.from_user.id
+    month = _month_key(1 if which == "prev" else 0)
+    pairs = lb_all(month)
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    rows = []
+    for i, (u, s) in enumerate(pairs[:LB_TOP_N], 1):
+        rows.append(f"{medals.get(i, f'#{i}')} {_lb_name(u)} — <b>{int(s)}</b> 🪙")
+    rank, pts = _my_rank(pairs, uid)
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_cur" if which == "prev" else "btn_prev"),
+                                callback_data="gm_lb_cur" if which == "prev" else "gm_lb_prev"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_hub"), callback_data="gm_hub"))
+    _pf_show(call, gt(lang, "lb").format(
+        month=_month_label(month, lang), rows="\n".join(rows) or gt(lang, "lb_empty"), rank=rank, pts=pts), mk)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("gm" + SEP))
+def handle_games(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    if not db:
+        bot.answer_callback_query(call.id, gt(lang, "unavailable"), show_alert=True)
+        return
+    parts = call.data.split(SEP, 2)
+    cmd = parts[1] if len(parts) > 1 else ""
+    arg = parts[2] if len(parts) > 2 else ""
+    register_user(uid)
+    try:
+        if cmd == "hub":
+            gm_hub(call, lang)
+        elif cmd == "wallet":
+            gm_wallet(call, lang)
+        elif cmd == "lb":
+            gm_leaderboard(call, lang, "prev" if arg == "prev" else "cur")
+        elif cmd == "soon":
+            bot.answer_callback_query(call.id, gt(lang, "soon"), show_alert=True)
+            return
+        elif cmd == "gift":
+            ok, _ = _gift_claim(uid)
+            if ok:
+                _lb_touch(call.from_user)
+                bot.answer_callback_query(call.id, gt(lang, "gift_ok").format(n=DAILY_GIFT_COINS), show_alert=True)
+            else:
+                left = _secs_to_midnight()
+                bot.answer_callback_query(call.id, gt(lang, "gift_done").format(h=left // 3600, m=(left % 3600) // 60),
+                                          show_alert=True)
+            gm_hub(call, lang)
+            return
+    except Exception as e:
+        print(f"games error: {e}")
+        bot.answer_callback_query(call.id, gt(lang, "unavailable"), show_alert=True)
+        return
+    bot.answer_callback_query(call.id)
+
+# ---------- أدوات الأدمن ----------
+@bot.message_handler(commands=["coins", "coinsadd"])
+def coins_admin(message):
+    if not is_admin_msg(message):
+        return
+    cmd = message.text.split()[0].lstrip("/").split("@")[0]
+    a = message.text.split()[1:]
+    if not db:
+        bot.reply_to(message, "⚠️ Upstash غير متصل.")
+        return
+    if not a or not a[0].isdigit():
+        bot.reply_to(message, "الاستعمال: /coins ID  أو  /coinsadd ID العدد")
+        return
+    uid = a[0]
+    if cmd == "coinsadd":
+        try:
+            n = int(a[1])
+        except (IndexError, ValueError):
+            bot.reply_to(message, "الاستعمال: /coinsadd ID العدد")
+            return
+        if n >= 0:
+            coins_add(uid, n, "admin", score=False)
+        elif not coins_take(uid, -n, "admin"):
+            bot.reply_to(message, "❌ الرصيد أقل من المبلغ المطلوب خصمه.")
+            return
+    rank, pts = _my_rank(lb_all(_month_key()), uid)
+    bot.reply_to(message, f"🪙 الزبون {uid}\nالرصيد: {coins_get(uid)}\nنقاط الشهر: {pts} | الترتيب: {rank}")
+
+# ---------- إشعار نهاية الشهر لبوت المراقبة ----------
+def _month_watch_loop():
+    time.sleep(90)
+    while True:
+        try:
+            cur = _month_key()
+            last = kv_get("rk:lb:last")
+            if last and str(last) != cur:
+                top = lb_all(str(last))[:3]
+                lines = [f"{['🥇','🥈','🥉'][i]} {_lb_name(u)} (<code>{u}</code>) — {int(s)}" for i, (u, s) in enumerate(top)]
+                monitor_send(f"🏆 <b>انتهى ترتيب شهر {_month_label(str(last), 'ar')}</b>\n\n" + ("\n".join(lines) or "لا مشاركين"))
+            if str(last) != cur:
+                kv_set("rk:lb:last", cur)
+        except Exception as e:
+            print(f"month watch error: {e}")
+        time.sleep(1800)
+
+if db:
+    threading.Thread(target=_month_watch_loop, daemon=True).start()
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
