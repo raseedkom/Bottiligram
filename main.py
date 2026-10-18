@@ -343,6 +343,20 @@ patch(r"""def refresh_for_user(chat_id, user_id):
         return
     register_user(user_id)""", "gate_refresh")
 
+
+# 21) "اطلب الآن" في الإشعارات يفتح مسار الشراء مباشرة
+patch(r"""    markup.add(InlineKeyboardButton(text="🛒 Buy now", url=BOT_LINK))""",
+      r"""    markup.add(InlineKeyboardButton(text="🛒 Buy now", url=BOT_LINK + "?start=qb" + chr(95) + item["id"]))""", "channel_buy_link")
+patch(r"""    markup.add(InlineKeyboardButton(text=t(lang, "order_now"), callback_data=f"buy_{item['id']}"))""",
+      r"""    markup.add(InlineKeyboardButton(text=t(lang, "order_now"), callback_data="qb" + chr(95) + item["id"]))""", "user_buy_btn")
+patch(r"""    send_persistent_menu(call.message.chat.id, lang)
+    send_main_menu(call.message.chat.id, lang)
+    bot.answer_callback_query(call.id)""",
+      r"""    send_persistent_menu(call.message.chat.id, lang)
+    send_main_menu(call.message.chat.id, lang)
+    bot.answer_callback_query(call.id)
+    _resume_quick_buy(call.message.chat.id, call.from_user)""", "resume_qb_after_lang")
+
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
 # ========== الطلبات اليدوية (A/B) + سجل الطلبات + جرس التوفر ==========
@@ -1348,7 +1362,11 @@ def generate_store_keyboard(lang):
         InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"),
     )
     markup.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
-    markup.add(InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_m"))
+    markup.row(
+        InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_m"),
+        InlineKeyboardButton(text=t(lang, "cmd_update"), callback_data="mn_refresh"),
+    )
+    markup.add(InlineKeyboardButton(text=t(lang, "kb_start"), callback_data="mn_start"))
     return markup
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("grp_"))
@@ -1406,6 +1424,14 @@ PM_NAME = {
     "fx": {"ar": "Flixy", "en": "Flixy", "fr": "Flixy"},
 }
 
+SOON_NAME = {"rp": "RedotPay", "bb": "Bybit"}
+ALL_M = ("bd", "fx", "rp", "bb")
+
+def _mname(m, lang):
+    if m in PM_NAME:
+        return PM_NAME[m][lang]
+    return SOON_NAME.get(m, m)
+
 PM_TEXTS = {
     "ar": {
         "pick_buy": "🛒 <b>طلب جديد</b>\n\n📦 {product}\n💵 المجموع: <b>{amount}$</b>\n\n💳 اختر طريقة الدفع:",
@@ -1415,6 +1441,8 @@ PM_TEXTS = {
         "btn_bd": "بريدي موب",
         "btn_fx": "Flixy +22%",
         "soon": "🔄 جاري التحديث، ستتوفر هذه الطريقة قريباً",
+        "btn_chat": "💬 الشراء عبر الدردشة مع فريق الدعم",
+        "notify_upd": "🔔 أعلمني عند التحديث",
         "full": "⛔ دفعات {method} ممتلئة مؤقتاً.\n\nيمكنك اختيار طريقة دفع أخرى، أو الضغط على الزر أدناه ليتم إعلامك عند توفرها.",
         "nt_ok": "✅ تم تسجيلك! سنعلمك فور توفر الدفع عبر {method}.",
         "avail": "✅ الدفع عبر <b>{method}</b> متاح الآن! 🛍️",
@@ -1441,6 +1469,8 @@ PM_TEXTS = {
         "btn_bd": "Baridimob",
         "btn_fx": "Flixy +22%",
         "soon": "🔄 Updating, this method will be available soon",
+        "btn_chat": "💬 Buy via chat with our support team",
+        "notify_upd": "🔔 Notify me when updated",
         "full": "⛔ {method} payments are temporarily full.\n\nYou can choose another payment method, or tap the button below to be notified when it is available again.",
         "nt_ok": "✅ Registered! We'll notify you as soon as {method} payments are available.",
         "avail": "✅ Payment via <b>{method}</b> is available now! 🛍️",
@@ -1467,6 +1497,8 @@ PM_TEXTS = {
         "btn_bd": "Baridimob",
         "btn_fx": "Flixy +22%",
         "soon": "🔄 Mise à jour en cours, ce mode de paiement sera bientôt disponible",
+        "btn_chat": "💬 Acheter via le chat avec l'équipe d'assistance",
+        "notify_upd": "🔔 M'avertir de la mise à jour",
         "full": "⛔ Les paiements {method} sont temporairement complets.\n\nVous pouvez choisir un autre mode de paiement, ou appuyer sur le bouton ci-dessous pour être averti dès qu'il sera de nouveau disponible.",
         "nt_ok": "✅ Enregistré ! Nous vous préviendrons dès que le paiement {method} sera disponible.",
         "avail": "✅ Le paiement via <b>{method}</b> est disponible ! 🛍️",
@@ -1512,7 +1544,7 @@ def pm_da(usd, m):
     return int((Decimal(str(usd)) * pm_rate(m)).to_integral_value(rounding=ROUND_CEILING))
 
 # ---------- قوائم "أعلمني عند التوفر" ----------
-_mem_pmw = {"bd": set(), "fx": set()}
+_mem_pmw = {"bd": set(), "fx": set(), "rp": set(), "bb": set()}
 
 def pmw_add(m, uid):
     if db:
@@ -1635,8 +1667,9 @@ def _pm_method_rows(lang, mk, ids):
     mk.add(InlineKeyboardButton(text=pmt(lang, "btn_binance"), callback_data=ids["bn"]))
     mk.add(InlineKeyboardButton(text=pmt(lang, "btn_bd"), callback_data=ids["bd"]))
     mk.add(InlineKeyboardButton(text=pmt(lang, "btn_fx"), callback_data=ids["fx"]))
-    mk.add(InlineKeyboardButton(text="RedotPay", callback_data=ids["soon"]))
-    mk.add(InlineKeyboardButton(text="Bybit", callback_data=ids["soon"]))
+    mk.add(InlineKeyboardButton(text="RedotPay", callback_data=ids["rp"]))
+    mk.add(InlineKeyboardButton(text="Bybit", callback_data=ids["bb"]))
+    mk.add(InlineKeyboardButton(text=pmt(lang, "btn_chat"), url=MY_PRIVATE_CHAT_LINK))
 
 def build_invoice_markup(lang, invoice_id, wallet=False):
     inv = None
@@ -1656,14 +1689,14 @@ def build_invoice_markup(lang, invoice_id, wallet=False):
     mk.add(InlineKeyboardButton(text=pmt(lang, "btn_wallet").format(bal=bal), callback_data=f"wpay_{invoice_id}"))
     _pm_method_rows(lang, mk, {
         "bn": f"pm_bn_{invoice_id}", "bd": f"pm_bd_{invoice_id}",
-        "fx": f"pm_fx_{invoice_id}", "soon": f"pm_soon_{invoice_id}",
+        "fx": f"pm_fx_{invoice_id}", "rp": f"pm_soon_rp_{invoice_id}", "bb": f"pm_soon_bb_{invoice_id}",
     })
     mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data=f"cancel_{invoice_id}"))
     return mk
 
 def topup_method_picker(call, lang):
     mk = InlineKeyboardMarkup(row_width=1)
-    _pm_method_rows(lang, mk, {"bn": "pm_tbn", "bd": "pm_tbd", "fx": "pm_tfx", "soon": "pm_tsoon"})
+    _pm_method_rows(lang, mk, {"bn": "pm_tbn", "bd": "pm_tbd", "fx": "pm_tfx", "rp": "pm_tsoon_rp", "bb": "pm_tsoon_bb"})
     mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data="pf_wallet"))
     _pf_show(call, pmt(lang, "pick_topup"), mk)
 
@@ -1683,8 +1716,10 @@ def _pm_full_screen(call, lang, m, back_cb):
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=back_cb))
     _pf_show(call, pmt(lang, "full").format(method=PM_NAME[m][lang]), mk)
 
-def _pm_soon_screen(call, lang, back_cb):
+def _pm_soon_screen(call, lang, back_cb, m=None):
     mk = InlineKeyboardMarkup(row_width=1)
+    if m:
+        mk.add(InlineKeyboardButton(text=pmt(lang, "notify_upd"), callback_data=f"pm_nt_{m}"))
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=back_cb))
     _pf_show(call, pmt(lang, "soon"), mk)
 
@@ -1768,11 +1803,11 @@ def handle_pm(call):
         return
 
     if cmd == "nt":
-        if arg in PM_NAME:
+        if arg in ALL_M:
             pmw_add(arg, uid)
-            bot.answer_callback_query(call.id, pmt(lang, "nt_ok").format(method=PM_NAME[arg][lang]), show_alert=True)
+            bot.answer_callback_query(call.id, pmt(lang, "nt_ok").format(method=_mname(arg, lang)), show_alert=True)
             monitor_send(
-                f"🔔 <b>زبون طلب إعلامه بتوفر {PM_NAME[arg]['ar']}</b>\n\n👤 {_user_link(uid)}\n"
+                f"🔔 <b>زبون طلب إعلامه بتوفر {_mname(arg, 'ar')}</b>\n\n👤 {_user_link(uid)}\n"
                 f"⏳ عدد المنتظرين الآن: {len(pmw_list(arg))}"
             )
         else:
@@ -1789,7 +1824,8 @@ def handle_pm(call):
         return
 
     if cmd == "soon":
-        _pm_soon_screen(call, lang, "pf_top" if arg == "t" else f"pm_back_{arg}")
+        m, _, ref = arg.partition(SEP)
+        _pm_soon_screen(call, lang, f"pm_back_{ref}", m if m in SOON_NAME else None)
         bot.answer_callback_query(call.id)
         return
 
@@ -1860,7 +1896,7 @@ def handle_pm(call):
         return
 
     if cmd == "tsoon":
-        _pm_soon_screen(call, lang, "pf_top")
+        _pm_soon_screen(call, lang, "pf_top", arg if arg in SOON_NAME else None)
         bot.answer_callback_query(call.id)
         return
 
@@ -2244,6 +2280,11 @@ def show_pm_settings(chat_id, msg_id=None):
             InlineKeyboardButton(text=f"⛔ إيقاف {PM_NAME[m]['ar']}", callback_data=f"ap_off_{m}"),
         )
         mk.add(InlineKeyboardButton(text=f"💱 سعر صرف {PM_NAME[m]['ar']}", callback_data=f"ap_rt_{m}"))
+    for m in ("rp", "bb"):
+        n = len(pmw_list(m))
+        lines.append(f"🔄 <b>{SOON_NAME[m]}</b>: قريباً | ⏳ {n} ينتظرون")
+        if n:
+            mk.add(InlineKeyboardButton(text=f"📢 إعلام منتظري {SOON_NAME[m]} (متاح الآن)", callback_data=f"ap_wn_{m}"))
     _pr_show(chat_id, msg_id, "\n".join(lines), mk)
 
 def _pm_notify_waiters(m):
@@ -2257,13 +2298,13 @@ def _pm_notify_waiters(m):
             mk = InlineKeyboardMarkup()
             mk.add(InlineKeyboardButton(text=t(lang, "kb_products"), callback_data="back_to_main"))
             try:
-                bot.send_message(int(u), pmt(lang, "avail").format(method=PM_NAME[m][lang]),
+                bot.send_message(int(u), pmt(lang, "avail").format(method=_mname(m, lang)),
                                  parse_mode="HTML", reply_markup=mk)
                 sent += 1
             except Exception as e:
                 print(f"pm waiter notify failed: {e}")
             time.sleep(0.05)
-        monitor_send(f"🔔 <b>أُعلم {sent} زبون بتوفر {PM_NAME[m]['ar']}</b>")
+        monitor_send(f"🔔 <b>أُعلم {sent} زبون بتوفر {_mname(m, 'ar')}</b>")
 
     threading.Thread(target=_run, daemon=True).start()
     return len(ids)
@@ -2374,6 +2415,11 @@ def handle_ap(call):
                 f"💱 أرسل سعر الصرف الجديد لـ {PM_NAME[arg]['ar']} (الحالي: {_fmt_rate(pm_rate(arg))} DA لكل 1$)\nمثال: <code>260</code>",
                 parse_mode="HTML",
             )
+    elif cmd == "wn":
+        if arg in SOON_NAME:
+            n = _pm_notify_waiters(arg)
+            bot.send_message(chat_id, f"📢 جاري إعلام {n} زبون بتوفر {SOON_NAME[arg]}.")
+            show_pm_settings(chat_id, msg_id)
     elif cmd == "pm":
         show_pm_settings(chat_id, msg_id)
     bot.answer_callback_query(call.id)
@@ -2589,13 +2635,26 @@ def _ref_finalize(uid):
         print(f"ref finalize error: {e}")
 
 def start_gate(message):
-    """يُستدعى أول /start: True = أوقف المعالجة (ظهرت رسالة الاشتراك)."""
+    """يُستدعى أول /start: True = أوقف المعالجة (ظهرت رسالة الاشتراك أو فُتح مسار الشراء)."""
     uid = message.from_user.id
     _ref_capture(message)
+    qb = _qb_param(message)
+    if qb:
+        try:
+            kv_set(f"rk:qb:{uid}", qb, ex=3600)
+        except Exception:
+            pass
     ok = gate_ok(message.chat.id, uid)
-    if ok:
-        _ref_finalize(uid)
-    return not ok
+    if not ok:
+        return True
+    _ref_finalize(uid)
+    if qb and str(uid) in user_lang:
+        register_user(uid)
+        ensure_profile(uid, message.from_user.first_name)
+        send_persistent_menu(message.chat.id, get_lang(uid))
+        _resume_quick_buy(message.chat.id, message.from_user)
+        return True
+    return False
 
 @bot.callback_query_handler(func=lambda c: c.data == "gate_verify")
 def handle_gate_verify(call):
@@ -2612,6 +2671,8 @@ def handle_gate_verify(call):
         pass
     bot.answer_callback_query(call.id)
     refresh_for_user(call.message.chat.id, uid)
+    if str(uid) in user_lang:
+        _resume_quick_buy(call.message.chat.id, call.from_user)
 
 # ---------- ضبط القناة تلقائياً + حظر البوت ----------
 try:
@@ -2857,6 +2918,85 @@ def handle_referral(call):
         _ref_show(call, lang, src)
         return
     bot.answer_callback_query(call.id)
+
+# ============================================================
+# ========== "اطلب الآن" من الإشعارات + القائمة السفلية + أزرار المنتجات ==========
+# ============================================================
+import types as _types
+
+_orig_answer_cq = bot.answer_callback_query
+
+def _safe_answer_cq(callback_query_id, *a, **k):
+    if str(callback_query_id) == "qb":   # نداء داخلي (رابط /start) لا يملك callback حقيقي
+        return True
+    return _orig_answer_cq(callback_query_id, *a, **k)
+
+bot.answer_callback_query = _safe_answer_cq
+
+def _qb_dispatch(call, pid):
+    """يفتح مسار الشراء مباشرة: طرق الدفع، أو اختيار الكمية/القيمة أولاً."""
+    product = find_product(pid)
+    if not product or product.get("type") == "separator":
+        bot.answer_callback_query(call.id)
+        return
+    sync_prices()
+    call.data = f"buy{SEP}{pid}"
+    if pid == GEMINI_ID:
+        handle_gemini_select(call)
+    elif pid in GIFT_VARIANTS:
+        handle_gift_card_select(call)
+    elif pid in MANUAL_IDS and pid != FREEFIRE_ID and _manual_in_stock(pid):
+        _start_manual_invoice(call, pid)
+    else:
+        handle_product_view(call)   # Free Fire (الباقات) أو منتج نفد (زر أعلمني)
+
+def _qb_run(chat_id, from_user, pid):
+    try:
+        ph = bot.send_message(chat_id, "⏳")
+        fake = _types.SimpleNamespace(id="qb", from_user=from_user, message=ph, data="")
+        _qb_dispatch(fake, pid)
+    except Exception as e:
+        print(f"quick buy error: {e}")
+
+def _qb_param(message):
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) > 1 and parts[1].startswith("qb" + SEP):
+        return parts[1][3:]
+    return None
+
+def _resume_quick_buy(chat_id, from_user):
+    try:
+        pid = kv_get(f"rk:qb:{from_user.id}")
+        if pid:
+            kv_del(f"rk:qb:{from_user.id}")
+            _qb_run(chat_id, from_user, str(pid))
+    except Exception as e:
+        print(f"resume quick buy error: {e}")
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("qb" + SEP))
+def handle_quick_buy(call):
+    _qb_dispatch(call, call.data[3:])
+
+@bot.callback_query_handler(func=lambda c: c.data in ("mn_refresh", "mn_start"))
+def handle_mn(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.answer_callback_query(call.id)
+    if call.data == "mn_refresh":
+        refresh_for_user(call.message.chat.id, uid)
+    elif gate_ok(call.message.chat.id, uid):
+        send_start_menu(call.message.chat.id, lang)
+
+def build_reply_keyboard(lang):
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row(KeyboardButton(t(lang, "kb_start")), KeyboardButton(t(lang, "kb_products")))
+    markup.row(KeyboardButton(t(lang, "kb_update")), KeyboardButton(t(lang, "kb_lang")))
+    markup.row(KeyboardButton(t(lang, "kb_support")))
+    return markup
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
