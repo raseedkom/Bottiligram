@@ -13,6 +13,9 @@ REF_NEED_USERS = 20   # عدد المحالين النشطين المطلوب
 REF_NEED_USD = 10     # مجموع مشتريات المحالين المطلوب ($)
 REF_REWARD_USD = 1    # مكافأة الإحالة ($)
 DAILY_GIFT_COINS = 10  # هدية Raseedkom Coins اليومية
+SW_PRIZE_COINS = 25    # جائزة تحدي التوقيت
+SW_TOLERANCE = 0.30    # الفارق المسموح (ثانية) لاعتبار الإيقاف مطابقاً للهدف
+SW_ATTEMPTS = 2        # عدد المحاولات كل 24 ساعة
 
 # ===== المنتجات الجديدة (تسليم يدوي) =====
 _CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
@@ -1367,6 +1370,7 @@ def generate_store_keyboard(lang):
         InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_m"),
         InlineKeyboardButton(text=t(lang, "cmd_update"), callback_data="mn_refresh"),
     )
+    markup.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_sw_m"))
     markup.add(InlineKeyboardButton(text=t(lang, "kb_start"), callback_data="mn_start"))
     return markup
 
@@ -3137,14 +3141,14 @@ def _month_label(month, lang):
 
 G_TEXTS = {
     "ar": {
-        "hub": "🎮 <b>ساحة الألعاب</b>\n\nتنافس واجمع <b>Raseedkom Coins</b> 🪙 وتصدّر الترتيب الشهري!\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🎁 الهدية اليومية: {gift}\n\n⚽ <b>ساحة المباريات</b> — توقّع نتائج المباريات وشارك بكوينزك. <i>(قريباً)</i>\n⏱️ <b>أوقف الوقت</b> — أوقف العداد عند 10:00 بالضبط واربح. <i>(قريباً)</i>\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
+        "hub": "🎮 <b>ساحة الألعاب</b>\n\nتنافس واجمع <b>Raseedkom Coins</b> 🪙 وتصدّر الترتيب الشهري!\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🎁 الهدية اليومية: {gift}\n\n⚽ <b>ساحة المباريات</b> — توقّع نتائج المباريات وشارك بكوينزك. <i>(قريباً)</i>\n⏱️ <b>تحدي التوقيت اليومي</b> — أوقف العداد عند هدف اليوم واربح <b>{prize}</b> 🪙.\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
         "gift_yes": "✅ متاحة الآن (+{n} 🪙)",
         "gift_no": "⏳ تم استلامها — عد بعد {h}س {m}د",
         "btn_gift": "🎁 استلام الهدية اليومية (+{n})",
         "btn_wallet": "🪙 محفظة الكوينز",
         "btn_lb": "🏆 الترتيب الشهري",
         "btn_soon_pred": "⚽ ساحة المباريات (قريباً)",
-        "btn_soon_sw": "⏱️ أوقف الوقت (قريباً)",
+        "btn_soon_sw": "⏱️ تحدي التوقيت اليومي",
         "btn_hub": "🎮 ساحة الألعاب",
         "btn_prev": "📅 الشهر الماضي",
         "btn_cur": "📅 هذا الشهر",
@@ -3157,14 +3161,14 @@ G_TEXTS = {
         "unavailable": "⚠️ الخدمة غير متاحة حالياً، حاول لاحقاً.",
     },
     "en": {
-        "hub": "🎮 <b>Games Arena</b>\n\nCompete, collect <b>Raseedkom Coins</b> 🪙 and top the monthly leaderboard!\n\n💰 Your balance: <b>{bal}</b> 🪙\n🎁 Daily gift: {gift}\n\n⚽ <b>Match Arena</b> — predict match results and stake your coins. <i>(soon)</i>\n⏱️ <b>Stop the Time</b> — stop the counter at exactly 10:00 and win. <i>(soon)</i>\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
+        "hub": "🎮 <b>Games Arena</b>\n\nCompete, collect <b>Raseedkom Coins</b> 🪙 and top the monthly leaderboard!\n\n💰 Your balance: <b>{bal}</b> 🪙\n🎁 Daily gift: {gift}\n\n⚽ <b>Match Arena</b> — predict match results and stake your coins. <i>(soon)</i>\n⏱️ <b>Daily Timing Challenge</b> — stop the counter at today's target and win <b>{prize}</b> 🪙.\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
         "gift_yes": "✅ available now (+{n} 🪙)",
         "gift_no": "⏳ claimed — come back in {h}h {m}m",
         "btn_gift": "🎁 Claim daily gift (+{n})",
         "btn_wallet": "🪙 Coins wallet",
         "btn_lb": "🏆 Monthly leaderboard",
         "btn_soon_pred": "⚽ Match Arena (soon)",
-        "btn_soon_sw": "⏱️ Stop the Time (soon)",
+        "btn_soon_sw": "⏱️ Daily Timing Challenge",
         "btn_hub": "🎮 Games Arena",
         "btn_prev": "📅 Last month",
         "btn_cur": "📅 This month",
@@ -3177,14 +3181,14 @@ G_TEXTS = {
         "unavailable": "⚠️ Service unavailable right now, try again later.",
     },
     "fr": {
-        "hub": "🎮 <b>Espace Jeux</b>\n\nParticipez, gagnez des <b>Raseedkom Coins</b> 🪙 et prenez la tête du classement mensuel !\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🎁 Cadeau quotidien : {gift}\n\n⚽ <b>Arène des matchs</b> — pronostiquez les résultats et misez vos coins. <i>(bientôt)</i>\n⏱️ <b>Arrêtez le temps</b> — stoppez le compteur à 10:00 pile et gagnez. <i>(bientôt)</i>\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
+        "hub": "🎮 <b>Espace Jeux</b>\n\nParticipez, gagnez des <b>Raseedkom Coins</b> 🪙 et prenez la tête du classement mensuel !\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🎁 Cadeau quotidien : {gift}\n\n⚽ <b>Arène des matchs</b> — pronostiquez les résultats et misez vos coins. <i>(bientôt)</i>\n⏱️ <b>Défi chrono quotidien</b> — stoppez le compteur sur l'objectif du jour et gagnez <b>{prize}</b> 🪙.\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
         "gift_yes": "✅ disponible (+{n} 🪙)",
         "gift_no": "⏳ récupéré — revenez dans {h}h {m}min",
         "btn_gift": "🎁 Récupérer le cadeau quotidien (+{n})",
         "btn_wallet": "🪙 Portefeuille de coins",
         "btn_lb": "🏆 Classement mensuel",
         "btn_soon_pred": "⚽ Arène des matchs (bientôt)",
-        "btn_soon_sw": "⏱️ Arrêtez le temps (bientôt)",
+        "btn_soon_sw": "⏱️ Défi chrono quotidien",
         "btn_hub": "🎮 Espace Jeux",
         "btn_prev": "📅 Mois dernier",
         "btn_cur": "📅 Ce mois-ci",
@@ -3221,9 +3225,9 @@ def gm_hub(call, lang):
     mk.row(InlineKeyboardButton(text=gt(lang, "btn_wallet"), callback_data="gm_wallet"),
            InlineKeyboardButton(text=gt(lang, "btn_lb"), callback_data="gm_lb_cur"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_pred"), callback_data="gm_soon"))
-    mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_soon"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_sw_h"))
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="sm_home"))
-    _pf_show(call, gt(lang, "hub").format(bal=coins_get(uid), gift=_gift_state(lang, uid)), mk)
+    _pf_show(call, gt(lang, "hub").format(bal=coins_get(uid), gift=_gift_state(lang, uid), prize=SW_PRIZE_COINS), mk)
 
 def gm_wallet(call, lang):
     uid = call.from_user.id
@@ -3253,6 +3257,7 @@ def gm_leaderboard(call, lang, which):
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gm" + SEP))
 def handle_games(call):
+    now_ms = int(time.time() * 1000)   # أول سطر: لحظة وصول الضغطة (مهم لزر الإيقاف)
     uid = call.from_user.id
     lang = get_lang(uid)
     if not db:
@@ -3271,6 +3276,14 @@ def handle_games(call):
             gm_leaderboard(call, lang, "prev" if arg == "prev" else "cur")
         elif cmd == "soon":
             bot.answer_callback_query(call.id, gt(lang, "soon"), show_alert=True)
+            return
+        elif cmd == "sw":
+            sw_intro(call, lang, "m" if arg == "m" else "h")
+        elif cmd == "swgo":
+            sw_go(call, lang, "m" if arg == "m" else "h")
+            return
+        elif cmd == "swstop":
+            sw_stop(call, lang, now_ms)
             return
         elif cmd == "gift":
             ok, _ = _gift_claim(uid)
@@ -3336,6 +3349,190 @@ def _month_watch_loop():
 
 if db:
     threading.Thread(target=_month_watch_loop, daemon=True).start()
+
+
+# ============================================================
+# ========== تحدي التوقيت اليومي ⏱️ ==========
+# ============================================================
+SW_ATT_TTL = 24 * 3600     # تتجدد المحاولات بعد 24 ساعة من أول محاولة
+SW_RUN_TTL = 900           # مهلة الجلسة (إن لم يضغط إيقاف تُحتسب المحاولة)
+
+SW_TEXTS = {
+    "ar": {
+        "intro": "⏱️ <b>تحدي التوقيت اليومي</b>\n\n🎯 هدف اليوم: <b>{target} ثانية</b>\n\nاضغط «ابدأ المؤقت»، سيعمل العداد بصمت، ثم اضغط «🛑 إيقاف العداد» حين تظن أنه مرّ <b>{target}</b> ثانية بالضبط. تُحتسب الإصابة إذا كان الفارق في حدود ±{tol} ثانية.\n\n🏆 الجائزة: <b>{prize}</b> Raseedkom Coins 🪙\n🎟️ محاولاتك: <b>{left} / {total}</b>{renew}\n\nℹ️ يتغير الهدف تلقائياً كل يوم. الكوينز افتراضية للتسلية فقط.",
+        "renew": "\n🔄 تتجدد المحاولات بعد {h}س {m}د",
+        "running": "⏱️ <b>العداد يعمل الآن...</b>\n\n🎯 أوقفه عند <b>{target}</b> ثانية بالضبط!\n\nاضغط «🛑 إيقاف العداد» عندما تكون جاهزاً.",
+        "win": "🎉 <b>أحسنت! أصبت الهدف!</b>\n\n⏱️ وقتك: <b>{el} ثانية</b>\n🎯 الهدف: <b>{target} ثانية</b>\n📏 الفارق: {diff} ثانية\n\n🏆 ربحت <b>{prize}</b> Raseedkom Coins 🪙\n💰 رصيدك: <b>{bal}</b> 🪙\n🎟️ محاولاتك المتبقية: <b>{left}</b>{renew}",
+        "lose": "❌ <b>لم تصب الهدف</b>\n\n⏱️ وقتك: <b>{el} ثانية</b>\n🎯 الهدف: <b>{target} ثانية</b>\n📏 الفارق: {diff} ثانية (المسموح ±{tol})\n\n🎟️ محاولاتك المتبقية: <b>{left}</b>{renew}\n{hint}",
+        "hint_more": "💪 حاول مرة أخرى!",
+        "hint_none": "🌙 حاول غداً!",
+        "no_left": "🎟️ استنفدت محاولاتك. تتجدد بعد {h}س {m}د.",
+        "expired": "⌛ انتهت جلسة العداد (احتُسبت المحاولة). ابدأ من جديد.",
+        "btn_start": "▶️ ابدأ المؤقت",
+        "btn_stop": "🛑 إيقاف العداد",
+        "btn_again": "▶️ محاولة أخرى",
+    },
+    "en": {
+        "intro": "⏱️ <b>Daily Timing Challenge</b>\n\n🎯 Today's target: <b>{target} seconds</b>\n\nTap «Start timer»: the counter runs silently. Then tap «🛑 Stop counter» when you think exactly <b>{target}</b> seconds have passed. You hit the target if you are within ±{tol} seconds.\n\n🏆 Prize: <b>{prize}</b> Raseedkom Coins 🪙\n🎟️ Your attempts: <b>{left} / {total}</b>{renew}\n\nℹ️ The target changes automatically every day. Coins are virtual, for fun only.",
+        "renew": "\n🔄 Attempts renew in {h}h {m}m",
+        "running": "⏱️ <b>The counter is running...</b>\n\n🎯 Stop it at exactly <b>{target}</b> seconds!\n\nTap «🛑 Stop counter» when you are ready.",
+        "win": "🎉 <b>Well done! You hit the target!</b>\n\n⏱️ Your time: <b>{el} s</b>\n🎯 Target: <b>{target} s</b>\n📏 Difference: {diff} s\n\n🏆 You won <b>{prize}</b> Raseedkom Coins 🪙\n💰 Balance: <b>{bal}</b> 🪙\n🎟️ Attempts left: <b>{left}</b>{renew}",
+        "lose": "❌ <b>You missed the target</b>\n\n⏱️ Your time: <b>{el} s</b>\n🎯 Target: <b>{target} s</b>\n📏 Difference: {diff} s (allowed ±{tol})\n\n🎟️ Attempts left: <b>{left}</b>{renew}\n{hint}",
+        "hint_more": "💪 Try again!",
+        "hint_none": "🌙 Try again tomorrow!",
+        "no_left": "🎟️ You have used all your attempts. They renew in {h}h {m}m.",
+        "expired": "⌛ The counter session expired (the attempt was counted). Start again.",
+        "btn_start": "▶️ Start timer",
+        "btn_stop": "🛑 Stop counter",
+        "btn_again": "▶️ Another attempt",
+    },
+    "fr": {
+        "intro": "⏱️ <b>Défi chrono quotidien</b>\n\n🎯 Objectif du jour : <b>{target} secondes</b>\n\nAppuyez sur « Démarrer le chrono » : le compteur tourne en silence. Puis appuyez sur « 🛑 Arrêter le compteur » quand vous pensez que <b>{target}</b> secondes se sont écoulées. L'objectif est atteint si vous êtes à ±{tol} seconde(s) près.\n\n🏆 Récompense : <b>{prize}</b> Raseedkom Coins 🪙\n🎟️ Vos tentatives : <b>{left} / {total}</b>{renew}\n\nℹ️ L'objectif change automatiquement chaque jour. Les coins sont virtuels, pour le plaisir uniquement.",
+        "renew": "\n🔄 Les tentatives se renouvellent dans {h}h {m}min",
+        "running": "⏱️ <b>Le compteur tourne...</b>\n\n🎯 Arrêtez-le à exactement <b>{target}</b> secondes !\n\nAppuyez sur « 🛑 Arrêter le compteur » quand vous êtes prêt.",
+        "win": "🎉 <b>Bravo ! Objectif atteint !</b>\n\n⏱️ Votre temps : <b>{el} s</b>\n🎯 Objectif : <b>{target} s</b>\n📏 Écart : {diff} s\n\n🏆 Vous gagnez <b>{prize}</b> Raseedkom Coins 🪙\n💰 Solde : <b>{bal}</b> 🪙\n🎟️ Tentatives restantes : <b>{left}</b>{renew}",
+        "lose": "❌ <b>Objectif manqué</b>\n\n⏱️ Votre temps : <b>{el} s</b>\n🎯 Objectif : <b>{target} s</b>\n📏 Écart : {diff} s (toléré ±{tol})\n\n🎟️ Tentatives restantes : <b>{left}</b>{renew}\n{hint}",
+        "hint_more": "💪 Réessayez !",
+        "hint_none": "🌙 Réessayez demain !",
+        "no_left": "🎟️ Vous avez utilisé toutes vos tentatives. Elles se renouvellent dans {h}h {m}min.",
+        "expired": "⌛ La session du compteur a expiré (la tentative est comptée). Recommencez.",
+        "btn_start": "▶️ Démarrer le chrono",
+        "btn_stop": "🛑 Arrêter le compteur",
+        "btn_again": "▶️ Nouvelle tentative",
+    },
+}
+
+def swt(lang, key):
+    return SW_TEXTS.get(lang, SW_TEXTS["ar"])[key]
+
+# ---------- الهدف اليومي: يبدأ 10.00 ثم يتحرك بين 5 و11 ثانية ----------
+def _sw_raw_idx(n):
+    return int(hashlib.sha256(f"sw{n}".encode()).hexdigest(), 16) % 13   # 13 قيمة: 5.0 ... 11.0 (خطوة 0.5)
+
+def _sw_target(n):
+    t = 10   # فهرس 10.0 (يوم الانطلاق)
+    for i in range(1, n + 1):
+        idx = _sw_raw_idx(i)
+        if idx == t:
+            idx = (idx + 1) % 13   # لا يتكرر نفس الهدف يومين متتاليين
+        t = idx
+    return Decimal(5) + Decimal("0.5") * t
+
+def _sw_day_index():
+    today = int(_now_dz() // 86400)
+    d0 = kv_get("rk:sw:day0")
+    if d0 is None:
+        kv_set("rk:sw:day0", str(today), nx=True)
+        d0 = kv_get("rk:sw:day0")
+    return max(0, today - int(d0))
+
+def _sw_today_target():
+    return _sw_target(_sw_day_index())
+
+def _sw_att_key(uid):
+    return f"rk:sw:att:{uid}"
+
+def _sw_run_key(uid):
+    return f"rk:sw:run:{uid}"
+
+def _sw_info(uid):
+    """(المحاولات المتبقية، ثواني التجديد)"""
+    try:
+        used = int(kv_get(_sw_att_key(uid)) or 0)
+    except Exception:
+        used = 0
+    left = max(0, SW_ATTEMPTS - used)
+    ttl = 0
+    if used:
+        try:
+            ttl = max(0, int(db.ttl(_sw_att_key(uid))))
+        except Exception:
+            ttl = SW_ATT_TTL
+    return left, ttl
+
+def _renew_txt(lang, ttl):
+    if ttl <= 0:
+        return ""
+    return swt(lang, "renew").format(h=ttl // 3600, m=(ttl % 3600) // 60)
+
+def sw_intro(call, lang, src):
+    uid = call.from_user.id
+    _lb_touch(call.from_user)
+    left, ttl = _sw_info(uid)
+    mk = InlineKeyboardMarkup(row_width=1)
+    if left > 0 or kv_get_json(_sw_run_key(uid)):
+        mk.add(InlineKeyboardButton(text=swt(lang, "btn_start"), callback_data=f"gm_swgo_{src}"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_lb"), callback_data="gm_lb_cur"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="gm_hub" if src == "h" else "back_to_main"))
+    _pf_show(call, swt(lang, "intro").format(
+        target=f"{_sw_today_target():.2f}", tol=f"{SW_TOLERANCE:.2f}", prize=SW_PRIZE_COINS,
+        left=left, total=SW_ATTEMPTS, renew=_renew_txt(lang, ttl)), mk)
+
+def _sw_running_screen(call, lang, target):
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=swt(lang, "btn_stop"), callback_data="gm_swstop"))
+    _pf_show(call, swt(lang, "running").format(target=target), mk)
+
+def sw_go(call, lang, src):
+    uid = call.from_user.id
+    run = kv_get_json(_sw_run_key(uid))
+    if run:   # عداد يعمل أصلاً: نعرض زر الإيقاف فقط
+        _sw_running_screen(call, lang, run["target"])
+        bot.answer_callback_query(call.id)
+        return
+    left, ttl = _sw_info(uid)
+    if left <= 0:
+        bot.answer_callback_query(call.id, swt(lang, "no_left").format(h=ttl // 3600, m=(ttl % 3600) // 60), show_alert=True)
+        sw_intro(call, lang, src)
+        return
+    n = kv_incr_window(_sw_att_key(uid), SW_ATT_TTL)   # تُستهلك المحاولة عند البدء
+    if n > SW_ATTEMPTS:
+        bot.answer_callback_query(call.id, swt(lang, "no_left").format(h=ttl // 3600, m=(ttl % 3600) // 60), show_alert=True)
+        return
+    target = f"{_sw_today_target():.2f}"
+    sess = {"start": int(time.time() * 1000), "target": target, "src": src}
+    if not kv_set(_sw_run_key(uid), json.dumps(sess), ex=SW_RUN_TTL, nx=True):
+        _sw_running_screen(call, lang, target)
+        bot.answer_callback_query(call.id)
+        return
+    _sw_running_screen(call, lang, target)
+    # نعيد ضبط لحظة البداية بعد وصول شاشة الإيقاف للزبون (أدق وأعدل)
+    sess["start"] = int(time.time() * 1000)
+    kv_set(_sw_run_key(uid), json.dumps(sess), ex=SW_RUN_TTL)
+    bot.answer_callback_query(call.id)
+
+def sw_stop(call, lang, now_ms):
+    uid = call.from_user.id
+    run = kv_get_json(_sw_run_key(uid))
+    if not run:
+        bot.answer_callback_query(call.id, swt(lang, "expired"), show_alert=True)
+        sw_intro(call, lang, "h")
+        return
+    if not kv_set(f"rk:sw:fin:{uid}:{run['start']}", "1", ex=3600, nx=True):
+        bot.answer_callback_query(call.id)   # ضغطة مزدوجة
+        return
+    kv_del(_sw_run_key(uid))
+    elapsed = (now_ms - int(run["start"])) / 1000.0
+    target = float(run["target"])
+    diff = abs(elapsed - target)
+    win = diff <= SW_TOLERANCE + 1e-9
+    src = run.get("src", "h")
+    left, ttl = _sw_info(uid)
+    renew = _renew_txt(lang, ttl) if left == 0 else ""
+    mk = InlineKeyboardMarkup(row_width=1)
+    if left > 0:
+        mk.add(InlineKeyboardButton(text=swt(lang, "btn_again"), callback_data=f"gm_swgo_{src}"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_lb"), callback_data="gm_lb_cur"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=f"gm_sw_{src}"))
+    common = dict(el=f"{elapsed:.2f}", target=run["target"], diff=f"{diff:.2f}", left=left, renew=renew)
+    if win:
+        bal = coins_add(uid, SW_PRIZE_COINS, "stopwatch")
+        text = swt(lang, "win").format(prize=SW_PRIZE_COINS, bal=bal, **common)
+        monitor_send(f"⏱️ <b>فائز في تحدي التوقيت</b>\n\n👤 {_user_link(uid)}\n🎯 {run['target']}s | وقته: {elapsed:.2f}s\n➕ {SW_PRIZE_COINS} 🪙")
+    else:
+        text = swt(lang, "lose").format(tol=f"{SW_TOLERANCE:.2f}", hint=swt(lang, "hint_more" if left > 0 else "hint_none"), **common)
+    _pf_show(call, text, mk)
+    bot.answer_callback_query(call.id)
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
