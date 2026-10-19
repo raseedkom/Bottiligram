@@ -18,6 +18,7 @@ SW_TOLERANCE = 0.30    # الفارق المسموح (ثانية) لاعتبار
 SW_ATTEMPTS = 2        # عدد المحاولات كل 24 ساعة
 MATCH_COMPETITIONS = "PL,PD,SA,BL1,FL1,CL"   # الدوريات الخمسة الكبرى + دوري الأبطال
 MATCH_MIN_STAKE = 5    # أقل مبلغ مشاركة (كوينز)
+MATCH_REMIND_MINUTES = 10   # التذكير قبل صافرة البداية (بالدقائق)
 
 # ===== المنتجات الجديدة (تسليم يدوي) =====
 _CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
@@ -1372,7 +1373,7 @@ def generate_store_keyboard(lang):
         InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_m"),
         InlineKeyboardButton(text=t(lang, "cmd_update"), callback_data="mn_refresh"),
     )
-    markup.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_sw_m"))
+    markup.add(InlineKeyboardButton(text=smt(lang, "game"), callback_data="gm_hub_m"))
     markup.add(InlineKeyboardButton(text=t(lang, "kb_start"), callback_data="mn_start"))
     return markup
 
@@ -2811,7 +2812,7 @@ def handle_sm(call):
     elif call.data == "sm_game" and db:
         try:
             register_user(call.from_user.id)
-            gm_hub(call, lang)
+            gm_hub(call, lang, "s")
         except Exception as e:
             print(f"hub error: {e}")
     else:
@@ -3219,8 +3220,13 @@ def _my_rank(pairs, uid):
             return f"#{i}", int(s)
     return "—", 0
 
-def gm_hub(call, lang):
+_hub_src = {}   # من أين فتح الزبون الساحة: "m" صفحة المنتجات | "s" قائمة ابدأ
+
+def gm_hub(call, lang, src=None):
     uid = call.from_user.id
+    if src in ("m", "s"):
+        _hub_src[uid] = src
+    back_cb = "back_to_main" if _hub_src.get(uid) == "m" else "sm_home"
     _lb_touch(call.from_user)
     mk = InlineKeyboardMarkup(row_width=1)
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_gift").format(n=DAILY_GIFT_COINS), callback_data="gm_gift"))
@@ -3228,7 +3234,7 @@ def gm_hub(call, lang):
            InlineKeyboardButton(text=gt(lang, "btn_lb"), callback_data="gm_lb_cur"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_pred"), callback_data="gm_ar_0"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_sw_h"))
-    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="sm_home"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=back_cb))
     _pf_show(call, gt(lang, "hub").format(bal=coins_get(uid), gift=_gift_state(lang, uid), prize=SW_PRIZE_COINS), mk)
 
 def gm_wallet(call, lang):
@@ -3271,7 +3277,7 @@ def handle_games(call):
     register_user(uid)
     try:
         if cmd == "hub":
-            gm_hub(call, lang)
+            gm_hub(call, lang, arg if arg in ("m", "s") else None)
         elif cmd == "wallet":
             gm_wallet(call, lang)
         elif cmd == "lb":
@@ -3596,6 +3602,9 @@ AT = {
         "r_void": "↩️ <b>أُلغيت المباراة / تأجلت</b>\n\n⚽ {home} 🆚 {away}\nأُعيد لك <b>{stake}</b> 🪙.",
         "new": "⚽ نزلت <b>{n}</b> مباريات جديدة للتوقع! شارك قبل صافرة البداية 🎯",
         "open_arena": "⚽ افتح الساحة",
+        "remind": "⏰ <b>تبقى {min} دقائق على صافرة البداية!</b>\n\n⚽ {home} 🆚 {away}\n🏆 {comp}\n🕒 {time}\n\nصوّت الآن قبل إغلاق المشاركة 🎯",
+        "vote_now": "🎯 صوّت الآن",
+        "daily": "🎁 اكسب نقاط يومية (+{n})",
     },
     "en": {
         "arena": "⚽ <b>Match Arena</b>\n\nPredict the match result (win / draw / win), stake your coins, and if you are right you share the losers' coins with the other winners.\n\n💰 Your balance: <b>{bal}</b> 🪙\n🔒 Predictions close at kick-off.\n\n{body}",
@@ -3627,6 +3636,9 @@ AT = {
         "r_void": "↩️ <b>Match cancelled / postponed</b>\n\n⚽ {home} 🆚 {away}\nYour <b>{stake}</b> 🪙 were refunded.",
         "new": "⚽ <b>{n}</b> new matches are open for predictions! Join before kick-off 🎯",
         "open_arena": "⚽ Open the arena",
+        "remind": "⏰ <b>{min} minutes left until kick-off!</b>\n\n⚽ {home} 🆚 {away}\n🏆 {comp}\n🕒 {time}\n\nPredict now before entries close 🎯",
+        "vote_now": "🎯 Predict now",
+        "daily": "🎁 Earn daily coins (+{n})",
     },
     "fr": {
         "arena": "⚽ <b>Arène des matchs</b>\n\nPronostiquez le résultat (victoire / nul / victoire), misez vos coins, et si vous avez raison vous partagez les coins des perdants avec les autres gagnants.\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🔒 Les pronostics ferment au coup d'envoi.\n\n{body}",
@@ -3658,6 +3670,9 @@ AT = {
         "r_void": "↩️ <b>Match annulé / reporté</b>\n\n⚽ {home} 🆚 {away}\nVos <b>{stake}</b> 🪙 ont été remboursés.",
         "new": "⚽ <b>{n}</b> nouveaux matchs sont ouverts aux pronostics ! Participez avant le coup d'envoi 🎯",
         "open_arena": "⚽ Ouvrir l'arène",
+        "remind": "⏰ <b>Plus que {min} minutes avant le coup d'envoi !</b>\n\n⚽ {home} 🆚 {away}\n🏆 {comp}\n🕒 {time}\n\nPronostiquez maintenant avant la fermeture 🎯",
+        "vote_now": "🎯 Pronostiquer",
+        "daily": "🎁 Gagner des coins quotidiens (+{n})",
     },
 }
 
@@ -3924,12 +3939,54 @@ def fb_check_results():
                 key=f"mres_{m['id']}", cooldown=6 * 3600)
     return done
 
+def fb_remind_due():
+    """تذكير قبل صافرة البداية بـ MATCH_REMIND_MINUTES دقائق لمن فعّل 🔔 ولم يشارك بعد."""
+    now = time.time()
+    due = []
+    for mid in m_ids():
+        m = m_get(mid)
+        if not m or m["status"] != "open":
+            continue
+        left = m["kickoff"] - now
+        if 0 < left <= MATCH_REMIND_MINUTES * 60 and kv_set(f"rk:mrem:{mid}", "1", ex=2 * 86400, nx=True):
+            due.append(m)
+    if not due:
+        return
+    try:
+        subs = [str(x) for x in (db.smembers("rk:msub") or [])]
+    except Exception:
+        subs = []
+
+    def _run(m):
+        preds = _preds(m["id"])
+        sent_n = 0
+        for u in subs:
+            if u in preds:
+                continue
+            lang = get_lang(u)
+            mk = InlineKeyboardMarkup(row_width=1)
+            mk.add(InlineKeyboardButton(text=at(lang, "vote_now"), callback_data=f"gm_mp_{m['id']}"))
+            mk.add(InlineKeyboardButton(text=at(lang, "daily").format(n=DAILY_GIFT_COINS), callback_data="gm_gift"))
+            try:
+                bot.send_message(int(u), at(lang, "remind").format(
+                    min=MATCH_REMIND_MINUTES, home=html.escape(m["home"]), away=html.escape(m["away"]),
+                    comp=html.escape(m["comp"]), time=_local_time(m["kickoff"])), parse_mode="HTML", reply_markup=mk)
+                sent_n += 1
+            except Exception as e:
+                print(f"match reminder failed: {e}")
+            time.sleep(0.05)
+        monitor_send(f"⏰ <b>تذكير قبل {MATCH_REMIND_MINUTES} دقائق</b>: {html.escape(m['home'])} 🆚 {html.escape(m['away'])}\nأُرسل لـ {sent_n} زبون.")
+
+    for m in due:
+        threading.Thread(target=_run, args=(m,), daemon=True).start()
+
 def _arena_loop():
     time.sleep(90)
     last_sync = last_res = 0
     while True:
         try:
             fb_close_due()
+            fb_remind_due()
             now = time.time()
             if FB_KEY and now - last_sync > 1800:
                 last_sync = now
