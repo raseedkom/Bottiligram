@@ -16,6 +16,8 @@ DAILY_GIFT_COINS = 10  # هدية Raseedkom Coins اليومية
 SW_PRIZE_COINS = 25    # جائزة تحدي التوقيت
 SW_TOLERANCE = 0.30    # الفارق المسموح (ثانية) لاعتبار الإيقاف مطابقاً للهدف
 SW_ATTEMPTS = 2        # عدد المحاولات كل 24 ساعة
+MATCH_COMPETITIONS = "PL,PD,SA,BL1,FL1,CL"   # الدوريات الخمسة الكبرى + دوري الأبطال
+MATCH_MIN_STAKE = 5    # أقل مبلغ مشاركة (كوينز)
 
 # ===== المنتجات الجديدة (تسليم يدوي) =====
 _CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
@@ -3141,13 +3143,13 @@ def _month_label(month, lang):
 
 G_TEXTS = {
     "ar": {
-        "hub": "🎮 <b>ساحة الألعاب</b>\n\nتنافس واجمع <b>Raseedkom Coins</b> 🪙 وتصدّر الترتيب الشهري!\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🎁 الهدية اليومية: {gift}\n\n⚽ <b>ساحة المباريات</b> — توقّع نتائج المباريات وشارك بكوينزك. <i>(قريباً)</i>\n⏱️ <b>تحدي التوقيت اليومي</b> — أوقف العداد عند هدف اليوم واربح <b>{prize}</b> 🪙.\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
+        "hub": "🎮 <b>ساحة الألعاب</b>\n\nتنافس واجمع <b>Raseedkom Coins</b> 🪙 وتصدّر الترتيب الشهري!\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🎁 الهدية اليومية: {gift}\n\n⚽ <b>ساحة المباريات</b> — توقّع نتائج المباريات وشارك بكوينزك.\n⏱️ <b>تحدي التوقيت اليومي</b> — أوقف العداد عند هدف اليوم واربح <b>{prize}</b> 🪙.\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
         "gift_yes": "✅ متاحة الآن (+{n} 🪙)",
         "gift_no": "⏳ تم استلامها — عد بعد {h}س {m}د",
         "btn_gift": "🎁 استلام الهدية اليومية (+{n})",
         "btn_wallet": "🪙 محفظة الكوينز",
         "btn_lb": "🏆 الترتيب الشهري",
-        "btn_soon_pred": "⚽ ساحة المباريات (قريباً)",
+        "btn_soon_pred": "⚽ ساحة المباريات",
         "btn_soon_sw": "⏱️ تحدي التوقيت اليومي",
         "btn_hub": "🎮 ساحة الألعاب",
         "btn_prev": "📅 الشهر الماضي",
@@ -3161,13 +3163,13 @@ G_TEXTS = {
         "unavailable": "⚠️ الخدمة غير متاحة حالياً، حاول لاحقاً.",
     },
     "en": {
-        "hub": "🎮 <b>Games Arena</b>\n\nCompete, collect <b>Raseedkom Coins</b> 🪙 and top the monthly leaderboard!\n\n💰 Your balance: <b>{bal}</b> 🪙\n🎁 Daily gift: {gift}\n\n⚽ <b>Match Arena</b> — predict match results and stake your coins. <i>(soon)</i>\n⏱️ <b>Daily Timing Challenge</b> — stop the counter at today's target and win <b>{prize}</b> 🪙.\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
+        "hub": "🎮 <b>Games Arena</b>\n\nCompete, collect <b>Raseedkom Coins</b> 🪙 and top the monthly leaderboard!\n\n💰 Your balance: <b>{bal}</b> 🪙\n🎁 Daily gift: {gift}\n\n⚽ <b>Match Arena</b> — predict match results and stake your coins.\n⏱️ <b>Daily Timing Challenge</b> — stop the counter at today's target and win <b>{prize}</b> 🪙.\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
         "gift_yes": "✅ available now (+{n} 🪙)",
         "gift_no": "⏳ claimed — come back in {h}h {m}m",
         "btn_gift": "🎁 Claim daily gift (+{n})",
         "btn_wallet": "🪙 Coins wallet",
         "btn_lb": "🏆 Monthly leaderboard",
-        "btn_soon_pred": "⚽ Match Arena (soon)",
+        "btn_soon_pred": "⚽ Match Arena",
         "btn_soon_sw": "⏱️ Daily Timing Challenge",
         "btn_hub": "🎮 Games Arena",
         "btn_prev": "📅 Last month",
@@ -3181,13 +3183,13 @@ G_TEXTS = {
         "unavailable": "⚠️ Service unavailable right now, try again later.",
     },
     "fr": {
-        "hub": "🎮 <b>Espace Jeux</b>\n\nParticipez, gagnez des <b>Raseedkom Coins</b> 🪙 et prenez la tête du classement mensuel !\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🎁 Cadeau quotidien : {gift}\n\n⚽ <b>Arène des matchs</b> — pronostiquez les résultats et misez vos coins. <i>(bientôt)</i>\n⏱️ <b>Défi chrono quotidien</b> — stoppez le compteur sur l'objectif du jour et gagnez <b>{prize}</b> 🪙.\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
+        "hub": "🎮 <b>Espace Jeux</b>\n\nParticipez, gagnez des <b>Raseedkom Coins</b> 🪙 et prenez la tête du classement mensuel !\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🎁 Cadeau quotidien : {gift}\n\n⚽ <b>Arène des matchs</b> — pronostiquez les résultats et misez vos coins.\n⏱️ <b>Défi chrono quotidien</b> — stoppez le compteur sur l'objectif du jour et gagnez <b>{prize}</b> 🪙.\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
         "gift_yes": "✅ disponible (+{n} 🪙)",
         "gift_no": "⏳ récupéré — revenez dans {h}h {m}min",
         "btn_gift": "🎁 Récupérer le cadeau quotidien (+{n})",
         "btn_wallet": "🪙 Portefeuille de coins",
         "btn_lb": "🏆 Classement mensuel",
-        "btn_soon_pred": "⚽ Arène des matchs (bientôt)",
+        "btn_soon_pred": "⚽ Arène des matchs",
         "btn_soon_sw": "⏱️ Défi chrono quotidien",
         "btn_hub": "🎮 Espace Jeux",
         "btn_prev": "📅 Mois dernier",
@@ -3224,7 +3226,7 @@ def gm_hub(call, lang):
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_gift").format(n=DAILY_GIFT_COINS), callback_data="gm_gift"))
     mk.row(InlineKeyboardButton(text=gt(lang, "btn_wallet"), callback_data="gm_wallet"),
            InlineKeyboardButton(text=gt(lang, "btn_lb"), callback_data="gm_lb_cur"))
-    mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_pred"), callback_data="gm_soon"))
+    mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_pred"), callback_data="gm_ar_0"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_sw_h"))
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="sm_home"))
     _pf_show(call, gt(lang, "hub").format(bal=coins_get(uid), gift=_gift_state(lang, uid), prize=SW_PRIZE_COINS), mk)
@@ -3277,6 +3279,23 @@ def handle_games(call):
         elif cmd == "soon":
             bot.answer_callback_query(call.id, gt(lang, "soon"), show_alert=True)
             return
+        elif cmd == "ar":
+            ar_list(call, lang, int(arg) if arg.isdigit() else 0)
+        elif cmd == "mt":
+            ar_match(call, lang, arg)
+        elif cmd == "mp":
+            ar_stake(call, lang, arg)
+        elif cmd == "mk":
+            ar_pick(call, lang, arg)
+        elif cmd == "mc":
+            ar_custom(call, lang, arg)
+        elif cmd == "mo":
+            ar_place(call, lang, arg)
+        elif cmd == "ms":
+            ar_toggle_sub(call, lang)
+            return
+        elif cmd == "mine":
+            ar_mine(call, lang)
         elif cmd == "sw":
             sw_intro(call, lang, "m" if arg == "m" else "h")
         elif cmd == "swgo":
@@ -3533,6 +3552,640 @@ def sw_stop(call, lang, now_ms):
         text = swt(lang, "lose").format(tol=f"{SW_TOLERANCE:.2f}", hint=swt(lang, "hint_more" if left > 0 else "hint_none"), **common)
     _pf_show(call, text, mk)
     bot.answer_callback_query(call.id)
+
+
+# ============================================================
+# ========== ساحة المباريات ⚽ (football-data.org) ==========
+# ============================================================
+import calendar
+
+FB_BASE = "https://api.football-data.org/v4"
+FB_KEY = os.environ.get("FOOTBALL_API_KEY", "")
+AR_PAGE = 8
+STAKE_CHOICES = (10, 25, 50, 100)
+_mp_wait = {}   # user_id -> match_id (ينتظر مبلغاً مكتوباً)
+
+AT = {
+    "ar": {
+        "arena": "⚽ <b>ساحة المباريات</b>\n\nتوقّع نتيجة المباراة (فوز / تعادل / فوز)، شارك بكوينزك، وإذا أصبت تتقاسم مع الفائزين نقاط من أخطأ.\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🔒 تُغلق المشاركة عند صافرة البداية.\n\n{body}",
+        "none": "لا توجد مباريات متاحة الآن. فعّل 🔔 ليصلك إشعار عند نزول مباريات جديدة.",
+        "pick": "اختر مباراة:",
+        "mine": "📋 توقعاتي", "notify_on": "🔔 أعلمني بالمباريات الجديدة", "notify_off": "🔕 إيقاف الإشعارات",
+        "sub_on": "✅ سنعلمك عند نزول مباريات جديدة.", "sub_off": "🔕 تم إيقاف الإشعارات.",
+        "next": "التالي ➡️", "prev": "⬅️ السابق",
+        "match": "⚽ <b>{home} 🆚 {away}</b>\n🏆 {comp}\n🕒 {time}\n\n👥 المشاركون: <b>{n}</b> | 💰 مجموع المشاركات: <b>{pool}</b> 🪙{your}",
+        "your": "\n\n🎯 توقعك: <b>{pick}</b> — {stake} 🪙",
+        "btn_join": "🎯 مشاركة",
+        "stake": "💰 اختر مبلغ المشاركة\n(رصيدك: <b>{bal}</b> 🪙 | الحد الأدنى: {min})",
+        "other": "✏️ مبلغ آخر",
+        "stake_prompt": "✏️ أرسل مبلغ المشاركة (رقم من {min} إلى {max}):",
+        "stake_bad": "❌ مبلغ غير صالح. أرسل رقماً من {min} إلى {max}.",
+        "stake_low": "❌ رصيدك لا يكفي. استلم هديتك اليومية من ساحة الألعاب.",
+        "outcome": "🎯 اختر توقعك:\n<b>{home} 🆚 {away}</b>\n💰 المبلغ: <b>{stake}</b> 🪙",
+        "win_label": "فوز {team}", "draw_label": "تعادل",
+        "placed": "✅ <b>تم تسجيل مشاركتك</b>\n\n⚽ {home} 🆚 {away}\n🎯 توقعك: <b>{pick}</b>\n💰 {stake} 🪙\n\n💼 رصيدك الآن: <b>{bal}</b> 🪙\nستصلك النتيجة هنا بعد نهاية المباراة.",
+        "closed": "🔒 أُغلقت المشاركة في هذه المباراة.",
+        "already": "ℹ️ شاركت في هذه المباراة من قبل.",
+        "mine_head": "📋 <b>توقعاتي</b>\n\n{rows}",
+        "mine_empty": "لم تقم بأي توقع بعد.",
+        "mine_line": "{icon} {home} – {away}\n    {pick} | {stake} 🪙 {res}",
+        "res_win": "→ +{p} 🪙", "res_lose": "→ −{s} 🪙", "res_wait": "⏳", "res_void": "↩️ استرداد",
+        "r_win": "🎉 <b>توقعك صحيح!</b>\n\n⚽ {home} {score} {away}\n🎯 توقعك: {pick}\n💰 ربحت: <b>+{profit}</b> 🪙 (استلمت {payout})\n💼 رصيدك: <b>{bal}</b> 🪙",
+        "r_even": "✅ <b>توقعك صحيح!</b>\n\n⚽ {home} {score} {away}\n🎯 {pick}\nاسترجعت مبلغك ({payout} 🪙) لأن الجميع أصاب.\n💼 رصيدك: <b>{bal}</b> 🪙",
+        "r_lose": "❌ <b>توقعك خاطئ</b>\n\n⚽ {home} {score} {away}\n🎯 توقعك: {pick}\n💸 خسرت: <b>{stake}</b> 🪙\nحظاً أوفر في المباراة القادمة!",
+        "r_void": "↩️ <b>أُلغيت المباراة / تأجلت</b>\n\n⚽ {home} 🆚 {away}\nأُعيد لك <b>{stake}</b> 🪙.",
+        "new": "⚽ نزلت <b>{n}</b> مباريات جديدة للتوقع! شارك قبل صافرة البداية 🎯",
+        "open_arena": "⚽ افتح الساحة",
+    },
+    "en": {
+        "arena": "⚽ <b>Match Arena</b>\n\nPredict the match result (win / draw / win), stake your coins, and if you are right you share the losers' coins with the other winners.\n\n💰 Your balance: <b>{bal}</b> 🪙\n🔒 Predictions close at kick-off.\n\n{body}",
+        "none": "No matches available right now. Turn on 🔔 to be notified when new matches are posted.",
+        "pick": "Choose a match:",
+        "mine": "📋 My predictions", "notify_on": "🔔 Notify me of new matches", "notify_off": "🔕 Turn off notifications",
+        "sub_on": "✅ We'll notify you when new matches are posted.", "sub_off": "🔕 Notifications turned off.",
+        "next": "Next ➡️", "prev": "⬅️ Previous",
+        "match": "⚽ <b>{home} 🆚 {away}</b>\n🏆 {comp}\n🕒 {time}\n\n👥 Players: <b>{n}</b> | 💰 Total staked: <b>{pool}</b> 🪙{your}",
+        "your": "\n\n🎯 Your pick: <b>{pick}</b> — {stake} 🪙",
+        "btn_join": "🎯 Join",
+        "stake": "💰 Choose your stake\n(balance: <b>{bal}</b> 🪙 | minimum: {min})",
+        "other": "✏️ Other amount",
+        "stake_prompt": "✏️ Send your stake (a number from {min} to {max}):",
+        "stake_bad": "❌ Invalid amount. Send a number from {min} to {max}.",
+        "stake_low": "❌ Not enough coins. Claim your daily gift in the Games Arena.",
+        "outcome": "🎯 Choose your prediction:\n<b>{home} 🆚 {away}</b>\n💰 Stake: <b>{stake}</b> 🪙",
+        "win_label": "{team} win", "draw_label": "Draw",
+        "placed": "✅ <b>Your entry is registered</b>\n\n⚽ {home} 🆚 {away}\n🎯 Your pick: <b>{pick}</b>\n💰 {stake} 🪙\n\n💼 Balance now: <b>{bal}</b> 🪙\nYou'll get the result here after the match.",
+        "closed": "🔒 Predictions are closed for this match.",
+        "already": "ℹ️ You already joined this match.",
+        "mine_head": "📋 <b>My predictions</b>\n\n{rows}",
+        "mine_empty": "You haven't made any prediction yet.",
+        "mine_line": "{icon} {home} – {away}\n    {pick} | {stake} 🪙 {res}",
+        "res_win": "→ +{p} 🪙", "res_lose": "→ −{s} 🪙", "res_wait": "⏳", "res_void": "↩️ refunded",
+        "r_win": "🎉 <b>Your prediction was right!</b>\n\n⚽ {home} {score} {away}\n🎯 Your pick: {pick}\n💰 You won: <b>+{profit}</b> 🪙 (received {payout})\n💼 Balance: <b>{bal}</b> 🪙",
+        "r_even": "✅ <b>Your prediction was right!</b>\n\n⚽ {home} {score} {away}\n🎯 {pick}\nYou got your stake back ({payout} 🪙) because everybody was right.\n💼 Balance: <b>{bal}</b> 🪙",
+        "r_lose": "❌ <b>Wrong prediction</b>\n\n⚽ {home} {score} {away}\n🎯 Your pick: {pick}\n💸 You lost: <b>{stake}</b> 🪙\nBetter luck next match!",
+        "r_void": "↩️ <b>Match cancelled / postponed</b>\n\n⚽ {home} 🆚 {away}\nYour <b>{stake}</b> 🪙 were refunded.",
+        "new": "⚽ <b>{n}</b> new matches are open for predictions! Join before kick-off 🎯",
+        "open_arena": "⚽ Open the arena",
+    },
+    "fr": {
+        "arena": "⚽ <b>Arène des matchs</b>\n\nPronostiquez le résultat (victoire / nul / victoire), misez vos coins, et si vous avez raison vous partagez les coins des perdants avec les autres gagnants.\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🔒 Les pronostics ferment au coup d'envoi.\n\n{body}",
+        "none": "Aucun match disponible pour le moment. Activez 🔔 pour être averti dès que de nouveaux matchs sont publiés.",
+        "pick": "Choisissez un match :",
+        "mine": "📋 Mes pronostics", "notify_on": "🔔 M'avertir des nouveaux matchs", "notify_off": "🔕 Désactiver les notifications",
+        "sub_on": "✅ Nous vous préviendrons des nouveaux matchs.", "sub_off": "🔕 Notifications désactivées.",
+        "next": "Suivant ➡️", "prev": "⬅️ Précédent",
+        "match": "⚽ <b>{home} 🆚 {away}</b>\n🏆 {comp}\n🕒 {time}\n\n👥 Participants : <b>{n}</b> | 💰 Total misé : <b>{pool}</b> 🪙{your}",
+        "your": "\n\n🎯 Votre choix : <b>{pick}</b> — {stake} 🪙",
+        "btn_join": "🎯 Participer",
+        "stake": "💰 Choisissez votre mise\n(solde : <b>{bal}</b> 🪙 | minimum : {min})",
+        "other": "✏️ Autre montant",
+        "stake_prompt": "✏️ Envoyez votre mise (un nombre de {min} à {max}) :",
+        "stake_bad": "❌ Montant invalide. Envoyez un nombre de {min} à {max}.",
+        "stake_low": "❌ Solde insuffisant. Récupérez votre cadeau quotidien dans l'Espace Jeux.",
+        "outcome": "🎯 Choisissez votre pronostic :\n<b>{home} 🆚 {away}</b>\n💰 Mise : <b>{stake}</b> 🪙",
+        "win_label": "Victoire {team}", "draw_label": "Match nul",
+        "placed": "✅ <b>Votre participation est enregistrée</b>\n\n⚽ {home} 🆚 {away}\n🎯 Votre choix : <b>{pick}</b>\n💰 {stake} 🪙\n\n💼 Solde actuel : <b>{bal}</b> 🪙\nVous recevrez le résultat ici après le match.",
+        "closed": "🔒 Les pronostics sont fermés pour ce match.",
+        "already": "ℹ️ Vous participez déjà à ce match.",
+        "mine_head": "📋 <b>Mes pronostics</b>\n\n{rows}",
+        "mine_empty": "Vous n'avez fait aucun pronostic.",
+        "mine_line": "{icon} {home} – {away}\n    {pick} | {stake} 🪙 {res}",
+        "res_win": "→ +{p} 🪙", "res_lose": "→ −{s} 🪙", "res_wait": "⏳", "res_void": "↩️ remboursé",
+        "r_win": "🎉 <b>Votre pronostic est bon !</b>\n\n⚽ {home} {score} {away}\n🎯 Votre choix : {pick}\n💰 Gain : <b>+{profit}</b> 🪙 (reçu {payout})\n💼 Solde : <b>{bal}</b> 🪙",
+        "r_even": "✅ <b>Votre pronostic est bon !</b>\n\n⚽ {home} {score} {away}\n🎯 {pick}\nVotre mise vous est rendue ({payout} 🪙) car tout le monde a eu raison.\n💼 Solde : <b>{bal}</b> 🪙",
+        "r_lose": "❌ <b>Pronostic raté</b>\n\n⚽ {home} {score} {away}\n🎯 Votre choix : {pick}\n💸 Perdu : <b>{stake}</b> 🪙\nPlus de chance au prochain match !",
+        "r_void": "↩️ <b>Match annulé / reporté</b>\n\n⚽ {home} 🆚 {away}\nVos <b>{stake}</b> 🪙 ont été remboursés.",
+        "new": "⚽ <b>{n}</b> nouveaux matchs sont ouverts aux pronostics ! Participez avant le coup d'envoi 🎯",
+        "open_arena": "⚽ Ouvrir l'arène",
+    },
+}
+
+def at(lang, key):
+    return AT.get(lang, AT["ar"])[key]
+
+# ---------- تخزين المباريات ----------
+def _mk(mid):
+    return f"rk:m:{mid}"
+
+def m_get(mid):
+    try:
+        return kv_get_json(_mk(mid))
+    except StorageError:
+        return None
+
+def m_save(m):
+    kv_set(_mk(m["id"]), json.dumps(m, ensure_ascii=False), ex=45 * 86400)
+
+def m_ids():
+    try:
+        return [str(x) for x in (db.smembers("rk:mset") or [])]
+    except Exception as e:
+        print(f"m_ids error: {e}")
+        return []
+
+def _preds(mid):
+    try:
+        raw = db.hgetall(f"rk:mp:{mid}") or {}
+    except Exception:
+        raw = {}
+    out = {}
+    for u, v in raw.items():
+        try:
+            out[str(u)] = v if isinstance(v, dict) else json.loads(v)
+        except Exception:
+            pass
+    return out
+
+def _ts(s):
+    return calendar.timegm(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ"))
+
+def _local_time(ts):
+    return time.strftime("%d/%m %H:%M", time.gmtime(ts + 3600))   # توقيت الجزائر
+
+def _olabel(lang, m, o):
+    if o == "H":
+        return at(lang, "win_label").format(team=m["home"])
+    if o == "A":
+        return at(lang, "win_label").format(team=m["away"])
+    return at(lang, "draw_label")
+
+# ---------- عميل football-data ----------
+def fb_get(path, params=None):
+    if not FB_KEY:
+        raise RuntimeError("FOOTBALL_API_KEY غير مضبوط في Render")
+    r = requests.get(FB_BASE + path, headers={"X-Auth-Token": FB_KEY}, params=params, timeout=20)
+    if r.status_code != 200:
+        raise RuntimeError(f"football-data HTTP {r.status_code}: {r.text[:160]}")
+    return r.json()
+
+def _fb_outcome(x):
+    sc = x.get("score") or {}
+    ft = sc.get("regularTime") or sc.get("fullTime") or {}   # نتيجة الـ90 دقيقة
+    h, a = ft.get("home"), ft.get("away")
+    if h is None or a is None:
+        return None, None
+    return ("H" if h > a else "A" if a > h else "D"), f"{h}-{a}"
+
+def fb_sync():
+    """ينشر مباريات اليوم والغد من المسابقات المختارة. يرجع عدد المباريات الجديدة."""
+    now = time.time()
+    d1 = time.strftime("%Y-%m-%d", time.gmtime(now))
+    d2 = time.strftime("%Y-%m-%d", time.gmtime(now + 2 * 86400))
+    data = fb_get("/matches", {"dateFrom": d1, "dateTo": d2, "competitions": MATCH_COMPETITIONS})
+    new = 0
+    for x in data.get("matches", []):
+        try:
+            mid = str(x["id"])
+            ts = _ts(x["utcDate"])
+            st = x.get("status")
+            m = m_get(mid)
+            if m:
+                if m["status"] == "open" and st in ("POSTPONED", "CANCELLED"):
+                    void_match(mid)
+                elif m["status"] == "open" and m["kickoff"] != ts and st in ("SCHEDULED", "TIMED"):
+                    m["kickoff"] = ts
+                    m_save(m)
+                continue
+            if st not in ("SCHEDULED", "TIMED") or ts <= now + 60 or ts > now + 49 * 3600:
+                continue
+            h, a = x.get("homeTeam") or {}, x.get("awayTeam") or {}
+            comp = x.get("competition") or {}
+            m = {"id": mid, "comp": comp.get("name", ""), "home": h.get("shortName") or h.get("name") or "?",
+                 "away": a.get("shortName") or a.get("name") or "?", "kickoff": ts, "status": "open"}
+            m_save(m)
+            db.sadd("rk:mset", mid)
+            new += 1
+        except Exception as e:
+            print(f"fb_sync item error: {e}")
+    if new:
+        _notify_new(new)
+    return new
+
+def _notify_new(n):
+    monitor_send(f"⚽ <b>نُشرت {n} مباريات جديدة للتوقع</b>")
+    try:
+        subs = [str(x) for x in (db.smembers("rk:msub") or [])]
+    except Exception:
+        subs = []
+
+    def _run():
+        for u in subs:
+            lang = get_lang(u)
+            mk = InlineKeyboardMarkup()
+            mk.add(InlineKeyboardButton(text=at(lang, "open_arena"), callback_data="gm_ar_0"))
+            try:
+                bot.send_message(int(u), at(lang, "new").format(n=n), parse_mode="HTML", reply_markup=mk)
+            except Exception as e:
+                print(f"new matches notify failed: {e}")
+            time.sleep(0.05)
+
+    if subs:
+        threading.Thread(target=_run, daemon=True).start()
+
+# ---------- الإغلاق والتسوية ----------
+def fb_close_due():
+    now = time.time()
+    for mid in m_ids():
+        m = m_get(mid)
+        if not m or m["status"] != "open" or now < m["kickoff"]:
+            continue
+        preds = _preds(mid)
+        pool = sum(int(p["s"]) for p in preds.values())
+        dist = {"H": 0, "D": 0, "A": 0}
+        for p in preds.values():
+            dist[p["o"]] = dist.get(p["o"], 0) + int(p["s"])
+        m["status"] = "closed"
+        m_save(m)
+        monitor_send(
+            f"🔒 <b>أُغلقت المشاركة</b>\n\n⚽ {html.escape(m['home'])} 🆚 {html.escape(m['away'])}\n"
+            f"👥 المشاركون: {len(preds)}\n💰 المجموع: {pool} 🪙\n"
+            f"🏠 {dist['H']} | 🤝 {dist['D']} | ✈️ {dist['A']}"
+        )
+        if not preds:
+            m["status"] = "settled"
+            m_save(m)
+            db.srem("rk:mset", mid)
+
+def _send_user(uid, text):
+    try:
+        bot.send_message(int(uid), text, parse_mode="HTML")
+    except Exception as e:
+        print(f"arena notify failed: {e}")
+    time.sleep(0.05)
+
+def settle_match(mid, result, score=None):
+    """تسوية: الفائزون يسترجعون رهانهم ويتقاسمون رهانات الخاسرين بنسبة رهان كل واحد. إذا لم يصب أحد يخسر الجميع."""
+    if not kv_set(f"rk:msettle:{mid}", "1", ex=45 * 86400, nx=True):
+        return "⚠️ تمت تسوية هذه المباراة سابقاً."
+    m = m_get(mid)
+    if not m:
+        kv_del(f"rk:msettle:{mid}")
+        return "❌ مباراة غير موجودة."
+    preds = _preds(mid)
+    pool = sum(int(p["s"]) for p in preds.values())
+    win_stake = sum(int(p["s"]) for p in preds.values() if p["o"] == result)
+    lose_stake = pool - win_stake
+    score_txt = score or "🆚"
+    winners = 0
+    for uid, p in preds.items():
+        lang = get_lang(uid)
+        s = int(p["s"])
+        pick = _olabel(lang, m, p["o"])
+        names = dict(home=m["home"], away=m["away"], score=score_txt, pick=pick)
+        if p["o"] == result:
+            winners += 1
+            payout = s + (s * lose_stake) // win_stake
+            profit = payout - s
+            bal = coins_add(uid, payout, "match", score=False)
+            if profit > 0:
+                lb_score_add(uid, profit)
+            p["p"] = payout
+            key = "r_win" if profit > 0 else "r_even"
+            _send_user(uid, at(lang, key).format(profit=profit, payout=payout, bal=bal, **names))
+        else:
+            p["p"] = 0
+            _send_user(uid, at(lang, "r_lose").format(stake=s, **names))
+        try:
+            db.hset(f"rk:mp:{mid}", uid, json.dumps(p))
+        except Exception as e:
+            print(f"pred update failed: {e}")
+    m["status"] = "settled"
+    m["result"] = result
+    m["score"] = score_txt
+    m_save(m)
+    try:
+        db.srem("rk:mset", mid)
+    except Exception:
+        pass
+    monitor_send(
+        f"✅ <b>تمت تسوية مباراة</b>\n\n⚽ {html.escape(m['home'])} {html.escape(score_txt)} {html.escape(m['away'])}\n"
+        f"👥 {len(preds)} مشارك | 🏆 {winners} فائز\n💰 المجموع: {pool} 🪙"
+        + ("\n⚠️ لم يصب أحد: خسر الجميع." if preds and winners == 0 else "")
+    )
+    return f"✅ سُوّيت: {len(preds)} مشارك، {winners} فائز، المجموع {pool} 🪙."
+
+def void_match(mid):
+    """مباراة ملغاة/مؤجلة: تُرجع كل الرهانات."""
+    if not kv_set(f"rk:msettle:{mid}", "1", ex=45 * 86400, nx=True):
+        return "⚠️ تمت معالجة هذه المباراة سابقاً."
+    m = m_get(mid)
+    if not m:
+        kv_del(f"rk:msettle:{mid}")
+        return "❌ مباراة غير موجودة."
+    preds = _preds(mid)
+    for uid, p in preds.items():
+        s = int(p["s"])
+        coins_add(uid, s, "match-refund", score=False)
+        p["p"] = -1
+        try:
+            db.hset(f"rk:mp:{mid}", uid, json.dumps(p))
+        except Exception:
+            pass
+        _send_user(uid, at(get_lang(uid), "r_void").format(home=m["home"], away=m["away"], stake=s))
+    m["status"] = "void"
+    m_save(m)
+    try:
+        db.srem("rk:mset", mid)
+    except Exception:
+        pass
+    monitor_send(f"↩️ <b>مباراة ملغاة/مؤجلة</b>: {html.escape(m['home'])} 🆚 {html.escape(m['away'])}\nأُعيد لـ {len(preds)} مشارك رهاناتهم.")
+    return f"↩️ أُرجعت رهانات {len(preds)} مشارك."
+
+def fb_check_results():
+    now = time.time()
+    pend = []
+    for mid in m_ids():
+        m = m_get(mid)
+        if m and m["status"] == "closed" and now >= m["kickoff"] + 100 * 60:
+            pend.append(m)
+    if not pend:
+        return 0
+    data = fb_get("/matches", {"ids": ",".join(m["id"] for m in pend)})
+    done = 0
+    by_id = {str(x["id"]): x for x in data.get("matches", [])}
+    for m in pend:
+        x = by_id.get(m["id"])
+        if not x:
+            continue
+        st = x.get("status")
+        if st == "FINISHED":
+            res, score = _fb_outcome(x)
+            if res:
+                settle_match(m["id"], res, score)
+                done += 1
+        elif st in ("POSTPONED", "CANCELLED"):
+            void_match(m["id"])
+            done += 1
+        elif now > m["kickoff"] + 12 * 3600:
+            monitor_send(
+                f"⏳ <b>نتيجة معلّقة</b>: {html.escape(m['home'])} 🆚 {html.escape(m['away'])}\n"
+                f"سوّها يدوياً: <code>/matchresult {m['id']} H|D|A</code>",
+                key=f"mres_{m['id']}", cooldown=6 * 3600)
+    return done
+
+def _arena_loop():
+    time.sleep(90)
+    last_sync = last_res = 0
+    while True:
+        try:
+            fb_close_due()
+            now = time.time()
+            if FB_KEY and now - last_sync > 1800:
+                last_sync = now
+                fb_sync()
+            if FB_KEY and now - last_res > 600:
+                last_res = now
+                fb_check_results()
+        except Exception as e:
+            print(f"arena loop error: {e}")
+            monitor_send(f"🚨 <b>خطأ في ساحة المباريات</b>\n<code>{html.escape(str(e))[:250]}</code>", key="arena_err", cooldown=3600)
+        time.sleep(60)
+
+if db and FB_KEY:
+    threading.Thread(target=_arena_loop, daemon=True).start()
+
+# ---------- الواجهة ----------
+def _open_matches():
+    now = time.time()
+    out = []
+    for mid in m_ids():
+        m = m_get(mid)
+        if m and m["status"] == "open" and m["kickoff"] > now:
+            out.append(m)
+    out.sort(key=lambda m: m["kickoff"])
+    return out
+
+def ar_list(call, lang, page=0):
+    uid = call.from_user.id
+    _lb_touch(call.from_user)
+    ms = _open_matches()
+    pages = max(1, (len(ms) + AR_PAGE - 1) // AR_PAGE)
+    page = max(0, min(page, pages - 1))
+    mk = InlineKeyboardMarkup(row_width=1)
+    for m in ms[page * AR_PAGE:(page + 1) * AR_PAGE]:
+        mk.add(InlineKeyboardButton(text=f"🕒 {_local_time(m['kickoff'])[-5:]} | {m['home']} – {m['away']}",
+                                    callback_data=f"gm_mt_{m['id']}"))
+    if pages > 1:
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton(text=at(lang, "prev"), callback_data=f"gm_ar_{page - 1}"))
+        if page < pages - 1:
+            nav.append(InlineKeyboardButton(text=at(lang, "next"), callback_data=f"gm_ar_{page + 1}"))
+        mk.row(*nav)
+    try:
+        subscribed = db.sismember("rk:msub", str(uid))
+    except Exception:
+        subscribed = False
+    mk.add(InlineKeyboardButton(text=at(lang, "mine"), callback_data="gm_mine"))
+    mk.add(InlineKeyboardButton(text=at(lang, "notify_off" if subscribed else "notify_on"), callback_data="gm_ms"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="gm_hub"))
+    body = at(lang, "pick") if ms else at(lang, "none")
+    _pf_show(call, at(lang, "arena").format(bal=coins_get(uid), body=body), mk)
+
+def ar_toggle_sub(call, lang):
+    uid = str(call.from_user.id)
+    if db.sismember("rk:msub", uid):
+        db.srem("rk:msub", uid)
+        msg = at(lang, "sub_off")
+    else:
+        db.sadd("rk:msub", uid)
+        msg = at(lang, "sub_on")
+        monitor_send(f"🔔 <b>زبون فعّل إشعارات المباريات</b>\n👤 {_user_link(uid)}")
+    bot.answer_callback_query(call.id, msg, show_alert=True)
+    ar_list(call, lang, 0)
+
+def ar_match(call, lang, mid, answer=True):
+    uid = call.from_user.id
+    m = m_get(mid)
+    if not m:
+        ar_list(call, lang, 0)
+        return
+    preds = _preds(mid)
+    mine = preds.get(str(uid))
+    your = at(lang, "your").format(pick=_olabel(lang, m, mine["o"]), stake=mine["s"]) if mine else ""
+    mk = InlineKeyboardMarkup(row_width=1)
+    if m["status"] == "open" and m["kickoff"] > time.time() and not mine:
+        mk.add(InlineKeyboardButton(text=at(lang, "btn_join"), callback_data=f"gm_mp_{mid}"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="gm_ar_0"))
+    _pf_show(call, at(lang, "match").format(
+        home=html.escape(m["home"]), away=html.escape(m["away"]), comp=html.escape(m["comp"]),
+        time=_local_time(m["kickoff"]), n=len(preds), pool=sum(int(p["s"]) for p in preds.values()), your=your), mk)
+
+def _can_join(m):
+    return bool(m) and m["status"] == "open" and m["kickoff"] > time.time()
+
+def ar_stake(call, lang, mid):
+    uid = call.from_user.id
+    m = m_get(mid)
+    if not _can_join(m):
+        bot.answer_callback_query(call.id, at(lang, "closed"), show_alert=True)
+        ar_list(call, lang, 0)
+        return
+    bal = coins_get(uid)
+    if bal < MATCH_MIN_STAKE:
+        bot.answer_callback_query(call.id, at(lang, "stake_low"), show_alert=True)
+        return
+    mk = InlineKeyboardMarkup(row_width=2)
+    mk.row(*[InlineKeyboardButton(text=str(a), callback_data=f"gm_mk_{mid}_{a}") for a in STAKE_CHOICES if a <= bal])
+    mk.add(InlineKeyboardButton(text=at(lang, "other"), callback_data=f"gm_mc_{mid}"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=f"gm_mt_{mid}"))
+    _pf_show(call, at(lang, "stake").format(bal=bal, min=MATCH_MIN_STAKE), mk)
+
+def _outcome_screen(lang, m, mid, stake):
+    mk = InlineKeyboardMarkup(row_width=1)
+    for o in ("H", "D", "A"):
+        icon = {"H": "🏠", "D": "🤝", "A": "✈️"}[o]
+        mk.add(InlineKeyboardButton(text=f"{icon} {_olabel(lang, m, o)}", callback_data=f"gm_mo_{mid}_{o}_{stake}"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=f"gm_mp_{mid}"))
+    text = at(lang, "outcome").format(home=html.escape(m["home"]), away=html.escape(m["away"]), stake=stake)
+    return text, mk
+
+def ar_pick(call, lang, arg):
+    mid, stake = arg.split(SEP, 1)
+    m = m_get(mid)
+    if not _can_join(m):
+        bot.answer_callback_query(call.id, at(lang, "closed"), show_alert=True)
+        ar_list(call, lang, 0)
+        return
+    text, mk = _outcome_screen(lang, m, mid, int(stake))
+    _pf_show(call, text, mk)
+
+def ar_custom(call, lang, mid):
+    uid = call.from_user.id
+    m = m_get(mid)
+    if not _can_join(m):
+        bot.answer_callback_query(call.id, at(lang, "closed"), show_alert=True)
+        return
+    bal = coins_get(uid)
+    if bal < MATCH_MIN_STAKE:
+        bot.answer_callback_query(call.id, at(lang, "stake_low"), show_alert=True)
+        return
+    _mp_wait[uid] = mid
+    mk = InlineKeyboardMarkup()
+    mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data=f"gm_mp_{mid}"))
+    _pf_show(call, at(lang, "stake_prompt").format(min=MATCH_MIN_STAKE, max=bal), mk)
+
+def place_prediction(uid, mid, outcome, stake):
+    """يرجع (ok، مفتاح رسالة)."""
+    m = m_get(mid)
+    if not _can_join(m):
+        return False, "closed"
+    if outcome not in ("H", "D", "A") or stake < MATCH_MIN_STAKE:
+        return False, "stake_bad"
+    if db.hget(f"rk:mp:{mid}", str(uid)):
+        return False, "already"
+    if not coins_take(uid, stake, "match"):
+        return False, "stake_low"
+    if not db.hsetnx(f"rk:mp:{mid}", str(uid), json.dumps({"o": outcome, "s": stake, "p": None})):
+        coins_add(uid, stake, "match-refund", score=False)
+        return False, "already"
+    try:
+        db.lpush(f"rk:mu:{uid}", mid)
+        db.ltrim(f"rk:mu:{uid}", 0, 39)
+    except Exception as e:
+        print(f"mu index error: {e}")
+    return True, "placed"
+
+def ar_place(call, lang, arg):
+    try:
+        mid, o, stake = arg.split(SEP, 2)
+        stake = int(stake)
+    except Exception:
+        bot.answer_callback_query(call.id)
+        return
+    ok, key = place_prediction(call.from_user.id, mid, o, stake)
+    if not ok:
+        bot.answer_callback_query(call.id, at(lang, key).format(min=MATCH_MIN_STAKE, max=coins_get(call.from_user.id)), show_alert=True)
+        ar_match(call, lang, mid)
+        return
+    m = m_get(mid)
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=at(lang, "mine"), callback_data="gm_mine"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="gm_ar_0"))
+    _pf_show(call, at(lang, "placed").format(
+        home=html.escape(m["home"]), away=html.escape(m["away"]), pick=_olabel(lang, m, o),
+        stake=stake, bal=coins_get(call.from_user.id)), mk)
+
+def ar_mine(call, lang):
+    uid = call.from_user.id
+    try:
+        ids = [str(x) for x in (db.lrange(f"rk:mu:{uid}", 0, 14) or [])]
+    except Exception:
+        ids = []
+    rows = []
+    for mid in ids:
+        m = m_get(mid)
+        p = _preds(mid).get(str(uid))
+        if not m or not p:
+            continue
+        s, pay = int(p["s"]), p.get("p")
+        if pay is None:
+            icon, res = "⏳", at(lang, "res_wait")
+        elif pay == -1:
+            icon, res = "↩️", at(lang, "res_void")
+        elif pay > 0:
+            icon, res = "✅", at(lang, "res_win").format(p=pay - s) if pay > s else "✅"
+        else:
+            icon, res = "❌", at(lang, "res_lose").format(s=s)
+        rows.append(at(lang, "mine_line").format(icon=icon, home=html.escape(m["home"]), away=html.escape(m["away"]),
+                                                  pick=_olabel(lang, m, p["o"]), stake=s, res=res))
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="gm_ar_0"))
+    _pf_show(call, at(lang, "mine_head").format(rows="\n\n".join(rows) or at(lang, "mine_empty")), mk)
+
+def _awaiting_mp(m):
+    return (bool(m.text) and not m.text.startswith("/") and m.chat.type == "private"
+            and m.from_user.id in _mp_wait)
+
+@bot.message_handler(func=_awaiting_mp, content_types=["text"])
+def handle_mp_amount(message):
+    uid = message.from_user.id
+    lang = get_lang(uid)
+    mid = _mp_wait[uid]
+    bal = coins_get(uid)
+    txt = message.text.strip()
+    if not txt.isdigit() or not (MATCH_MIN_STAKE <= int(txt) <= bal):
+        bot.reply_to(message, at(lang, "stake_bad").format(min=MATCH_MIN_STAKE, max=bal))
+        return
+    _mp_wait.pop(uid, None)
+    m = m_get(mid)
+    if not _can_join(m):
+        bot.send_message(message.chat.id, at(lang, "closed"))
+        return
+    text, mk = _outcome_screen(lang, m, mid, int(txt))
+    bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=mk)
+
+# ---------- أوامر الأدمن ----------
+@bot.message_handler(commands=["matchfetch", "matches", "matchresult", "matchvoid"])
+def arena_admin(message):
+    if not is_admin_msg(message):
+        return
+    cmd = message.text.split()[0].lstrip("/").split("@")[0]
+    a = message.text.split()[1:]
+    if cmd == "matchfetch":
+        try:
+            n = fb_sync()
+            bot.reply_to(message, f"✅ الاتصال يعمل. نُشرت {n} مباراة جديدة. المفتوحة الآن: {len(_open_matches())}")
+        except Exception as e:
+            bot.reply_to(message, f"❌ {str(e)[:400]}")
+    elif cmd == "matches":
+        lines = []
+        for mid in m_ids():
+            m = m_get(mid)
+            if m:
+                lines.append(f"{m['id']} | {m['status']} | {_local_time(m['kickoff'])} | {m['home']}–{m['away']} | 👥{len(_preds(mid))}")
+        bot.reply_to(message, "\n".join(lines[:40]) or "لا توجد مباريات نشطة.")
+    elif cmd == "matchresult":
+        if len(a) < 2 or a[1].upper() not in ("H", "D", "A"):
+            bot.reply_to(message, "الاستعمال: /matchresult ID H|D|A   (H فوز الأول، D تعادل، A فوز الثاني)")
+            return
+        bot.reply_to(message, settle_match(a[0], a[1].upper()))
+    elif cmd == "matchvoid":
+        if not a:
+            bot.reply_to(message, "الاستعمال: /matchvoid ID")
+            return
+        bot.reply_to(message, void_match(a[0]))
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
