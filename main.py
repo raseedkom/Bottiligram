@@ -19,6 +19,9 @@ SW_ATTEMPTS = 2        # عدد المحاولات كل 24 ساعة
 MATCH_COMPETITIONS = "PL,PD,SA,BL1,FL1,CL"   # الدوريات الخمسة الكبرى + دوري الأبطال
 MATCH_MIN_STAKE = 5    # أقل مبلغ مشاركة (كوينز)
 MATCH_REMIND_MINUTES = 10   # التذكير قبل صافرة البداية (بالدقائق)
+PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
+REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
+REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
 
 # ===== المنتجات الجديدة (تسليم يدوي) =====
 _CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
@@ -89,6 +92,14 @@ NEW_PRODUCTS = [
         "icon": "🎙️",
         "description": "• يتم استرداد القسيمة على صفحة دفع Stripe\n• تُسترد على حسابك الخاص\n• تمنح 121 ألف رصيد شهرياً\n• الضمان بعد التفعيل - شهر واحد\n• يجب استردادها خلال 7 أيام من الشراء\n• يمكنك أيضاً استردادها عبر: https://elevenlabs.io/signup?coupon=YOURCODE",
     },
+    {
+        "id": "iptv_14m",
+        "name": "IPTV 14 شهراً",
+        "price": "$14.99",
+        "stock": 1,
+        "icon": "📡",
+        "description": '📺 IPTV لمدة 14 شهراً\n\n• Android TV / الشاشات الذكية 📺\n\nافتح Google Play 🔍\nحمّل التطبيق\n🔗 NEXT+\n\nفي خانة الاسم ✏️ اكتب أي اسم عشوائي\nثم أدخل اسم المستخدم + كلمة المرور 🔑\n\nفي خانة السيرفر 🖥 اكتب 5544\n\n──────────────\nخيار بديل 🔁\n\nافتح Google Play 🔍\nحمّل تطبيق Downloadr 🟡\n\nافتح التطبيق وأدخل هذا الرقم 🔗\n2231346\n\nحمّل السيرفر على شاشتك 📡\nسجّل الدخول باسم المستخدم + كلمة المرور 🔑\n──────────────\n\nيعمل على جميع الأجهزة\nعلى iPhone: حمّل تطبيق VAR\nرابط السيرفر:\n\nhttps://device.sabplayer.com/list/',
+    },
 ]
 
 NEW_TRANSLATIONS = {
@@ -119,6 +130,10 @@ NEW_TRANSLATIONS = {
     "elevenlabs_3m": {
         "en": {"description": "• The voucher is redeemed on the Stripe checkout page\n• It is redeemed on your own account\n• Gives 121K credits per month\n• Warranty after activation - 1 month\n• Must be redeemed within 7 days of purchase\n• You can also redeem it via: https://elevenlabs.io/signup?coupon=YOURCODE"},
         "fr": {"description": "• Le bon est utilisé sur la page de paiement Stripe\n• Il est utilisé sur votre propre compte\n• Donne 121 000 crédits par mois\n• Garantie après activation - 1 mois\n• À utiliser dans les 7 jours suivant l'achat\n• Vous pouvez aussi l'utiliser via : https://elevenlabs.io/signup?coupon=YOURCODE"},
+    },
+    "iptv_14m": {
+        "en": {"name": "IPTV 14 months", "description": '📺 IPTV 14 months\n\n• Android TV / Smart Screen 📺\n\nOpen Google Play 🔍\nDownload the app\n🔗 NEXT+\n\nIn the name field ✏️ enter any random name\nThen enter your Username + Password 🔑\n\nIn the server field 🖥 type 5544\n\n──────────────\nAlternative option 🔁\n\nOpen Google Play 🔍\nDownload the Downloadr app 🟡\n\nOpen the app and enter this number 🔗\n2231346\n\nLoad the server on your screen 📡\nSign in with your Username + Password 🔑\n──────────────\n\nWorks on all devices\nOn iPhone, download the VAR app\nServer link:\n\nhttps://device.sabplayer.com/list/'},
+        "fr": {"name": "IPTV 14 mois", "description": "📺 IPTV 14 mois\n\n• Android TV / Écran connecté 📺\n\nOuvrez Google Play 🔍\nTéléchargez l'application\n🔗 NEXT+\n\nDans le champ du nom ✏️ saisissez un nom aléatoire\nPuis saisissez votre nom d'utilisateur + mot de passe 🔑\n\nDans le champ serveur 🖥 tapez 5544\n\n──────────────\nOption alternative 🔁\n\nOuvrez Google Play 🔍\nTéléchargez l'application Downloadr 🟡\n\nOuvrez l'application et saisissez ce numéro 🔗\n2231346\n\nChargez le serveur sur votre écran 📡\nConnectez-vous avec votre nom d'utilisateur + mot de passe 🔑\n──────────────\n\nFonctionne sur tous les appareils\nSur iPhone, téléchargez l'application VAR\nLien du serveur :\n\nhttps://device.sabplayer.com/list/"},
     },
 }
 
@@ -364,6 +379,22 @@ patch(r"""    send_persistent_menu(call.message.chat.id, lang)
     bot.answer_callback_query(call.id)
     _resume_quick_buy(call.message.chat.id, call.from_user)""", "resume_qb_after_lang")
 
+
+# 22) كوينز الشراء + سطر الكوينز في المحفظة + أزرار الشراء اليدوي
+patch(r"""        wlog_add(uid, "buy", cents, pname)""",
+      r"""        wlog_add(uid, "buy", cents, pname)
+        _purchase_coins_hook(uid)""", "purchase_coins")
+patch(r"""                    pct=WALLET_PCT, gift_pct=GIFT_REWARD_PCT,
+                )
+                + "\n\n" + wt(lang, "wallet_note")""",
+      r"""                    pct=WALLET_PCT, gift_pct=GIFT_REWARD_PCT,
+                )
+                + _coins_wallet_line(lang, uid)
+                + "\n\n" + wt(lang, "wallet_note")""", "wallet_coins_line")
+patch(r"""        ok, msg = add_manual_purchase(st["uid"], st["amount"], "" if text == "-" else text)
+        bot.send_message(message.chat.id, msg, parse_mode="HTML")""",
+      r"""        _mp_choose_mode(message.chat.id, st["uid"], st["amount"], "" if text == "-" else text)""", "manual_purchase_modes")
+
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
 # ========== الطلبات اليدوية (A/B) + سجل الطلبات + جرس التوفر ==========
@@ -379,7 +410,7 @@ MANUAL_B = {  # منتجات يسلّمها الأدمن (حساب / كود) م�
     "netflix_full", "netflix_profile", "capcut_1m", "duolingo_12m",
     "duolingo_link_12m", "nordvpn_3m", "n8n_starter_12m", "canva_edu_500",
     "prime_video_ultra_6m", "amazon_prime_6m", "claude_100_30d", "claude_10m_1d",
-    "chatgpt_plus_1m", "chatgpt_k12_edu", "office365_1y", "elevenlabs_3m",
+    "chatgpt_plus_1m", "chatgpt_k12_edu", "office365_1y", "elevenlabs_3m", "iptv_14m",
 }
 MANUAL_IDS = set(MANUAL_A) | set(MANUAL_B)
 FREEFIRE_ID = "freefire_diamonds"
@@ -1257,6 +1288,7 @@ STORE_SLOTS = [
     "grp:claude_api",
     ("chatgpt_plus_1m", "chatgpt_k12_edu"),
     ("office365_1y", "elevenlabs_3m"),
+    "iptv_14m",
     "nordvpn_3m", "n8n_starter_12m",
     "grp:snapchat",
     "canva_edu_500", "canva_edu_5000", "freefire_diamonds",
@@ -2098,6 +2130,64 @@ def _parse_amount_input(text, rate):
         return None
     return usd, da
 
+def _mp_choose_mode(chat_id, uid, amount, name):
+    """بعد إدخال شراء يدوي: ثلاثة أزرار لطريقة إضافة الرصيد للمحفظة."""
+    token = uuid.uuid4().hex[:8]
+    kv_set(f"rk:mpm:{token}", json.dumps({"uid": str(uid), "amount": str(amount), "name": name}, ensure_ascii=False), ex=3600)
+    cents = int((Decimal(str(amount)) * 100).to_integral_value())
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text="🎁 كاش باك 5%", callback_data=f"ap_pr5_{token}"))
+    mk.add(InlineKeyboardButton(text="🎁 كاش باك 2%", callback_data=f"ap_pr2_{token}"))
+    mk.add(InlineKeyboardButton(text="💵 حساب عام (المبلغ كما كتبته)", callback_data=f"ap_prg_{token}"))
+    mk.add(InlineKeyboardButton(text="❌ إلغاء", callback_data="ap_prx"))
+    bot.send_message(
+        chat_id,
+        f"➕ <b>شراء يدوي</b> للزبون <code>{uid}</code>\n📦 {html.escape(name or 'شراء يدوي')}\n💵 المبلغ: <b>${Decimal(str(amount)):.2f}</b>\n\n"
+        f"اختر طريقة إضافة الرصيد للمحفظة:\n"
+        f"• كاش باك 5% ← يُضاف <b>${_money(cents * 5 // 100)}</b>\n"
+        f"• كاش باك 2% ← يُضاف <b>${_money(cents * 2 // 100)}</b>\n"
+        f"• حساب عام ← يُضاف <b>${_money(cents)}</b> بالضبط",
+        parse_mode="HTML", reply_markup=mk,
+    )
+
+def add_manual_purchase_mode(token, mode):
+    """mode: '5' | '2' | 'g'. يسجل الشراء في السجل ويضيف رصيد المحفظة حسب الطريقة."""
+    data = kv_get_json(f"rk:mpm:{token}")
+    if not data:
+        return False, "⚠️ انتهت صلاحية العملية، أعد تسجيل الشراء."
+    if not kv_set(f"rk:mpm:done:{token}", "1", ex=3600, nx=True):
+        return False, "⚠️ هذه العملية تمت معالجتها مسبقاً."
+    uid, name = data["uid"], (data.get("name") or "").strip() or "شراء يدوي"
+    err = _adm_precheck(uid)
+    if err:
+        kv_del(f"rk:mpm:done:{token}")
+        return False, err
+    amount = Decimal(str(data["amount"]))
+    cents = int((amount * 100).to_integral_value())
+    try:
+        # via غير (binance/manual) = بدون مكافأة تلقائية؛ نضيف المبلغ بأنفسنا حسب الطريقة
+        record_purchase(uid, None, name, amount, f"manual:{uuid.uuid4().hex[:12]}", via="manual_nr")
+        reward_c = cents * 5 // 100 if mode == "5" else cents * 2 // 100 if mode == "2" else cents
+        if reward_c > 0:
+            _ensure_reward_field(uid)
+            db.hincrby(_prof_key(uid), "reward_c", reward_c)
+            wlog_add(uid, "reward", reward_c, name)
+        p = prof_get(uid)
+    except Exception as e:
+        kv_del(f"rk:mpm:done:{token}")
+        return False, f"❌ خطأ: {str(e)[:150]}"
+    label = {"5": "كاش باك 5%", "2": "كاش باك 2%", "g": "حساب عام"}[mode]
+    monitor_send(
+        f"➕ <b>شراء يدوي مسجل</b> ({label})\n\n👤 {_user_link(uid)}\n📦 {html.escape(name)}\n💵 ${amount:.2f}\n"
+        f"🎁 أُضيف للمحفظة: ${_money(reward_c)}\n💼 المتاح الآن: ${_money(wallet_avail_c(p))}"
+    )
+    return True, (
+        f"✅ سُجل شراء للزبون <code>{uid}</code>: {html.escape(name)} — ${amount:.2f}\n"
+        f"🎁 {label}: أُضيف <b>${_money(reward_c)}</b> إلى المحفظة\n"
+        f"🛒 مجموع مشترياته: {p['buys']} | 💵 ${_money(p['spent_c'])}\n"
+        f"💼 الرصيد المتاح: <b>${_money(wallet_avail_c(p))}</b>"
+    )
+
 def _ap_set(aid, **kw):
     kw["t"] = time.time()
     _ap_wait[aid] = kw
@@ -2423,6 +2513,11 @@ def handle_ap(call):
                 f"💱 أرسل سعر الصرف الجديد لـ {PM_NAME[arg]['ar']} (الحالي: {_fmt_rate(pm_rate(arg))} DA لكل 1$)\nمثال: <code>260</code>",
                 parse_mode="HTML",
             )
+    elif cmd in ("pr5", "pr2", "prg"):
+        ok, msg = add_manual_purchase_mode(arg, {"pr5": "5", "pr2": "2", "prg": "g"}[cmd])
+        bot.send_message(chat_id, msg, parse_mode="HTML")
+    elif cmd == "prx":
+        bot.send_message(chat_id, "❌ أُلغي تسجيل الشراء.")
     elif cmd == "wn":
         if arg in SOON_NAME:
             n = _pm_notify_waiters(arg)
@@ -2638,6 +2733,7 @@ def _ref_finalize(uid):
         rid = str(rid)
         if kv_set(f"rk:ref:of:{uid}", rid, nx=True):
             _sadd(f"rk:ref:list:{rid}", str(uid))
+            _ref_grant_coins(rid, uid)
         kv_del(f"rk:refp:{uid}")
     except Exception as e:
         print(f"ref finalize error: {e}")
@@ -3144,7 +3240,7 @@ def _month_label(month, lang):
 
 G_TEXTS = {
     "ar": {
-        "hub": "🎮 <b>ساحة الألعاب</b>\n\nتنافس واجمع <b>Raseedkom Coins</b> 🪙 وتصدّر الترتيب الشهري!\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🎁 الهدية اليومية: {gift}\n\n⚽ <b>ساحة المباريات</b> — توقّع نتائج المباريات وشارك بكوينزك.\n⏱️ <b>تحدي التوقيت اليومي</b> — أوقف العداد عند هدف اليوم واربح <b>{prize}</b> 🪙.\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
+        "hub": "🎮 <b>ساحة الألعاب</b>\n\nتنافس واجمع <b>Raseedkom Coins</b> 🪙 وتصدّر الترتيب الشهري!\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🎁 الهدية اليومية: {gift}\n\n⚽ <b>ساحة المباريات</b> — توقّع نتائج المباريات وشارك بكوينزك.\n⏱️ <b>تحدي التوقيت اليومي</b> — أوقف العداد عند هدف اليوم واربح <b>{prize}</b> 🪙.\n\n🪙 <b>كيف تكسب الكوينز؟</b>\n• 🎁 الهدية اليومية\n• 🛒 {pc} كوينز عند كل عملية شراء\n• 👥 {rc} كوينز عن كل صديق ينضم عبر رابط الإحالة\n• 🎮 الفوز في الألعاب\n\n🏆 أفضل 3 في الترتيب الشهري يفوزون بمنتجات مجانية 🆓\n\nℹ️ الكوينز افتراضية للتسلية فقط، بلا قيمة نقدية ولا يمكن سحبها.",
         "gift_yes": "✅ متاحة الآن (+{n} 🪙)",
         "gift_no": "⏳ تم استلامها — عد بعد {h}س {m}د",
         "btn_gift": "🎁 استلام الهدية اليومية (+{n})",
@@ -3164,7 +3260,7 @@ G_TEXTS = {
         "unavailable": "⚠️ الخدمة غير متاحة حالياً، حاول لاحقاً.",
     },
     "en": {
-        "hub": "🎮 <b>Games Arena</b>\n\nCompete, collect <b>Raseedkom Coins</b> 🪙 and top the monthly leaderboard!\n\n💰 Your balance: <b>{bal}</b> 🪙\n🎁 Daily gift: {gift}\n\n⚽ <b>Match Arena</b> — predict match results and stake your coins.\n⏱️ <b>Daily Timing Challenge</b> — stop the counter at today's target and win <b>{prize}</b> 🪙.\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
+        "hub": "🎮 <b>Games Arena</b>\n\nCompete, collect <b>Raseedkom Coins</b> 🪙 and top the monthly leaderboard!\n\n💰 Your balance: <b>{bal}</b> 🪙\n🎁 Daily gift: {gift}\n\n⚽ <b>Match Arena</b> — predict match results and stake your coins.\n⏱️ <b>Daily Timing Challenge</b> — stop the counter at today's target and win <b>{prize}</b> 🪙.\n\n🪙 <b>How to earn coins?</b>\n• 🎁 The daily gift\n• 🛒 {pc} coins on every purchase\n• 👥 {rc} coins for every friend who joins with your referral link\n• 🎮 Winning games\n\n🏆 The top 3 of the monthly leaderboard win free products 🆓\n\nℹ️ Coins are virtual, for fun only, with no cash value and no withdrawal.",
         "gift_yes": "✅ available now (+{n} 🪙)",
         "gift_no": "⏳ claimed — come back in {h}h {m}m",
         "btn_gift": "🎁 Claim daily gift (+{n})",
@@ -3184,7 +3280,7 @@ G_TEXTS = {
         "unavailable": "⚠️ Service unavailable right now, try again later.",
     },
     "fr": {
-        "hub": "🎮 <b>Espace Jeux</b>\n\nParticipez, gagnez des <b>Raseedkom Coins</b> 🪙 et prenez la tête du classement mensuel !\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🎁 Cadeau quotidien : {gift}\n\n⚽ <b>Arène des matchs</b> — pronostiquez les résultats et misez vos coins.\n⏱️ <b>Défi chrono quotidien</b> — stoppez le compteur sur l'objectif du jour et gagnez <b>{prize}</b> 🪙.\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
+        "hub": "🎮 <b>Espace Jeux</b>\n\nParticipez, gagnez des <b>Raseedkom Coins</b> 🪙 et prenez la tête du classement mensuel !\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🎁 Cadeau quotidien : {gift}\n\n⚽ <b>Arène des matchs</b> — pronostiquez les résultats et misez vos coins.\n⏱️ <b>Défi chrono quotidien</b> — stoppez le compteur sur l'objectif du jour et gagnez <b>{prize}</b> 🪙.\n\n🪙 <b>Comment gagner des coins ?</b>\n• 🎁 Le cadeau quotidien\n• 🛒 {pc} coins à chaque achat\n• 👥 {rc} coins pour chaque ami qui rejoint via votre lien de parrainage\n• 🎮 Gagner aux jeux\n\n🏆 Les 3 premiers du classement mensuel gagnent des produits gratuits 🆓\n\nℹ️ Les coins sont virtuels, pour le plaisir uniquement, sans valeur monétaire ni retrait possible.",
         "gift_yes": "✅ disponible (+{n} 🪙)",
         "gift_no": "⏳ récupéré — revenez dans {h}h {m}min",
         "btn_gift": "🎁 Récupérer le cadeau quotidien (+{n})",
@@ -3235,7 +3331,8 @@ def gm_hub(call, lang, src=None):
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_pred"), callback_data="gm_ar_0"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_soon_sw"), callback_data="gm_sw_h"))
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=back_cb))
-    _pf_show(call, gt(lang, "hub").format(bal=coins_get(uid), gift=_gift_state(lang, uid), prize=SW_PRIZE_COINS), mk)
+    _pf_show(call, gt(lang, "hub").format(bal=coins_get(uid), gift=_gift_state(lang, uid), prize=SW_PRIZE_COINS,
+                                                pc=PURCHASE_COINS, rc=REF_COINS), mk)
 
 def gm_wallet(call, lang):
     uid = call.from_user.id
@@ -3558,6 +3655,69 @@ def sw_stop(call, lang, now_ms):
         text = swt(lang, "lose").format(tol=f"{SW_TOLERANCE:.2f}", hint=swt(lang, "hint_more" if left > 0 else "hint_none"), **common)
     _pf_show(call, text, mk)
     bot.answer_callback_query(call.id)
+
+
+# ============================================================
+# ========== الكوينز: شراء (+PURCHASE_COINS) وإحالة (+REF_COINS) وملاحظة المحفظة ==========
+# ============================================================
+COINS_NOTE = {
+    "ar": f"🪙 <b>كيف تكسب Raseedkom Coins؟</b>\n• 🎁 هدية يومية من ساحة الألعاب\n• 🛒 {PURCHASE_COINS} كوينز عند كل عملية شراء\n• 👥 {REF_COINS} كوينز عن كل صديق ينضم عبر رابطك\n• 🎮 الفوز في الألعاب\n\nادخل «🚀 ابدأ» في الصفحة الرئيسية (تحت المنتجات)، ثم «🎮 لعبة · من سيفوز؟» واقرأ التعليمات.\n🏆 أفضل 3 في الترتيب الشهري يفوزون بمنتجات مجانية 🆓",
+    "en": f"🪙 <b>How to earn Raseedkom Coins?</b>\n• 🎁 A daily gift from the Games Arena\n• 🛒 {PURCHASE_COINS} coins on every purchase\n• 👥 {REF_COINS} coins for every friend who joins with your link\n• 🎮 Winning games\n\nOpen «🚀 Start» on the main page (under the products), then «🎮 Game · Who will win?» and read the instructions.\n🏆 The top 3 of the monthly leaderboard win free products 🆓",
+    "fr": f"🪙 <b>Comment gagner des Raseedkom Coins ?</b>\n• 🎁 Un cadeau quotidien dans l'Espace Jeux\n• 🛒 {PURCHASE_COINS} coins à chaque achat\n• 👥 {REF_COINS} coins pour chaque ami qui rejoint via votre lien\n• 🎮 Gagner aux jeux\n\nOuvrez « 🚀 Commencer » sur la page principale (sous les produits), puis « 🎮 Jeu · Qui va gagner ? » et lisez les instructions.\n🏆 Les 3 premiers du classement mensuel gagnent des produits gratuits 🆓",
+}
+for _l in ("ar", "en", "fr"):
+    WALLET_TEXTS[_l]["wallet_note"] = COINS_NOTE[_l]
+
+def _coins_wallet_line(lang, uid):
+    label = {"ar": "رصيد Raseedkom Coins", "en": "Raseedkom Coins balance", "fr": "Solde Raseedkom Coins"}.get(lang, "Raseedkom Coins")
+    try:
+        return f"\n\n🪙 <b>{label}:</b> {coins_get(uid)}"
+    except Exception:
+        return ""
+
+PC_TEXTS = {
+    "ar": "🪙 <b>كسبت {n} Raseedkom Coins</b> على مشترياتك!\n💰 رصيدك: <b>{bal}</b> 🪙\n\nلكسب المزيد: اشترِ مجدداً، أو ادخل «🚀 ابدأ» في الصفحة الرئيسية (تحت المنتجات) ثم «🎮 لعبة · من سيفوز؟» واتبع التعليمات.\n🏆 أفضل 3 في الترتيب الشهري يفوزون بمنتجات مجانية 🆓",
+    "en": "🪙 <b>You earned {n} Raseedkom Coins</b> for your purchase!\n💰 Balance: <b>{bal}</b> 🪙\n\nTo earn more: buy again, or open «🚀 Start» on the main page (under the products), then «🎮 Game · Who will win?» and follow the instructions.\n🏆 The top 3 of the monthly leaderboard win free products 🆓",
+    "fr": "🪙 <b>Vous avez gagné {n} Raseedkom Coins</b> pour votre achat !\n💰 Solde : <b>{bal}</b> 🪙\n\nPour en gagner plus : achetez à nouveau, ou ouvrez « 🚀 Commencer » sur la page principale (sous les produits), puis « 🎮 Jeu · Qui va gagner ? » et suivez les instructions.\n🏆 Les 3 premiers du classement mensuel gagnent des produits gratuits 🆓",
+}
+RC_TEXTS = {
+    "ar": "👥 <b>انضم صديق عبر رابطك!</b>\n🪙 +{n} Raseedkom Coins\n💰 رصيدك: <b>{bal}</b> 🪙",
+    "en": "👥 <b>A friend joined through your link!</b>\n🪙 +{n} Raseedkom Coins\n💰 Balance: <b>{bal}</b> 🪙",
+    "fr": "👥 <b>Un ami a rejoint via votre lien !</b>\n🪙 +{n} Raseedkom Coins\n💰 Solde : <b>{bal}</b> 🪙",
+}
+
+def _coins_notify(uid, texts, n, bal, with_games_btn=False):
+    lang = get_lang(uid)
+    mk = None
+    if with_games_btn:
+        mk = InlineKeyboardMarkup()
+        mk.add(InlineKeyboardButton(text=smt(lang, "game"), callback_data="gm_hub_s"))
+    try:
+        bot.send_message(int(uid), texts.get(lang, texts["ar"]).format(n=n, bal=bal), parse_mode="HTML", reply_markup=mk)
+    except Exception as e:
+        print(f"coins notify failed: {e}")
+
+def _purchase_coins_hook(uid):
+    """يُستدعى من record_purchase (مرة واحدة لكل شراء): +PURCHASE_COINS كوينز ورسالة للزبون."""
+    try:
+        if not db:
+            return
+        bal = coins_add(uid, PURCHASE_COINS, "purchase")
+        threading.Thread(target=_coins_notify, args=(uid, PC_TEXTS, PURCHASE_COINS, bal, True), daemon=True).start()
+    except Exception as e:
+        print(f"purchase coins error: {e}")
+
+def _ref_grant_coins(rid, new_uid):
+    """+REF_COINS كوينز لصاحب الرابط عند انضمام صديق (بحد أقصى REF_COINS_DAILY_CAP يومياً)."""
+    try:
+        if not db:
+            return
+        if kv_incr_window(f"rk:refcap:{rid}:{_day_key()}", 86400) > REF_COINS_DAILY_CAP:
+            return
+        bal = coins_add(rid, REF_COINS, "referral")
+        threading.Thread(target=_coins_notify, args=(rid, RC_TEXTS, REF_COINS, bal), daemon=True).start()
+    except Exception as e:
+        print(f"referral coins error: {e}")
 
 
 # ============================================================
