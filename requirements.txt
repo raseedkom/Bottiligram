@@ -2,3 +2,4 @@ pyTelegramBotAPI
 flask
 upstash-redis
 requests
+cryptography
