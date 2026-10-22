@@ -22,6 +22,9 @@ MATCH_REMIND_MINUTES = 10   # التذكير قبل صافرة البداية (�
 PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
 REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
 REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
+REDOTPAY_PCT = 3       # كاش باك المنتجات العادية عند الدفع عبر RedotPay فقط (بدل 5%)
+REDOTPAY_GIFT_PCT = 1  # كاش باك بطاقات الهدايا عند الدفع عبر RedotPay فقط (بدل 2%)
+MATCH_BONUS_PCT = 50   # مكافأة تلقائية للفائز في التوقعات: نسبة من مبلغ مشاركته
 
 # ===== المنتجات الجديدة (تسليم يدوي) =====
 _CLAUDE_URL = "https://docs.google.com/document/d/1yxSEreqNY9VaqCa5Whzv2Q_Z7-0RDKdKk0csM5l7aIw/edit?usp=sharing"
@@ -394,6 +397,40 @@ patch(r"""                    pct=WALLET_PCT, gift_pct=GIFT_REWARD_PCT,
 patch(r"""        ok, msg = add_manual_purchase(st["uid"], st["amount"], "" if text == "-" else text)
         bot.send_message(message.chat.id, msg, parse_mode="HTML")""",
       r"""        _mp_choose_mode(message.chat.id, st["uid"], st["amount"], "" if text == "-" else text)""", "manual_purchase_modes")
+
+# 23) RedotPay: مسارات الويب هوك + الكاش باك المخفّض + مصدر الدفعة
+patch(r"""@app.route('/')
+def home():
+    return "I'm alive!"
+""",
+      r"""@app.route('/')
+def home():
+    return "I'm alive!"
+
+@app.route('/rdp/cb', methods=['POST'])
+def _rdp_cb_route():
+    from flask import request as _rq
+    return _rdp_cb_impl(_rq)
+
+@app.route('/rdp/done')
+def _rdp_done_route():
+    return _rdp_done_impl()
+""", "rdp_routes")
+patch(r"""            "via": "binance",
+            "status": "claimed",""",
+      r"""            "via": tx.get("via", "binance"),
+            "status": "claimed",""", "claim_via")
+patch(r"""        if via in ("binance", "manual"):
+            pct = GIFT_REWARD_PCT if pid in GIFT_VARIANTS else WALLET_PCT
+            reward_c = cents * pct // 100""",
+      r"""        if via in ("binance", "manual"):
+            pct = GIFT_REWARD_PCT if pid in GIFT_VARIANTS else WALLET_PCT
+            reward_c = cents * pct // 100
+        elif via == "redotpay":
+            pct = REDOTPAY_GIFT_PCT if pid in GIFT_VARIANTS else REDOTPAY_PCT
+            reward_c = cents * pct // 100""", "rdp_cashback")
+patch(r"""            wallet_credit(uid, cents, "topup", "Binance")""",
+      r"""            wallet_credit(uid, cents, "topup", "RedotPay" if tx.get("via") == "redotpay" else "Binance")""", "topup_label")
 
 # 13) الكتلة الجديدة (قبل معالج رقم العملية ليكون لها الأولوية)
 NEW_BLOCK = r'''# ============================================================
@@ -1562,6 +1599,324 @@ PM_TEXTS = {
 def pmt(lang, key):
     return PM_TEXTS.get(lang, PM_TEXTS["ar"])[key]
 
+# ============================================================
+# ========== RedotPay (دفع حقيقي بالعملات الرقمية) ==========
+# ============================================================
+RDP_SANDBOX = (os.getenv("REDOTPAY_SANDBOX") or "1").strip() != "0"
+RDP_BASE = (os.getenv("REDOTPAY_BASE_URL")
+            or ("https://acquirersandbox.rp-2023app.com" if RDP_SANDBOX else "https://acquirer.redotpay.com")).rstrip("/")
+RDP_APP_KEY = (os.getenv("REDOTPAY_APP_KEY") or "").strip()
+RDP_PRIV_RAW = (os.getenv("REDOTPAY_PRIVATE_KEY") or "").strip()
+RDP_PUB_RAW = (os.getenv("REDOTPAY_PLATFORM_PUBKEY") or "").strip()
+RDP_KEY_VERSION = (os.getenv("REDOTPAY_KEY_VERSION") or "1").strip()
+RDP_ORDER_MINUTES = 30
+RDP_URI_CREATE = "/openapi/v2/order/create"
+
+PM_TEXTS["ar"].update({
+    "rdp_link": "💳 <b>الدفع عبر RedotPay</b>\n\n📦 {what}\n💵 المبلغ: <b>{usd}$</b>\n\nاضغط الزر أدناه لإتمام الدفع بالعملات الرقمية.\n⏳ الرابط صالح لمدة 30 دقيقة.\n{cash}\n✅ بعد نجاح الدفع يصلك طلبك تلقائياً هنا.",
+    "rdp_cash": "\n⚠️ بسبب رسوم RedotPay، الكاش باك عند الدفع بها هو <b>{pct}%</b>.\n",
+    "rdp_open": "💳 ادفع الآن عبر RedotPay",
+    "rdp_fail": "⚠️ تعذّر إنشاء رابط الدفع الآن. حاول بعد قليل أو اختر طريقة دفع أخرى.",
+    "rdp_amounts": "➕ <b>شحن المحفظة — RedotPay</b>\n\nاختر المبلغ:",
+    "rdp_paid_topup": "✅ وصلت دفعتك عبر RedotPay.",
+})
+PM_TEXTS["en"].update({
+    "rdp_link": "💳 <b>Pay with RedotPay</b>\n\n📦 {what}\n💵 Amount: <b>{usd}$</b>\n\nTap the button below to pay with crypto.\n⏳ The link is valid for 30 minutes.\n{cash}\n✅ Once the payment succeeds your order arrives here automatically.",
+    "rdp_cash": "\n⚠️ Because of RedotPay fees, the cashback when paying with it is <b>{pct}%</b>.\n",
+    "rdp_open": "💳 Pay now with RedotPay",
+    "rdp_fail": "⚠️ Could not create the payment link right now. Try again shortly or choose another payment method.",
+    "rdp_amounts": "➕ <b>Top up wallet — RedotPay</b>\n\nChoose the amount:",
+    "rdp_paid_topup": "✅ Your RedotPay payment was received.",
+})
+PM_TEXTS["fr"].update({
+    "rdp_link": "💳 <b>Paiement via RedotPay</b>\n\n📦 {what}\n💵 Montant : <b>{usd}$</b>\n\nAppuyez sur le bouton ci-dessous pour payer en crypto.\n⏳ Le lien est valable 30 minutes.\n{cash}\n✅ Une fois le paiement réussi, votre commande arrive automatiquement ici.",
+    "rdp_cash": "\n⚠️ En raison des frais RedotPay, le cashback en payant avec ce mode est de <b>{pct}%</b>.\n",
+    "rdp_open": "💳 Payer maintenant avec RedotPay",
+    "rdp_fail": "⚠️ Impossible de créer le lien de paiement pour le moment. Réessayez bientôt ou choisissez un autre mode de paiement.",
+    "rdp_amounts": "➕ <b>Recharger le portefeuille — RedotPay</b>\n\nChoisissez le montant :",
+    "rdp_paid_topup": "✅ Votre paiement RedotPay a été reçu.",
+})
+
+def rdp_ready():
+    return bool(RDP_APP_KEY and RDP_PRIV_RAW)
+
+def rdp_visible(uid):
+    """RedotPay يظهر للجميع في الإنتاج فقط؛ في Sandbox (أموال وهمية) للأدمن فقط حتى لا يُسلَّم منتج حقيقي بدفعة تجريبية."""
+    try:
+        if not rdp_ready():
+            return False
+        return (not RDP_SANDBOX) or bool(_is_admin_user(uid))
+    except Exception:
+        return False
+
+def _rdp_pem(raw, kind):
+    raw = raw.replace("\\n", "\n").strip()
+    if "BEGIN" in raw:
+        return raw.encode()
+    body = "".join(raw.split())
+    lines = [body[i:i + 64] for i in range(0, len(body), 64)]
+    return ("-----BEGIN %s-----\n%s\n-----END %s-----\n" % (kind, "\n".join(lines), kind)).encode()
+
+def _rdp_sign(text):
+    import base64
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    key = serialization.load_pem_private_key(_rdp_pem(RDP_PRIV_RAW, "PRIVATE KEY"), password=None)
+    return base64.b64encode(key.sign(text.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())).decode()
+
+def _rdp_headers(uri, body_str):
+    ts = str(int(time.time() * 1000))
+    h = {
+        "Content-Type": "application/json", "accept": "application/json",
+        "X-R-Ak": RDP_APP_KEY, "X-Merchant-Ak": RDP_APP_KEY,
+        "X-R-Ts": ts, "X-R-Key-Version": RDP_KEY_VERSION,
+    }
+    try:
+        h["X-R-Signature"] = _rdp_sign("POST %s\n%s.%s.%s" % (uri, RDP_APP_KEY, ts, body_str))
+    except Exception as e:
+        print(f"redotpay sign error: {e}")
+        if not RDP_SANDBOX:
+            raise
+    return h
+
+_RDP_SKIP = ("icon", "logo", "img", "image", "pic", "avatar")
+_RDP_PREF = ("checkout", "cashier", "paylink", "h5", "pay", "redirect", "url", "link")
+
+def _rdp_collect(node, key, out):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            _rdp_collect(v, str(k), out)
+    elif isinstance(node, list):
+        for v in node:
+            _rdp_collect(v, key, out)
+    elif isinstance(node, str) and node.startswith("http"):
+        out.append((key, node))
+
+def _rdp_find_url(data):
+    out = []
+    _rdp_collect(data, "", out)
+    best, best_rank = None, 99
+    for k, v in out:
+        kl = k.lower()
+        if any(s in kl for s in _RDP_SKIP) or re.search(r"\.(png|jpe?g|svg|gif|webp)(\?|$)", v, re.I):
+            continue
+        rank = 50
+        for i, tok in enumerate(_RDP_PREF):
+            if tok in kl:
+                rank = i
+                break
+        if rank < best_rank:
+            best, best_rank = v, rank
+    return best
+
+def _rdp_find_key(node, names):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in names and isinstance(v, (str, int)):
+                return str(v)
+        for v in node.values():
+            r = _rdp_find_key(v, names)
+            if r:
+                return r
+    elif isinstance(node, list):
+        for v in node:
+            r = _rdp_find_key(v, names)
+            if r:
+                return r
+    return None
+
+def rdp_create_order(inv_id, invoice):
+    """ينشئ طلباً في RedotPay ويرجع (رابط الدفع، رقم الطلب)."""
+    amount = Decimal(str(invoice["price_usdt"])).quantize(Decimal("0.01"))
+    name = str(invoice.get("product_name") or "Order")
+    body = {
+        "outerOrderSn": ("rk-%s" % inv_id)[:32],
+        "outerUid": str(invoice.get("user_id"))[:32],
+        "orderAmount": float(amount),
+        "orderCurrency": "USD",
+        "env": "WEB",
+        "orderDesc": ("RASEEDKOM - " + name)[:100],
+        "timeExpire": int(time.time() * 1000) + RDP_ORDER_MINUTES * 60 * 1000,
+        "goods": [{
+            "goodsType": "02", "goodsCategory": "6000", "goodsCode": str(inv_id)[:20],
+            "goodsName": name[:30], "goodsCount": 1, "goodsAmount": float(amount), "goodsCoin": "USD",
+        }],
+    }
+    base_url = (os.getenv("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+    if base_url:
+        body["redirectUrl"] = base_url + "/rdp/done"
+    body_str = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
+    r = requests.post(RDP_BASE + RDP_URI_CREATE, data=body_str.encode("utf-8"),
+                      headers=_rdp_headers(RDP_URI_CREATE, body_str), timeout=25)
+    if r.status_code != 200:
+        raise RuntimeError("http %s: %s" % (r.status_code, r.text[:300]))
+    data = r.json()
+    print("redotpay create response: " + json.dumps(data)[:600])
+    url = _rdp_find_url(data)
+    if not url:
+        raise RuntimeError("no checkout url in response: " + json.dumps(data)[:300])
+    sn = _rdp_find_key(data, ("orderSn", "sn", "paymentSn", "paySn"))
+    return url, sn
+
+def _rdp_verify(headers, body_str):
+    """True = توقيع صحيح | False = توقيع خاطئ | None = لا يوجد مفتاح المنصة للتحقق."""
+    if not RDP_PUB_RAW:
+        return None
+    try:
+        import base64
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+        h = {str(k).lower(): v for k, v in headers.items()}
+        sig = h.get("x-r-signature")
+        if not sig:
+            return False
+        key = serialization.load_pem_public_key(_rdp_pem(RDP_PUB_RAW, "PUBLIC KEY"))
+        data = ("%s.%s.%s" % (RDP_APP_KEY, h.get("x-r-ts", ""), body_str)).encode("utf-8")
+        key.verify(base64.b64decode(sig), data, padding.PKCS1v15(), hashes.SHA256())
+        return True
+    except Exception as e:
+        print(f"redotpay verify failed: {e}")
+        return False
+
+def _rdp_settle(inv_id, outer, amount):
+    try:
+        invoice = get_invoice(inv_id)
+    except Exception as e:
+        print(f"redotpay settle get_invoice error: {e}")
+        invoice = None
+    if not invoice:
+        txt = ("⚠️ <b>دفعة RedotPay لفاتورة غير موجودة</b>\n\n🆔 %s\n💵 $%s\nراجع الدفعة يدوياً." % (html.escape(outer), amount))
+        alert_admin(txt)
+        monitor_send(txt)
+        return
+    uid = invoice["user_id"]
+    lang = get_lang(uid)
+    tx = {"tx_id": "rdp-%s" % outer, "amount": amount, "currency": "USDT",
+          "time": int(time.time() * 1000), "via": "redotpay"}
+    try:
+        _settle_payment(uid, uid, lang, inv_id, invoice, tx)
+    except Exception as e:
+        print(f"redotpay settle error: {e}")
+        alert_admin("⚠️ <b>خطأ في معالجة دفعة RedotPay</b>\n\n🆔 %s\n💵 $%s\n👤 %s\n%s" % (html.escape(outer), amount, _user_link(uid), html.escape(str(e))[:200]))
+        return
+    monitor_send("💳 <b>دفعة RedotPay</b>\n\n👤 %s\n💵 $%s\n🆔 %s" % (_user_link(uid), amount, html.escape(outer)))
+
+def rdp_process_webhook(headers, body_bytes):
+    """يرجع True إذا نقبل الإشعار (SUCCESS) و False ليعيد RedotPay المحاولة."""
+    body_str = body_bytes.decode("utf-8", "replace")
+    try:
+        data = json.loads(body_str)
+    except Exception:
+        return False
+    v = _rdp_verify(headers, body_str)
+    if v is False:
+        return False
+    if data.get("actionType") != "ACQUIRER_PAY" or str(data.get("orderStatus")) != "2":
+        return True
+    outer = str(data.get("outerOrderSn") or "")
+    if not outer.startswith("rk-"):
+        return True
+    inv_id = outer[3:]
+    try:
+        amount = Decimal(str(data.get("orderAmount")))
+    except Exception:
+        return False
+    if str(data.get("orderCurrency") or "USD").upper() != "USD" or amount <= 0:
+        alert_admin("⚠️ إشعار RedotPay بعملة/مبلغ غير متوقع: %s" % html.escape(body_str[:300]))
+        return True
+    if v is None:  # لا يوجد مفتاح المنصة: مسموح فقط في Sandbox لفواتير الأدمن
+        ok = False
+        if RDP_SANDBOX:
+            try:
+                inv = get_invoice(inv_id)
+                ok = bool(inv and _is_admin_user(inv["user_id"]))
+            except Exception:
+                ok = False
+        if not ok:
+            alert_admin("⚠️ وصل إشعار RedotPay بدون إمكانية التحقق من توقيعه. أضف REDOTPAY_PLATFORM_PUBKEY في Render.")
+            return False
+    threading.Thread(target=_rdp_settle, args=(inv_id, outer, amount), daemon=True).start()
+    return True
+
+def _rdp_cb_impl(req):
+    ok = False
+    try:
+        ok = rdp_process_webhook(dict(req.headers), req.get_data() or b"")
+    except Exception as e:
+        print(f"redotpay webhook error: {e}")
+    payload = {"code": "SUCCESS" if ok else "FAIL", "requestId": uuid.uuid4().hex}
+    if not ok:
+        payload["msg"] = "rejected"
+    return app.response_class(json.dumps(payload), mimetype="application/json")
+
+def _rdp_done_impl():
+    page = ("<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head>"
+            "<body style='font-family:sans-serif;text-align:center;padding:48px'>"
+            "<h2>&#x2705; RedotPay</h2><p>ارجع إلى تيليجرام — سيصلك طلبك تلقائياً بعد تأكيد الدفع.<br>Return to Telegram: your order will arrive automatically.</p>"
+            "<p><a href='" + BOT_LINK + "'>Open bot</a></p></body></html>")
+    return app.response_class(page, mimetype="text/html")
+
+def _rdp_cash_pct(inv):
+    if inv.get("product_id") == TOPUP_PID:
+        return None
+    return REDOTPAY_GIFT_PCT if inv.get("product_id") in GIFT_VARIANTS else REDOTPAY_PCT
+
+def _rdp_checkout(chat_id, lang, uid, inv_id, inv, call, back_cb):
+    """ينشئ طلب RedotPay ويعرض زر الدفع."""
+    try:
+        url, sn = rdp_create_order(inv_id, inv)
+    except Exception as e:
+        print(f"redotpay create order failed: {e}")
+        mk = InlineKeyboardMarkup(row_width=1)
+        mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=back_cb))
+        if call:
+            _pf_show(call, pmt(lang, "rdp_fail"), mk)
+        else:
+            bot.send_message(chat_id, pmt(lang, "rdp_fail"), reply_markup=mk)
+        try:
+            alert_admin("⚠️ فشل إنشاء طلب RedotPay: %s" % html.escape(str(e))[:300])
+        except Exception:
+            pass
+        return
+    try:
+        kv_set("rk:rdpsn:%s" % inv_id, sn or "-", ex=4 * 3600)
+        kv_set("rk:inv:%s" % inv_id, json.dumps(inv), ex=4 * 3600)  # تمديد صلاحية الفاتورة لحين وصول الإشعار
+    except Exception as e:
+        print(f"redotpay ttl extend error: {e}")
+    clear_pending(uid)
+    inv_live_remove(inv_id)
+    pct = _rdp_cash_pct(inv)
+    cash = pmt(lang, "rdp_cash").format(pct=pct) if pct is not None else ""
+    text = pmt(lang, "rdp_link").format(what=html.escape(str(inv.get("product_name") or "")), usd=html.escape(str(inv["price_usdt"])), cash=cash)
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=pmt(lang, "rdp_open"), url=url))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=back_cb))
+    if call:
+        _pf_show(call, text, mk)
+    else:
+        bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=mk)
+
+def _rdp_topup_request(call, chat_id, uid, lang, amount):
+    chat = chat_id or call.message.chat.id
+    if call:
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception:
+            pass
+    if not rdp_visible(uid):
+        bot.send_message(chat, pmt(lang, "soon"))
+        return
+    try:
+        price = "%.2f" % Decimal(str(amount))
+        inv_id = create_invoice(uid, TOPUP_PID, "topup", price, "💳 شحن المحفظة")
+        inv = get_invoice(inv_id)
+    except Exception as e:
+        print(f"redotpay topup invoice error: {e}")
+        bot.send_message(chat, t(lang, "temp_error"))
+        return
+    _rdp_checkout(chat, lang, uid, inv_id, inv, call, "pf_top")
+
+
 # ---------- إعدادات (تفعيل/إيقاف + سعر الصرف) ----------
 def pm_enabled(m):
     try:
@@ -1729,14 +2084,16 @@ def build_invoice_markup(lang, invoice_id, wallet=False):
     mk.add(InlineKeyboardButton(text=pmt(lang, "btn_wallet").format(bal=bal), callback_data=f"wpay_{invoice_id}"))
     _pm_method_rows(lang, mk, {
         "bn": f"pm_bn_{invoice_id}", "bd": f"pm_bd_{invoice_id}",
-        "fx": f"pm_fx_{invoice_id}", "rp": f"pm_soon_rp_{invoice_id}", "bb": f"pm_soon_bb_{invoice_id}",
+        "fx": f"pm_fx_{invoice_id}",
+        "rp": (f"pm_rp_{invoice_id}" if rdp_visible(inv["user_id"]) else f"pm_soon_rp_{invoice_id}"),
+        "bb": f"pm_soon_bb_{invoice_id}",
     })
     mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data=f"cancel_{invoice_id}"))
     return mk
 
 def topup_method_picker(call, lang):
     mk = InlineKeyboardMarkup(row_width=1)
-    _pm_method_rows(lang, mk, {"bn": "pm_tbn", "bd": "pm_tbd", "fx": "pm_tfx", "rp": "pm_tsoon_rp", "bb": "pm_tsoon_bb"})
+    _pm_method_rows(lang, mk, {"bn": "pm_tbn", "bd": "pm_tbd", "fx": "pm_tfx", "rp": ("pm_trp" if rdp_visible(call.from_user.id) else "pm_tsoon_rp"), "bb": "pm_tsoon_bb"})
     mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data="pf_wallet"))
     _pf_show(call, pmt(lang, "pick_topup"), mk)
 
@@ -1896,6 +2253,34 @@ def handle_pm(call):
         bot.answer_callback_query(call.id)
         return
 
+    if cmd == "rp":
+        inv = _pm_inv(call, arg, lang)
+        if not inv:
+            return
+        if not rdp_visible(uid):
+            _pm_soon_screen(call, lang, f"pm_back_{arg}", "rp")
+            bot.answer_callback_query(call.id)
+            return
+        bot.answer_callback_query(call.id)
+        _rdp_checkout(call.message.chat.id, lang, uid, arg, inv, call, f"pm_back_{arg}")
+        return
+
+    if cmd == "trp":
+        if not rdp_visible(uid):
+            _pm_soon_screen(call, lang, "pf_top", "rp")
+            bot.answer_callback_query(call.id)
+            return
+        mk = InlineKeyboardMarkup(row_width=2)
+        mk.row(*[
+            InlineKeyboardButton(text=f"{a}$", callback_data=f"pm_ta_rp_{a}")
+            for a in TOPUP_AMOUNTS
+        ])
+        mk.add(InlineKeyboardButton(text=wt(lang, "btn_topup_other"), callback_data="pm_to_rp"))
+        mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="pf_top"))
+        _pf_show(call, pmt(lang, "rdp_amounts"), mk)
+        bot.answer_callback_query(call.id)
+        return
+
     if cmd == "bn":
         inv = _pm_inv(call, arg, lang)
         if inv:
@@ -1958,7 +2343,7 @@ def handle_pm(call):
         return
 
     if cmd == "to":
-        if arg not in PM_NAME:
+        if arg not in PM_NAME and not (arg == "rp" and rdp_visible(uid)):
             bot.answer_callback_query(call.id)
             return
         if not pm_enabled(arg):
@@ -1976,7 +2361,7 @@ def handle_pm(call):
         try:
             m, amt = arg.split(SEP, 1)
             amount = Decimal(amt)
-            if m not in PM_NAME or amount not in [Decimal(a) for a in TOPUP_AMOUNTS]:
+            if (m not in PM_NAME and not (m == "rp" and rdp_visible(uid))) or amount not in [Decimal(a) for a in TOPUP_AMOUNTS]:
                 raise ValueError("bad")
         except Exception:
             bot.answer_callback_query(call.id)
@@ -1988,6 +2373,9 @@ def handle_pm(call):
 
 def _pm_topup_request(call, chat_id, uid, lang, m, amount):
     """ينشئ طلب شحن (بريدي موب/Flixy) ويعرض التعليمات. call أو chat_id."""
+    if m == "rp":
+        _rdp_topup_request(call, chat_id, uid, lang, amount)
+        return
     if not pm_enabled(m):
         if call:
             _pm_full_screen(call, lang, m, "pf_top")
@@ -2380,7 +2768,10 @@ def show_pm_settings(chat_id, msg_id=None):
         mk.add(InlineKeyboardButton(text=f"💱 سعر صرف {PM_NAME[m]['ar']}", callback_data=f"ap_rt_{m}"))
     for m in ("rp", "bb"):
         n = len(pmw_list(m))
-        lines.append(f"🔄 <b>{SOON_NAME[m]}</b>: قريباً | ⏳ {n} ينتظرون")
+        if m == "rp" and rdp_ready():
+            lines.append(f"💳 <b>RedotPay</b>: {'🧪 Sandbox (للأدمن فقط)' if RDP_SANDBOX else '✅ مفعّلة'} | ⏳ {n} ينتظرون")
+        else:
+            lines.append(f"🔄 <b>{SOON_NAME[m]}</b>: قريباً | ⏳ {n} ينتظرون")
         if n:
             mk.add(InlineKeyboardButton(text=f"📢 إعلام منتظري {SOON_NAME[m]} (متاح الآن)", callback_data=f"ap_wn_{m}"))
     _pr_show(chat_id, msg_id, "\n".join(lines), mk)
@@ -3733,7 +4124,7 @@ _mp_wait = {}   # user_id -> match_id (ينتظر مبلغاً مكتوباً)
 
 AT = {
     "ar": {
-        "arena": "⚽ <b>ساحة المباريات</b>\n\nتوقّع نتيجة المباراة (فوز / تعادل / فوز)، شارك بكوينزك، وإذا أصبت تتقاسم مع الفائزين نقاط من أخطأ.\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🔒 تُغلق المشاركة عند صافرة البداية.\n\n{body}",
+        "arena": "⚽ <b>ساحة المباريات</b>\n\nتوقّع نتيجة المباراة (فوز / تعادل / فوز)، شارك بكوينزك، وإذا أصبت تسترجع مبلغك + نصفه كمكافأة تلقائية، وتتقاسم مع الفائزين نقاط من أخطأ.\n\n💰 رصيدك: <b>{bal}</b> 🪙\n🔒 تُغلق المشاركة عند صافرة البداية.\n\n{body}",
         "none": "لا توجد مباريات متاحة الآن. فعّل 🔔 ليصلك إشعار عند نزول مباريات جديدة.",
         "pick": "اختر مباراة:",
         "mine": "📋 توقعاتي", "notify_on": "🔔 أعلمني بالمباريات الجديدة", "notify_off": "🔕 إيقاف الإشعارات",
@@ -3767,7 +4158,7 @@ AT = {
         "daily": "🎁 اكسب نقاط يومية (+{n})",
     },
     "en": {
-        "arena": "⚽ <b>Match Arena</b>\n\nPredict the match result (win / draw / win), stake your coins, and if you are right you share the losers' coins with the other winners.\n\n💰 Your balance: <b>{bal}</b> 🪙\n🔒 Predictions close at kick-off.\n\n{body}",
+        "arena": "⚽ <b>Match Arena</b>\n\nPredict the match result (win / draw / win), stake your coins, and if you are right you get your stake back + 50% of it as an automatic bonus, and you share the losers' coins with the other winners.\n\n💰 Your balance: <b>{bal}</b> 🪙\n🔒 Predictions close at kick-off.\n\n{body}",
         "none": "No matches available right now. Turn on 🔔 to be notified when new matches are posted.",
         "pick": "Choose a match:",
         "mine": "📋 My predictions", "notify_on": "🔔 Notify me of new matches", "notify_off": "🔕 Turn off notifications",
@@ -3801,7 +4192,7 @@ AT = {
         "daily": "🎁 Earn daily coins (+{n})",
     },
     "fr": {
-        "arena": "⚽ <b>Arène des matchs</b>\n\nPronostiquez le résultat (victoire / nul / victoire), misez vos coins, et si vous avez raison vous partagez les coins des perdants avec les autres gagnants.\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🔒 Les pronostics ferment au coup d'envoi.\n\n{body}",
+        "arena": "⚽ <b>Arène des matchs</b>\n\nPronostiquez le résultat (victoire / nul / victoire), misez vos coins, et si vous avez raison vous récupérez votre mise + 50 % de bonus automatique, et vous partagez les coins des perdants avec les autres gagnants.\n\n💰 Votre solde : <b>{bal}</b> 🪙\n🔒 Les pronostics ferment au coup d'envoi.\n\n{body}",
         "none": "Aucun match disponible pour le moment. Activez 🔔 pour être averti dès que de nouveaux matchs sont publiés.",
         "pick": "Choisissez un match :",
         "mine": "📋 Mes pronostics", "notify_on": "🔔 M'avertir des nouveaux matchs", "notify_off": "🔕 Désactiver les notifications",
@@ -3990,7 +4381,7 @@ def _send_user(uid, text):
     time.sleep(0.05)
 
 def settle_match(mid, result, score=None):
-    """تسوية: الفائزون يسترجعون رهانهم ويتقاسمون رهانات الخاسرين بنسبة رهان كل واحد. إذا لم يصب أحد يخسر الجميع."""
+    """تسوية: الفائز يسترجع رهانه + مكافأة تلقائية (نصف رهانه) + حصته من رهانات الخاسرين بنسبة رهانه. إذا لم يصب أحد يخسر الجميع."""
     if not kv_set(f"rk:msettle:{mid}", "1", ex=45 * 86400, nx=True):
         return "⚠️ تمت تسوية هذه المباراة سابقاً."
     m = m_get(mid)
@@ -4010,7 +4401,8 @@ def settle_match(mid, result, score=None):
         names = dict(home=m["home"], away=m["away"], score=score_txt, pick=pick)
         if p["o"] == result:
             winners += 1
-            payout = s + (s * lose_stake) // win_stake
+            bonus = s * MATCH_BONUS_PCT // 100
+            payout = s + bonus + (s * lose_stake) // win_stake
             profit = payout - s
             bal = coins_add(uid, payout, "match", score=False)
             if profit > 0:
