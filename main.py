@@ -1446,7 +1446,7 @@ def handle_gift_qty(call):
 STORE_SLOTS = [
     "gemini_18m", "capcut_1m",
     ("duolingo_12m", "duolingo_link_12m"),
-    ("netflix_full", "netflix_profile"),
+    "row:prime_netflix",
     ("prime_video_ultra_6m", "amazon_prime_6m"),
     "grp:claude_api",
     ("chatgpt_plus_1m", "chatgpt_k12_edu"),
@@ -1479,6 +1479,7 @@ GIFT_PAGE_TEXT = {
 STORE_GROUPS = {
     "claude_api": {"name": "Claude API", "icon": "🧠", "members": ["claude_100_30d", "claude_10m_1d"]},
     "snapchat": {"name": "Snapchat Plus+", "icon": "👻", "members": ["snapchat_3m", "snapchat_6m", "snapchat_12m"]},
+    "netflix": {"name": "Netflix", "icon": "🎞️", "members": ["netflix_full", "netflix_profile"]},
 }
 
 # أسماء قصيرة للأزرار الجنبية (تيليغرام يقص الأسماء الطويلة)
@@ -1546,6 +1547,22 @@ def generate_store_keyboard(lang):
                 markup.row(_pair_button(items[0], lang), _pair_button(items[1], lang))
             elif items:
                 markup.add(_slot_button(items[0], lang))
+        elif slot == "row:prime_netflix":
+            _g = STORE_GROUPS["netflix"]
+            shown.update(_g["members"])
+            _pc = None
+            try:
+                _pc = _vt_find_cell("prime")
+            except Exception as e:
+                print(f"prime cell failed: {e}")
+            lo, hi, stock = _group_range("netflix")
+            if _pc:
+                markup.row(_vt_cell_button(_pc, lang, True),
+                           InlineKeyboardButton(text=f"{_g['icon']} {_g['name']} | {lo}+", callback_data="grp_netflix"))
+            else:
+                price = lo if lo == hi else f"{lo} - {hi}"
+                stock_txt = stock if stock == "♾️" else f"📦 {stock}"
+                markup.add(InlineKeyboardButton(text=f"{_g['icon']} {_g['name']} | {price} | {stock_txt}", callback_data="grp_netflix"))
         elif slot == "vente:all":
             try:
                 _vt_add_buttons(markup, lang)
@@ -1584,18 +1601,15 @@ def generate_store_keyboard(lang):
             continue
         markup.add(_slot_button(item, lang))
 
-    markup.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="change_lang"))
     markup.row(
-        InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"),
-        InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"),
-    )
-    markup.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
-    markup.row(
-        InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_m"),
         InlineKeyboardButton(text=t(lang, "cmd_update"), callback_data="mn_refresh"),
+        InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_m"),
+    )
+    markup.row(
+        InlineKeyboardButton(text=t(lang, "kb_start"), callback_data="mn_start"),
+        InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"),
     )
     markup.add(InlineKeyboardButton(text=smt(lang, "game"), callback_data="gm_hub_m"))
-    markup.add(InlineKeyboardButton(text=t(lang, "kb_start"), callback_data="mn_start"))
     return markup
 
 # ============================================================
@@ -2127,7 +2141,7 @@ VT_LAYOUT = [
     [("cap1", "CapCut", r"capcut\s*pro\s*1m\b"), ("cap6", "CapCut", r"capcut\s*pro\s*6m")],
     [("claude", "Claude API", r"claude"), ("codex", "Codex API", r"codex")],
     [("linear", "Linear", r"linear"), ("mobbin10", "Mobbin", r"mobbin\s*10x")],
-    [("hma", "HMA", r"\bhma\b"), ("proton", "Proton VPN", r"proton")],
+    [("nord", "NordVPN", r"nord"), ("proton", "Proton VPN", r"proton")],
     [("magic", "Magic Patterns", r"magic patterns"), ("scribd", "Scribd", r"scribd")],
     [("msoft", "Microsoft Office", r"microsoft|office")],
     [("prime", "Prime Video", r"\bprime\b")],
@@ -2135,14 +2149,13 @@ VT_LAYOUT = [
     [("quizlet", "Quizlet", r"quizlet"), ("wordwall", "Wordwall", r"wordwall")],
     [("duo", "Duolingo", r"duolingo"), ("ilovepdf", "iLovePDF", r"ilovepdf")],
     [("autodesk", "Autodesk", r"autodesk")],
-    [("figma", "Figma", r"figma")],
+    [("figma", "Figma", r"figma"), ("framer", "Framer", r"framer")],
     [("bolt", "bolt.new", r"bolt\.new")],
     [("jetbrains", "JetBrains", r"jetbrains")],
     [("descript", "Descript", r"descript")],
     [("readwise", "Readwise", r"readwise"), ("fin", "Fin", r"^fin\b")],
     [("speechify", "Speechify", r"speechify"), ("arize", "Arize", r"arize")],
     [("jam", "Jam", r"^jam\b")],
-    [("framer", "Framer", r"framer")],
     [("posthog", "Posthog", r"posthog"), ("supercut", "Supercut", r"supercut")],
     [("replit", "Replit", r"replit")],
     [("warp", "Warp", r"^warp")],
@@ -2157,18 +2170,18 @@ VT_LAYOUT = [
     [("wakingup", "Waking Up", r"waking up")],
     [("notion", "Notion", r"notion")],
     [("elevenlabs", "ElevenLabs", r"eleven\s*labs")],
-    [("nord", "NordVPN", r"nord")],
     [("railway", "Railway", r"railway")],
     [("lovable", "Lovable", r"lovable")],
     [("mobbinpro", "Mobbin", r"mobbin")],
-    [("applemusic", "Apple Music", r"apple music")],
+    [("applemusic", "Apple Music", r"apple music"), ("youtube", "YouTube Premium", r"youtube")],
     [("surfshark", "Surfshark", r"surfshark")],
-    [("youtube", "YouTube Premium", r"youtube")],
     [("elevenreader", "Eleven Reader", r"eleven reader")],
     [("cursor", "Cursor", r"cursor")],
     [("muse", "Muse AI", r"^muse")],
 ]
 
+VT_SKIP_RENDER = {"prime"}              # يُعرض بجانب Netflix في صف خاص
+VT_USE_TITLE = {"prime"}                # زر قصير بالعنوان
 VT_ALWAYS_GROUP = {"claude", "codex"}   # دائماً زر مجموعة حتى لو بقي خيار واحد
 
 def _vt_cells():
@@ -2198,7 +2211,8 @@ def _vt_cell_button(cell, lang, pair):
     if len(its) == 1 and key not in VT_ALWAYS_GROUP:
         p = its[0]
         if pair:
-            return InlineKeyboardButton(text=f"{p['icon']} {_vt_short(p['name'])}", callback_data=f"buy_{p['id']}")
+            _lbl = title if key in VT_USE_TITLE else _vt_short(p["name"])
+            return InlineKeyboardButton(text=f"{p['icon']} {_lbl}", callback_data=f"buy_{p['id']}")
         return _slot_button(p, lang)
     stock = sum(p["stock"] for p in its)
     lo = min(Decimal(p["price"].lstrip("$")) for p in its)
@@ -2208,6 +2222,9 @@ def _vt_cell_button(cell, lang, pair):
 def _vt_add_buttons(markup, lang):
     rows, left = _vt_cells()
     for cells in rows:
+        cells = [c for c in cells if c[0] not in VT_SKIP_RENDER]
+        if not cells:
+            continue
         if len(cells) == 2:
             markup.row(_vt_cell_button(cells[0], lang, True), _vt_cell_button(cells[1], lang, True))
         else:
