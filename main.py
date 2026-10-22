@@ -141,6 +141,99 @@ NEW_TRANSLATIONS = {
     },
 }
 
+# ===== بطاقات الهدايا الجديدة (تسليم تلقائي من FAZER) =====
+NEW_GIFT_VARIANTS = {
+    "apple_gift_us": [("2 USD", "2.15"), ("5 USD", "5.15"), ("10 USD", "10.20"), ("20 USD", "20.50"), ("30 USD", "31.00")],
+    "gplay_us": [("5 USD", "5.20"), ("10 USD", "10.70"), ("15 USD", "15.70"), ("20 USD", "20.81"), ("50 USD", "53.00"), ("100 USD", "103.00")],
+    "gplay_fr": [("10 EUR", "12.00"), ("15 EUR", "18.00"), ("25 EUR", "30.10"), ("50 EUR", "60.00"), ("100 EUR", "119.00")],
+    "gplay_br": [("10 BRL", "2.20"), ("30 BRL", "5.90"), ("50 BRL", "11.00"), ("100 BRL", "22.10"), ("150 BRL", "34.00")],
+    "gplay_in": [("10 INR", "0.71"), ("50 INR", "0.98"), ("100 INR", "1.37"), ("1000 INR", "11.11"), ("1500 INR", "18.00")],
+    "gplay_tr": [("50 TRY", "1.31"), ("100 TRY", "2.30"), ("250 TRY", "5.50"), ("500 TRY", "12.00")],
+    "steam_us": [("5 USD", "5.80"), ("20 USD", "23.20"), ("25 USD", "29.00"), ("30 USD", "33.00"), ("50 USD", "54.00"), ("100 USD", "110.00")],
+    "steam_id": [("6000 IDR", "1.00"), ("8000 IDR", "1.10"), ("12000 IDR", "1.30"), ("45000 IDR", "3.60"), ("60000 IDR", "5.00")],
+    "pubg_gcoin": [("100 G-Coin", "1.20"), ("500 + 10 G-Coin", "5.00"), ("1000 + 50 G-Coin", "9.80"), ("2500 + 200 G-Coin", "24.00")],
+    "freefire_codes": [("100 + 10 💎", "1.40"), ("210 + 21 💎", "2.40"), ("530 + 53 💎", "5.10"), ("1080 + 108 💎", "10.30"), ("2200 + 220 💎", "20.00")],
+}
+
+def _gift_price_range(pid):
+    vals = [float(p) for _, p in NEW_GIFT_VARIANTS[pid]]
+    return f"${min(vals):.2f} - ${max(vals):.2f}"
+
+# ---- نصوص الأوصاف (3 لغات) ----
+_APPLE_US_DESC = {
+    "ar": "🍎 Apple Gift Card 🇺🇸 — أمريكا\n\nبطاقات مخصّصة لمتجر App Store الأمريكي 📱\n✅ للايفون والايباد (حسابات Apple ID الأمريكية فقط).\n💳 عند الدفع يصلك كود التفعيل مباشرة.\n\n🛡️ الضمان: ساعة واحدة من وقت الشراء.\n(لم يسبق أن واجهتنا أي مشكلة مع الأكواد.)",
+    "en": "🍎 Apple Gift Card 🇺🇸 — USA\n\nCards for the US App Store 📱\n✅ For iPhone and iPad (US Apple ID accounts only).\n💳 After payment you receive the activation code immediately.\n\n🛡️ Warranty: one hour from the time of purchase.\n(We have never had any problem with the codes.)",
+    "fr": "🍎 Apple Gift Card 🇺🇸 — États-Unis\n\nCartes destinées à l'App Store américain 📱\n✅ Pour iPhone et iPad (comptes Apple ID américains uniquement).\n💳 Après le paiement, vous recevez immédiatement le code d'activation.\n\n🛡️ Garantie : une heure à partir de l'achat.\n(Nous n'avons jamais eu de problème avec les codes.)",
+}
+
+def _gplay_desc(flag, c_ar, c_en, c_fr):
+    return {
+        "ar": f"🤖 Google Play Gift Card {flag} — {c_ar}\n\nرصيد لمتجر Google Play الخاص بـ{c_ar} 📱\n✅ صالحة لهواتف Android فقط (لا تعمل على iPhone).\n🌍 تعمل فقط مع حسابات Google Play المسجّلة في {c_ar}، تأكد من بلد حسابك قبل الشراء.\n\n🛒 تصلح لشراء التطبيقات والألعاب والاشتراكات والمشتريات داخل التطبيقات.\n\n📩 طريقة الطلب:\n1️⃣ اختر القيمة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: Google Play ← صورة حسابك ← المدفوعات والاشتراكات ← استرداد رمز الهدية (Redeem)",
+        "en": f"🤖 Google Play Gift Card {flag} — {c_en}\n\nCredit for the {c_en} Google Play store 📱\n✅ Valid for Android devices only (does not work on iPhone).\n🌍 Works only with Google Play accounts registered in {c_en}, check your account country before buying.\n\n🛒 Good for apps, games, subscriptions and in-app purchases.\n\n📩 How to order:\n1️⃣ Choose the value from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: Google Play → your profile picture → Payments and subscriptions → Redeem gift code",
+        "fr": f"🤖 Google Play Gift Card {flag} — {c_fr}\n\nCrédit pour le Google Play {c_fr} 📱\n✅ Valable uniquement sur Android (ne fonctionne pas sur iPhone).\n🌍 Fonctionne uniquement avec les comptes Google Play enregistrés en {c_fr}, vérifiez le pays de votre compte avant d'acheter.\n\n🛒 Utile pour les applications, jeux, abonnements et achats intégrés.\n\n📩 Comment commander :\n1️⃣ Choisissez la valeur avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : Google Play → votre photo de profil → Paiements et abonnements → Utiliser un code cadeau",
+    }
+
+def _steam_desc(flag, c_ar, c_en, c_fr, cur):
+    return {
+        "ar": f"🎮 Steam Wallet {flag} — {c_ar}\n\nرصيد لمحفظة Steam بعملة {cur} 💰\n🌍 صالحة فقط لحسابات Steam ذات منطقة {c_ar}، تأكد من منطقة حسابك قبل الشراء.\n\n🛒 تصلح لشراء الألعاب والإضافات والعناصر داخل متجر Steam.\n\n📩 طريقة الطلب:\n1️⃣ اختر القيمة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: تطبيق Steam ← اسم حسابك ← تفاصيل الحساب ← إضافة رصيد ← استرداد بطاقة هدية Steam أو رمز المحفظة",
+        "en": f"🎮 Steam Wallet {flag} — {c_en}\n\nSteam Wallet credit in {cur} 💰\n🌍 Valid only for Steam accounts in the {c_en} region, check your account region before buying.\n\n🛒 Good for games, DLC and items in the Steam store.\n\n📩 How to order:\n1️⃣ Choose the value from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: Steam app → your account name → Account details → Add funds → Redeem a Steam Gift Card or Wallet Code",
+        "fr": f"🎮 Steam Wallet {flag} — {c_fr}\n\nCrédit Steam Wallet en {cur} 💰\n🌍 Valable uniquement pour les comptes Steam de la région {c_fr}, vérifiez la région de votre compte avant d'acheter.\n\n🛒 Utile pour les jeux, DLC et objets du magasin Steam.\n\n📩 Comment commander :\n1️⃣ Choisissez la valeur avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : application Steam → nom du compte → Détails du compte → Ajouter des fonds → Utiliser une carte cadeau ou un code Steam",
+    }
+
+_PUBG_DESC = {
+    "ar": "🔫 PUBG: BATTLEGROUNDS — G-Coin (Global) 🌍\n\nأكواد G-Coin عالمية (Global) لشحن عملة اللعبة 💰\n⚠️ مهم: هذه لنسخة PUBG: BATTLEGROUNDS (كمبيوتر وأجهزة الكونسول المدعومة) وليست لـ PUBG Mobile (التي عملتها UC).\n\n🛒 تصلح لشراء السكنات والعناصر وباتل باس داخل اللعبة.\n\n📩 طريقة الطلب:\n1️⃣ اختر الباقة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: ادخل لصفحة استرداد الأكواد الرسمية لـ PUBG بحسابك على KRAFTON ID وأدخل الكود، ثم تجد الرصيد في اللعبة",
+    "en": "🔫 PUBG: BATTLEGROUNDS — G-Coin (Global) 🌍\n\nGlobal G-Coin codes to top up the in-game currency 💰\n⚠️ Important: this is for PUBG: BATTLEGROUNDS (PC and supported consoles), not PUBG Mobile (whose currency is UC).\n\n🛒 Good for skins, items and the battle pass in the game.\n\n📩 How to order:\n1️⃣ Choose the pack from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: open the official PUBG code redemption page with your KRAFTON ID, enter the code, then find the balance in the game",
+    "fr": "🔫 PUBG: BATTLEGROUNDS — G-Coin (Global) 🌍\n\nCodes G-Coin mondiaux pour recharger la monnaie du jeu 💰\n⚠️ Important : pour PUBG: BATTLEGROUNDS (PC et consoles compatibles), pas pour PUBG Mobile (dont la monnaie est l'UC).\n\n🛒 Utile pour les skins, objets et le battle pass du jeu.\n\n📩 Comment commander :\n1️⃣ Choisissez le pack avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : ouvrez la page officielle d'échange de codes PUBG avec votre KRAFTON ID, entrez le code, puis retrouvez le solde dans le jeu",
+}
+
+_FF_DESC = {
+    "ar": "🔥 Free Fire — أكواد جواهر 💎 (Global) 🌍\n\nأكواد جواهر Garena Free Fire عالمية (Global) 💎\n⚡ يصلك كود تشحنه بنفسك على حسابك.\n\n📩 طريقة الطلب:\n1️⃣ اختر الباقة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: ادخل لموقع شحن Garena الرسمي (shop.garena.sg/app)، اختر Free Fire، سجّل الدخول بمعرّف اللاعب (Player ID) أو حسابك المرتبط، اختر Garena Voucher وأدخل الكود، ثم اضغط Redeem وتصلك الجواهر\n\nℹ️ هذا منتج منفصل عن «Free Fire Diamonds» (الشحن بالـ ID) الموجود في المتجر.",
+    "en": "🔥 Free Fire — Diamond codes 💎 (Global) 🌍\n\nGlobal Garena Free Fire diamond codes 💎\n⚡ You receive a code that you redeem yourself on your account.\n\n📩 How to order:\n1️⃣ Choose the pack from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: open the official Garena top-up site (shop.garena.sg/app), pick Free Fire, log in with your Player ID or linked account, choose Garena Voucher, enter the code and press Redeem\n\nℹ️ This is separate from the «Free Fire Diamonds» (top-up by ID) product in the store.",
+    "fr": "🔥 Free Fire — Codes de diamants 💎 (Global) 🌍\n\nCodes de diamants Garena Free Fire mondiaux (Global) 💎\n⚡ Vous recevez un code que vous utilisez vous-même sur votre compte.\n\n📩 Comment commander :\n1️⃣ Choisissez le pack avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : ouvrez le site de recharge officiel Garena (shop.garena.sg/app), choisissez Free Fire, connectez-vous avec votre Player ID ou compte lié, choisissez Garena Voucher, entrez le code et appuyez sur Redeem\n\nℹ️ Produit distinct de «Free Fire Diamonds» (recharge par ID) déjà disponible dans la boutique.",
+}
+
+# (id, icon, name ar, name en, name fr, descriptions)
+_GIFT_DEFS = [
+    ("apple_gift_us", "🍎", "Apple Gift Card 🇺🇸 أمريكية", "Apple Gift Card 🇺🇸 American", "Apple Gift Card 🇺🇸 Américaine", _APPLE_US_DESC),
+    ("gplay_us", "🤖", "Google Play 🇺🇸 أمريكية", "Google Play 🇺🇸 American", "Google Play 🇺🇸 Américaine", _gplay_desc("🇺🇸", "أمريكا", "USA", "États-Unis")),
+    ("gplay_fr", "🤖", "Google Play 🇫🇷 فرنسية", "Google Play 🇫🇷 French", "Google Play 🇫🇷 Française", _gplay_desc("🇫🇷", "فرنسا", "France", "France")),
+    ("gplay_br", "🤖", "Google Play 🇧🇷 برازيلية", "Google Play 🇧🇷 Brazilian", "Google Play 🇧🇷 Brésilienne", _gplay_desc("🇧🇷", "البرازيل", "Brazil", "Brésil")),
+    ("gplay_in", "🤖", "Google Play 🇮🇳 هندية", "Google Play 🇮🇳 Indian", "Google Play 🇮🇳 Indienne", _gplay_desc("🇮🇳", "الهند", "India", "Inde")),
+    ("gplay_tr", "🤖", "Google Play 🇹🇷 تركية", "Google Play 🇹🇷 Turkish", "Google Play 🇹🇷 Turque", _gplay_desc("🇹🇷", "تركيا", "Turkey", "Turquie")),
+    ("steam_us", "🎮", "Steam Wallet 🇺🇸 أمريكية", "Steam Wallet 🇺🇸 American", "Steam Wallet 🇺🇸 Américaine", _steam_desc("🇺🇸", "أمريكا (US)", "US", "États-Unis (US)", "USD")),
+    ("steam_id", "🎮", "Steam Wallet 🇮🇩 إندونيسية", "Steam Wallet 🇮🇩 Indonesian", "Steam Wallet 🇮🇩 Indonésienne", _steam_desc("🇮🇩", "إندونيسيا", "Indonesia", "Indonésie", "IDR")),
+    ("pubg_gcoin", "🔫", "PUBG G-Coin 🌍 Global", "PUBG G-Coin 🌍 Global", "PUBG G-Coin 🌍 Global", _PUBG_DESC),
+    ("freefire_codes", "🔥", "Free Fire Codes 💎 Global", "Free Fire Codes 💎 Global", "Free Fire Codes 💎 Global", _FF_DESC),
+]
+
+NEW_GIFT_PRODUCTS = []
+for _gid, _icon, _n_ar, _n_en, _n_fr, _d in _GIFT_DEFS:
+    NEW_GIFT_PRODUCTS.append({
+        "id": _gid, "name": _n_ar, "price": _gift_price_range(_gid),
+        "stock": "♾️", "icon": _icon, "description": _d["ar"],
+    })
+    NEW_TRANSLATIONS[_gid] = {
+        "en": {"name": _n_en, "description": _d["en"]},
+        "fr": {"name": _n_fr, "description": _d["fr"]},
+    }
+
+# فواصل الأزرار الطويلة
+_GIFT_SEPS = [
+    ("sep_apple", "⬇️ Apple gift card ⬇️", "⬇️ Apple gift card ⬇️", "⬇️ Apple gift card ⬇️"),
+    ("sep_google", "⬇️ Google gift card ⬇️", "⬇️ Google gift card ⬇️", "⬇️ Google gift card ⬇️"),
+    ("sep_steam", "⬇️ Steam gift card ⬇️", "⬇️ Steam gift card ⬇️", "⬇️ Steam gift card ⬇️"),
+    ("sep_games", "⬇️ 🎮 بطاقات الألعاب (Global) ⬇️", "⬇️ 🎮 Game Cards (Global) ⬇️", "⬇️ 🎮 Cartes de jeux (Global) ⬇️"),
+]
+for _sid, _t_ar, _t_en, _t_fr in _GIFT_SEPS:
+    NEW_GIFT_PRODUCTS.append({"type": "separator", "id": _sid, "text": _t_ar})
+    NEW_TRANSLATIONS[_sid] = {"en": {"text": _t_en}, "fr": {"text": _t_fr}}
+
+# تغيير اسم فاصل «بطاقات الهداية» القديم إلى «اشتراكات متنوعة» (يُستعمل الآن في الصفحة الأولى)
+NEW_TRANSLATIONS["sep_gift_cards"] = {
+    "en": {"text": "⬇️ Various Subscriptions ⬇️"},
+    "fr": {"text": "⬇️ Abonnements divers ⬇️"},
+}
+
 
 BASE_FILE = os.environ.get("BOT_BASE_FILE", "bot_base.py")
 if not os.path.exists(BASE_FILE):
@@ -291,6 +384,7 @@ products = [
         "id": "gemini_18m",""",
       r"""
 TRANSLATIONS.update(NEW_TRANSLATIONS)
+GIFT_VARIANTS.update(NEW_GIFT_VARIANTS)
 
 products = [
     {
@@ -302,6 +396,19 @@ patch(r"""    {
     {
         "type": "separator",
         "id": "sep_gift_cards",""", "new_products")
+# 16b) بطاقات الهدايا الجديدة: إدراجها في قائمة products + إعادة تسمية الفاصل + زر العودة لصفحة البطاقات
+patch(r"""    },
+]
+
+# ========== التحكم في الأسعار من تيليغرام (الأدمن فقط) ==========""",
+      r"""    },
+    *NEW_GIFT_PRODUCTS,
+]
+
+# ========== التحكم في الأسعار من تيليغرام (الأدمن فقط) ==========""", "new_gift_products")
+patch(r""""text": "⬇️ بطقات الهداية ⬇️",""", r""""text": "⬇️ اشتراكات متنوعة ⬇️",""", "sep_rename")
+patch(r"""    gift_markup.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))""",
+      r"""    gift_markup.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="gcp"))""", "gift_back_btn")
 
 
 # 17) الرجوع من منتج تابع لمجموعة (Claude / Snapchat) يرجع لصفحة المجموعة
@@ -1330,8 +1437,23 @@ STORE_SLOTS = [
     "nordvpn_3m", "n8n_starter_12m",
     "grp:snapchat",
     "canva_edu_500", "canva_edu_5000", "freefire_diamonds",
-    "sep:sep_gift_cards", "apple_gift_tr", "apple_gift_in", "apple_gift_fr",
+    "sep:sep_gift_cards", "next:gifts",
 ]
+
+# صفحة بطاقات الهدايا (الصفحة الثانية): فواصل طويلة + بطاقات
+GIFT_SLOTS = [
+    "sep:sep_apple", "apple_gift_tr", "apple_gift_in", "apple_gift_fr", "apple_gift_us",
+    "sep:sep_google", "gplay_us", "gplay_fr", "gplay_br", "gplay_in", "gplay_tr",
+    "sep:sep_steam", "steam_us", "steam_id",
+    "sep:sep_games", "pubg_gcoin", "freefire_codes",
+]
+GIFT_NEXT_TEXT = {"ar": "🎁 بطاقات الهدايا — التالي ◀️", "en": "Next ▶️ 🎁 Gift Cards", "fr": "Suivant ▶️ 🎁 Cartes cadeaux"}
+GIFT_BACK_TEXT = {"ar": "🔙 العودة", "en": "🔙 Back", "fr": "🔙 Retour"}
+GIFT_PAGE_TEXT = {
+    "ar": "🎁 <b>بطاقات الهدايا</b>\n\n👇 اختر البطاقة التي تريدها:",
+    "en": "🎁 <b>Gift Cards</b>\n\n👇 Choose the card you want:",
+    "fr": "🎁 <b>Cartes cadeaux</b>\n\n👇 Choisissez la carte souhaitée :",
+}
 
 # مجموعات: زر واحد طويل يفتح صفحة فيها أزرار المنتجات
 STORE_GROUPS = {
@@ -1404,6 +1526,8 @@ def generate_store_keyboard(lang):
                 markup.row(_pair_button(items[0], lang), _pair_button(items[1], lang))
             elif items:
                 markup.add(_slot_button(items[0], lang))
+        elif slot == "next:gifts":
+            markup.add(InlineKeyboardButton(text=GIFT_NEXT_TEXT.get(lang, GIFT_NEXT_TEXT["ar"]), callback_data="gcp"))
         elif slot.startswith("grp:"):
             gid = slot[4:]
             g = STORE_GROUPS.get(gid)
@@ -1429,7 +1553,7 @@ def generate_store_keyboard(lang):
 
     # أي منتج يضيفه الأدمن لاحقاً ولم يوضع في الترتيب يظهر في الآخر
     for item in products:
-        if item.get("type") == "separator" or item["id"] in shown or item["id"] in group_members:
+        if item.get("type") == "separator" or item["id"] in shown or item["id"] in group_members or item["id"] in GIFT_VARIANTS:
             continue
         markup.add(_slot_button(item, lang))
 
@@ -1446,6 +1570,159 @@ def generate_store_keyboard(lang):
     markup.add(InlineKeyboardButton(text=smt(lang, "game"), callback_data="gm_hub_m"))
     markup.add(InlineKeyboardButton(text=t(lang, "kb_start"), callback_data="mn_start"))
     return markup
+
+# ============================================================
+# ========== صفحة بطاقات الهدايا (الصفحة الثانية) ==========
+# ============================================================
+def generate_gift_keyboard(lang):
+    mk = InlineKeyboardMarkup(row_width=1)
+    for slot in GIFT_SLOTS:
+        if slot.startswith("sep:"):
+            item = find_product(slot[4:])
+            if item:
+                mk.add(InlineKeyboardButton(text=tr(item, "text", lang), callback_data="noop"))
+        else:
+            item = find_product(slot)
+            if item:
+                mk.add(_slot_button(item, lang))
+    mk.add(InlineKeyboardButton(text=GIFT_BACK_TEXT.get(lang, GIFT_BACK_TEXT["ar"]), callback_data="back_to_main"))
+    return mk
+
+@bot.callback_query_handler(func=lambda c: c.data == "gcp")
+def handle_gift_page(call):
+    lang = get_lang(call.from_user.id)
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(
+        call.message.chat.id, GIFT_PAGE_TEXT.get(lang, GIFT_PAGE_TEXT["ar"]),
+        parse_mode="HTML", reply_markup=generate_gift_keyboard(lang),
+    )
+    bot.answer_callback_query(call.id)
+
+
+# ============================================================
+# ========== FAZER: كتالوج أوسع + مطابقة Google/Steam/PUBG/Free Fire ==========
+# ============================================================
+FAZER_CAT_FILTER = re.compile(r"apple|itunes|google|steam|pubg|battlegrounds|free\s*fire|garena", re.I)
+
+def _fazer_fetch_catalog():
+    from concurrent.futures import ThreadPoolExecutor
+    cats = []
+    cursor = None
+    for _ in range(10):
+        params = {"limit": 500}
+        if cursor:
+            params["cursor"] = cursor
+        data = _fazer_get("/giftcards", params)
+        cats.extend(data.get("items") or [])
+        meta = data.get("meta") or {}
+        if meta.get("has_more") and meta.get("next_cursor"):
+            cursor = meta["next_cursor"]
+        else:
+            break
+    wanted = [c for c in cats if FAZER_CAT_FILTER.search(f"{c.get('name','')} {c.get('note','')}")]
+    prev = {c["category_id"]: c for c in (_catalog.get("cats") or [])}
+
+    def one(c):
+        cid = str(c.get("category_id"))
+        try:
+            d = _fazer_get("/giftcards/cards", {"category_id": c.get("category_id")})
+        except Exception as e:
+            print(f"fazer category {cid} failed: {e}")
+            if cid in prev:
+                return prev[cid]
+            if re.search(r"apple|itunes", f"{c.get('name','')} {c.get('note','')}", re.I):
+                raise
+            return None
+        return {
+            "category_id": cid,
+            "name": c.get("name") or "",
+            "note": c.get("note") or "",
+            "offers": d.get("offers") or [],
+        }
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = list(ex.map(one, wanted))
+    return [r for r in res if r]
+
+_US_RE = re.compile(r"\bus\b|\busa\b|united states|america|🇺🇸", re.I)
+_GP_RE = re.compile(r"google", re.I)
+_ST_RE = re.compile(r"steam", re.I)
+_ANY_RE = re.compile(r"")
+# product_id -> (فلتر القسم، فلتر البلد، استثناء اختياري)
+FAZER_SPEC = {
+    "apple_gift_us": (re.compile(r"apple|itunes", re.I), _US_RE, None),
+    "gplay_us": (_GP_RE, _US_RE, None),
+    "gplay_fr": (_GP_RE, re.compile(r"france|french|🇫🇷|\bfr\b", re.I), None),
+    "gplay_br": (_GP_RE, re.compile(r"brazil|brasil|🇧🇷|\bbr\b|\bbrl\b", re.I), None),
+    "gplay_in": (_GP_RE, re.compile(r"india|🇮🇳|\binr\b", re.I), None),
+    "gplay_tr": (_GP_RE, re.compile(r"turk|türk|🇹🇷|\btr\b|\btry\b", re.I), None),
+    "steam_us": (_ST_RE, _US_RE, None),
+    "steam_id": (_ST_RE, re.compile(r"indonesia|🇮🇩|\bidr\b", re.I), None),
+    "pubg_gcoin": (re.compile(r"pubg|battlegrounds", re.I), _ANY_RE, re.compile(r"mobile|\buc\b", re.I)),
+    "freefire_codes": (re.compile(r"free\s*fire", re.I), _ANY_RE, None),
+}
+
+def _ff_re(usd, dia):
+    # عرض Free Fire قد يُسمّى بالدولار (1 USD) أو بالجواهر (100+10)
+    return re.compile(rf"(?<![\d.]){usd}\s*(?:usd|\$)|\$\s*{usd}(?![\d.])|(?<![\d.+]){dia}(?!\d)", re.I)
+
+# مطابقة خاصة لاسم العرض عند FAZER (بدل رقم الاسم الأول)
+FAZER_OFFER_RE = {
+    ("pubg_gcoin", "100 G-Coin"): re.compile(r"(?<![\d.+])100(?!\d)(?!\s*\+)", re.I),
+    ("pubg_gcoin", "500 + 10 G-Coin"): re.compile(r"(?<![\d.])500\s*\+\s*10(?!\d)", re.I),
+    ("pubg_gcoin", "1000 + 50 G-Coin"): re.compile(r"(?<![\d.])1000\s*\+\s*50(?!\d)", re.I),
+    ("pubg_gcoin", "2500 + 200 G-Coin"): re.compile(r"(?<![\d.])2500\s*\+\s*200(?!\d)", re.I),
+    ("freefire_codes", "100 + 10 💎"): _ff_re(1, r"100\s*\+\s*10"),
+    ("freefire_codes", "210 + 21 💎"): _ff_re(2, r"210\s*\+\s*21"),
+    ("freefire_codes", "530 + 53 💎"): _ff_re(5, r"530\s*\+\s*53"),
+    ("freefire_codes", "1080 + 108 💎"): _ff_re(10, r"1080\s*\+\s*108"),
+    ("freefire_codes", "2200 + 220 💎"): _ff_re(20, r"2200\s*\+\s*220"),
+}
+
+_fazer_match_orig = fazer_match
+
+def fazer_match(product_id, label, cats):
+    spec = FAZER_SPEC.get(product_id)
+    if not spec:
+        # بطاقات Apple القديمة: تبقى المطابقة داخل أقسام Apple فقط (حتى لا تختلط مع Google/Steam)
+        if cats and not FAZER_MANUAL_MAP.get((product_id, re.sub(r"\s+x\d+$", "", str(label)))):
+            cats = [c for c in cats if re.search(r"apple|itunes", f"{c['name']} {c['note']}", re.I)]
+        return _fazer_match_orig(product_id, label, cats)
+    base = re.sub(r"\s+x\d+$", "", str(label))
+    if FAZER_MANUAL_MAP.get((product_id, base)):
+        return _fazer_match_orig(product_id, label, cats)
+    if not cats:
+        return None, "no_catalog"
+    cat_re, ctry_re, excl_re = spec
+    num_re = FAZER_OFFER_RE.get((product_id, base))
+    if num_re is None:
+        num = base.split()[0]
+        num_re = re.compile(rf"(?<![\d.]){re.escape(num)}(?!\d|\.\d)")
+    found = []
+    for c in cats:
+        ctext = f"{c['name']} {c['note']}"
+        if not cat_re.search(ctext) or (excl_re and excl_re.search(ctext)):
+            continue
+        cat_ok = bool(ctry_re.search(ctext))
+        for o in c["offers"]:
+            name = _norm_name(o.get("name"))
+            if (cat_ok or ctry_re.search(name)) and num_re.search(name):
+                found.append((c, o))
+    uniq = {(c["category_id"], str(o.get("card_id"))): (c, o) for c, o in found}
+    if not uniq:
+        return None, "no_offer"
+    if len(uniq) > 1:
+        glob = {k: v for k, v in uniq.items() if re.search(r"global|\bww\b|worldwide", f"{v[0]['name']} {v[0]['note']} {v[1].get('name')}", re.I)}
+        if len(glob) == 1:
+            uniq = glob
+        else:
+            return None, "ambiguous"
+    c, o = next(iter(uniq.values()))
+    return _mapping(c, o), "auto"
+
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("grp_"))
 def handle_store_group(call):
