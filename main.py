@@ -22,17 +22,23 @@ MATCH_REMIND_MINUTES = 10   # التذكير قبل صافرة البداية (�
 PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
 REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
 REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
+# منتجاتك الخاصة المخفية دائماً (Prime Video: يُباع من المورّد فقط). لإرجاع منتج احذفه من هنا.
+OWN_ALWAYS_HIDDEN = {"amazon_prime_6m", "prime_video_ultra_6m", "chatgpt_plus_1m", "chatgpt_k12_edu"}
 VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
 VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
 VENTE_REFRESH_SECONDS = 300 # تحديث الكتالوج كل كم ثانية
 VENTE_LOW_BALANCE = 10      # تنبيه إذا نزل رصيدك عند المورّد عن هذا ($)
 # منتجات المورّد المخفية افتراضياً (regex على الاسم). يمكن إظهارها بـ /vente_show ID
-VENTE_DEFAULT_HIDE = [r"higgsfield.*pro.*year", r"mobbin", r"railway.*hobby", r"crunchyroll.*link"]
+# منتجات تتطلب من الزبون تفعيل كود على حسابه (مخفية بطلبك)
+VENTE_HIDE_ACTIVATE = [r"^jam\b", r"^gamma\b", r"posthog", r"^supercut", r"^airtable", r"^runway", r"quizlet"]
+VENTE_DEFAULT_HIDE = VENTE_HIDE_ACTIVATE + [r"higgsfield.*pro.*year", r"mobbin\s*pro\s*1\s*year", r"railway.*hobby", r"crunchyroll.*link"]
+# ربط Gemini الافتراضي: منتجك الخاص ← رقم منتج Gemini عند المورّد (يغيّره /vente_link)
+VENTE_DEFAULT_LINK = {"gemini_18m": 28}
 # منتجاتك التي يحلّ محلها منتج المورّد (إذا وُجد عنده منتج مطابق للاسم) — تتغيّر بـ /vente_replace
 VENTE_REPLACE_DEFAULT = {
-    "capcut_1m": r"capcut", "duolingo_12m": r"duolingo", "duolingo_link_12m": r"duolingo", "iptv_14m": r"iptv",
-    "prime_video_ultra_6m": r"\bprime\b", "amazon_prime_6m": r"\bprime\b", "nordvpn_3m": r"nord",
+    "capcut_1m": r"capcut", "duolingo_12m": r"duolingo", "duolingo_link_12m": r"duolingo", "nordvpn_3m": r"nord",
     "n8n_starter_12m": r"n8n", "office365_1y": r"office|microsoft", "elevenlabs_3m": r"eleven",
+    "chatgpt_plus_1m": r"chatgpt", "chatgpt_k12_edu": r"chatgpt",
 }
 REDOTPAY_ID = "1947886487"   # معرّف حسابك في RedotPay الذي يستقبل التحويلات اليدوية
 REDOTPAY_PCT = 3       # كاش باك المنتجات العادية عند الدفع عبر RedotPay فقط (بدل 5%)
@@ -1553,11 +1559,8 @@ def generate_store_keyboard(lang):
             if not g:
                 continue
             if gid == "claude_api" and not _own_claude_shown():
-                _its = _vt_claude_items()
-                _pr = [Decimal(x["price"].lstrip("$")) for x in _its]
-                lo, hi, stock = f"${min(_pr):.2f}", f"${max(_pr):.2f}", sum(x["stock"] for x in _its)
-            else:
-                lo, hi, stock = _group_range(gid)
+                continue          # Claude/Codex عند المورّد داخل قائمته
+            lo, hi, stock = _group_range(gid)
             price = lo if lo == hi else f"{lo} - {hi}"
             stock_txt = stock if stock == "♾️" else f"📦 {stock}"
             markup.add(InlineKeyboardButton(
@@ -1878,7 +1881,7 @@ def _vt_icon(name):
 
 VT_BRAND_ALIASES = [
     (r"\bprime\b", "prime"), (r"office|microsoft", "microsoft"), (r"nord", "nordvpn"),
-    (r"notion", "notion"), (r"n8n", "n8n"), (r"eleven", "elevenlabs"),
+    (r"notion", "notion"), (r"n8n", "n8n"), (r"eleven\s*labs", "elevenlabs"),
 ]
 VT_BRAND_TITLES = {"prime": "Prime Video", "microsoft": "Microsoft Office", "nordvpn": "NordVPN", "notion": "Notion",
                    "n8n": "n8n", "elevenlabs": "ElevenLabs", "gemini": "Gemini", "claude": "Claude API"}
@@ -2035,11 +2038,27 @@ def _vt_kick():
         threading.Thread(target=vt_refresh, kwargs={"force": True}, daemon=True).start()
 
 # ---------- إدارة الظهور ----------
+def _vt_link_map():
+    m = dict(VENTE_DEFAULT_LINK)
+    m.update(_vt_conf().get("link", {}))
+    return {k: int(v) for k, v in m.items() if str(v).isdigit() and int(v) > 0}
+
 def _vt_linked_vids():
-    return {int(v) for v in _vt_conf().get("link", {}).values() if str(v).isdigit()}
+    return set(_vt_link_map().values())
 
 def _vt_replacing(p):
-    return any(re.search(pat, p["name"], re.I) for pat in VENTE_REPLACE_DEFAULT.values())
+    """منتج مستبدِل لمنتجك وكل نظائره عند المورّد نفدت: يظهر كـ"نفد" (بدل رجوع منتجك). وإلا يُخفى النافد."""
+    pats = [pat for pat in VENTE_REPLACE_DEFAULT.values() if re.search(pat, p["name"], re.I)]
+    if not pats:
+        return False
+    for q in _VT_PRODS.values():
+        if q is p or not q.get("eligible") or q.get("api_test") or q["stock"] <= 0:
+            continue
+        if _vt_hidden({"id": q["vid"], "name": q["name"]}) or q["vid"] in _vt_linked_vids():
+            continue
+        if any(re.search(pat, q["name"], re.I) for pat in pats):
+            return False
+    return True
 
 def _vt_listed(p):
     """هل يظهر المنتج للزبائن في القائمة؟"""
@@ -2055,6 +2074,8 @@ def _vt_visible():
 
 def _own_hidden(pid):
     """منتجك الخاص يُخفى إذا حلّ محله منتج من API."""
+    if pid in OWN_ALWAYS_HIDDEN:
+        return True
     if not VENTE_KEY or not _VT_PRODS:
         return False
     conf = _vt_conf()
@@ -2095,63 +2116,133 @@ def _vt_qty(label):
     m = re.search(r"x(\d+)$", str(label))
     return int(m.group(1)) if m else 1
 
-# ---------- أزرار الصفحة الرئيسية ----------
-def _vt_gkey(brand):
-    return re.sub(r"[^a-z0-9]", "", str(brand).lower())[:20] or "x"
+# ---------- أزرار الصفحة الرئيسية: نفس ترتيب متجر المورّد ----------
+# كل صف: خلية واحدة (زر طويل) أو خليتان (زران جنب بعض). الخلية = (مفتاح, اسم المجموعة, regex على اسم المنتج).
+# إذا طابقت الخلية عدة منتجات صار زر مجموعة يفتح خياراتها. الخلية الفارغة (غير موجود/نافد/مستبعد) تُتخطّى،
+# والزوج الذي بقي منه منتج واحد يظهر زراً طويلاً. أي منتج جديد غير مذكور هنا يظهر في آخر القائمة.
+VT_LAYOUT = [
+    [("gem", "Gemini", r"google ai|gemini")],
+    [("chatgpt", "ChatGPT", r"chatgpt")],
+    [("cap12", "CapCut", r"capcut\s*pro\s*12m")],
+    [("cap1", "CapCut", r"capcut\s*pro\s*1m\b"), ("cap6", "CapCut", r"capcut\s*pro\s*6m")],
+    [("claude", "Claude API", r"claude"), ("codex", "Codex API", r"codex")],
+    [("linear", "Linear", r"linear"), ("mobbin10", "Mobbin", r"mobbin\s*10x")],
+    [("hma", "HMA", r"\bhma\b"), ("proton", "Proton VPN", r"proton")],
+    [("magic", "Magic Patterns", r"magic patterns"), ("scribd", "Scribd", r"scribd")],
+    [("msoft", "Microsoft Office", r"microsoft|office")],
+    [("prime", "Prime Video", r"\bprime\b")],
+    [("zoom", "Zoom", r"zoom"), ("miro", "Miro", r"\bmiro\b")],
+    [("quizlet", "Quizlet", r"quizlet"), ("wordwall", "Wordwall", r"wordwall")],
+    [("duo", "Duolingo", r"duolingo"), ("ilovepdf", "iLovePDF", r"ilovepdf")],
+    [("autodesk", "Autodesk", r"autodesk")],
+    [("figma", "Figma", r"figma")],
+    [("bolt", "bolt.new", r"bolt\.new")],
+    [("jetbrains", "JetBrains", r"jetbrains")],
+    [("descript", "Descript", r"descript")],
+    [("readwise", "Readwise", r"readwise"), ("fin", "Fin", r"^fin\b")],
+    [("speechify", "Speechify", r"speechify"), ("arize", "Arize", r"arize")],
+    [("jam", "Jam", r"^jam\b")],
+    [("framer", "Framer", r"framer")],
+    [("posthog", "Posthog", r"posthog"), ("supercut", "Supercut", r"supercut")],
+    [("replit", "Replit", r"replit")],
+    [("warp", "Warp", r"^warp")],
+    [("customerio", "customer.io", r"customer\.io"), ("granola", "Granola", r"granola")],
+    [("n8n", "n8n", r"n8n")],
+    [("airtable", "Airtable", r"airtable")],
+    [("runway", "Runway", r"runway")],
+    [("gamma", "Gamma", r"^gamma")],
+    [("mercury", "Mercury", r"mercury")],
+    [("stripe", "Stripe", r"stripe")],
+    [("resend", "Resend", r"resend")],
+    [("wakingup", "Waking Up", r"waking up")],
+    [("notion", "Notion", r"notion")],
+    [("elevenlabs", "ElevenLabs", r"eleven\s*labs")],
+    [("nord", "NordVPN", r"nord")],
+    [("railway", "Railway", r"railway")],
+    [("lovable", "Lovable", r"lovable")],
+    [("mobbinpro", "Mobbin", r"mobbin")],
+    [("applemusic", "Apple Music", r"apple music")],
+    [("surfshark", "Surfshark", r"surfshark")],
+    [("youtube", "YouTube Premium", r"youtube")],
+    [("elevenreader", "Eleven Reader", r"eleven reader")],
+    [("cursor", "Cursor", r"cursor")],
+    [("muse", "Muse AI", r"^muse")],
+]
 
-def _vt_norm(name):
-    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+VT_ALWAYS_GROUP = {"claude", "codex"}   # دائماً زر مجموعة حتى لو بقي خيار واحد
 
-def _vt_by_brand():
-    groups = {}
-    for p in _vt_visible():
-        groups.setdefault(p["brand"], []).append(p)
-    for g in groups.values():
-        g.sort(key=lambda x: x["cost"])
-    return groups
+def _vt_cells():
+    """يرجع (صفوف الخلايا حسب VT_LAYOUT, باقي المنتجات غير المذكورة)."""
+    vis = _vt_visible()
+    used = set()
+    rows = []
+    for row in VT_LAYOUT:
+        cells = []
+        for key, title, rx in row:
+            its = sorted([p for p in vis if p["vid"] not in used and re.search(rx, p["name"], re.I)], key=lambda x: x["cost"])
+            used.update(p["vid"] for p in its)
+            if its:
+                cells.append((key, title, its))
+        if cells:
+            rows.append(cells)
+    left = [p for p in vis if p["vid"] not in used]
+    return rows, left
 
-def _vt_claude_items():
-    """منتجات Claude/Codex عند المورّد التي تُضاف داخل مجموعة Claude API (بدون المكرر باسمك)."""
-    return list(_vt_by_brand().get("claude", []))
+def _vt_price_txt(its):
+    pr = [Decimal(p["price"].lstrip("$")) for p in its]
+    lo, hi = min(pr), max(pr)
+    return f"${lo}" if lo == hi else f"${lo} - ${hi}"
 
-def _own_claude_shown():
-    """منتجاتك القديمة (Claude API) تُحذف من القائمة ما دام عند المورّد منتجات Claude. يرجعها /vente_unreplace claude_api"""
-    if not VENTE_KEY or "claude_api" in _vt_conf().get("unreplace", []):
-        return True
-    return not _vt_claude_items()
-
-def _vt_brand_title(items):
-    return VT_BRAND_TITLES.get(items[0].get("brand")) or str(items[0]["name"]).split()[0]
+def _vt_cell_button(cell, lang, pair):
+    key, title, its = cell
+    if len(its) == 1 and key not in VT_ALWAYS_GROUP:
+        p = its[0]
+        if pair:
+            return InlineKeyboardButton(text=f"{p['icon']} {_vt_short(p['name'])}", callback_data=f"buy_{p['id']}")
+        return _slot_button(p, lang)
+    stock = sum(p["stock"] for p in its)
+    lo = min(Decimal(p["price"].lstrip("$")) for p in its)
+    text = f"{its[0]['icon']} {title} | ${lo}+" if pair else f"{its[0]['icon']} {title} | {_vt_price_txt(its)} | 📦 {stock}"
+    return InlineKeyboardButton(text=text, callback_data=f"vgrp_{key}")
 
 def _vt_add_buttons(markup, lang):
-    for brand, g in _vt_by_brand().items():
-        if brand == "claude":
-            continue          # داخل مجموعة Claude API
-        if len(g) == 1:
-            markup.add(_slot_button(g[0], lang))
-            continue
-        lo = min(Decimal(x["price"].lstrip("$")) for x in g)
-        hi = max(Decimal(x["price"].lstrip("$")) for x in g)
-        price = f"${lo}" if lo == hi else f"${lo} - ${hi}"
-        stock = sum(x["stock"] for x in g)
-        markup.add(InlineKeyboardButton(
-            text=f"{g[0]['icon']} {_vt_brand_title(g)} | {price} | 📦 {stock}",
-            callback_data=f"vgrp_{_vt_gkey(brand)}"))
+    rows, left = _vt_cells()
+    for cells in rows:
+        if len(cells) == 2:
+            markup.row(_vt_cell_button(cells[0], lang, True), _vt_cell_button(cells[1], lang, True))
+        else:
+            markup.add(_vt_cell_button(cells[0], lang, False))
+    for p in left:
+        markup.add(_slot_button(p, lang))
+
+def _vt_find_cell(key):
+    for cells in _vt_cells()[0]:
+        for c in cells:
+            if c[0] == key:
+                return c
+    return None
+
+def _own_claude_shown():
+    """منتجاتك القديمة (Claude API) تُحذف ما دام عند المورّد منتجات Claude. يرجعها /vente_unreplace claude_api"""
+    if not VENTE_KEY or "claude_api" in _vt_conf().get("unreplace", []):
+        return True
+    return not any(re.search(r"claude", p["name"], re.I) for p in _vt_visible())
 
 def _vt_back_cb(p):
-    if p.get("brand") == "claude":
-        return "grp_claude_api"
-    g = _vt_by_brand().get(p.get("brand"), [])
-    return f"vgrp_{_vt_gkey(p['brand'])}" if len(g) > 1 else "back_to_main"
+    for cells in _vt_cells()[0]:
+        for key, title, its in cells:
+            if (len(its) > 1 or key in VT_ALWAYS_GROUP) and any(x["vid"] == p["vid"] for x in its):
+                return f"vgrp_{key}"
+    return "back_to_main"
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("vgrp_"))
 def handle_vente_group(call):
-    key = call.data[5:]
     lang = get_lang(call.from_user.id)
-    items = next((g for b, g in _vt_by_brand().items() if _vt_gkey(b) == key and b != "claude"), None)
-    if not items:
+    cell = _vt_find_cell(call.data[5:])
+    if not cell or len(cell[2]) < 1:
         bot.answer_callback_query(call.id)
         return
+    key, title, items = cell
     lo = min(Decimal(x["price"].lstrip("$")) for x in items)
     hi = max(Decimal(x["price"].lstrip("$")) for x in items)
     mk = InlineKeyboardMarkup(row_width=1)
@@ -2163,37 +2254,7 @@ def handle_vente_group(call):
     except Exception:
         pass
     bot.send_message(call.message.chat.id,
-        GROUP_TEXTS.get(lang, GROUP_TEXTS["ar"]).format(name=html.escape(_vt_brand_title(items)), lo=f"${lo}", hi=f"${hi}"),
-        parse_mode="HTML", reply_markup=mk)
-    bot.answer_callback_query(call.id)
-
-@bot.callback_query_handler(func=lambda c: c.data == "grp_claude_api")
-def handle_claude_group_vente(call):
-    """مجموعة Claude API: منتجاتك + منتجات المورّد (يسبق المعالج الأصلي لأنه مسجّل قبله)."""
-    g = STORE_GROUPS["claude_api"]
-    lang = get_lang(call.from_user.id)
-    sync_stock()
-    mk = InlineKeyboardMarkup(row_width=1)
-    prices = []
-    for pid in (g["members"] if _own_claude_shown() else []):
-        item = _find_product_orig(pid)
-        if item:
-            mk.add(_slot_button(item, lang))
-            try:
-                prices.append(Decimal(item["price"].lstrip("$")))
-            except Exception:
-                pass
-    for p in _vt_claude_items():
-        mk.add(_slot_button(p, lang))
-        prices.append(Decimal(p["price"].lstrip("$")))
-    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
-    lo, hi = (min(prices), max(prices)) if prices else (Decimal(0), Decimal(0))
-    try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-    except Exception:
-        pass
-    bot.send_message(call.message.chat.id,
-        GROUP_TEXTS.get(lang, GROUP_TEXTS["ar"]).format(name=html.escape(g["name"]), lo=f"${lo:.2f}", hi=f"${hi:.2f}"),
+        GROUP_TEXTS.get(lang, GROUP_TEXTS["ar"]).format(name=html.escape(title), lo=f"${lo}", hi=f"${hi}"),
         parse_mode="HTML", reply_markup=mk)
     bot.answer_callback_query(call.id)
 
@@ -2404,8 +2465,7 @@ _sync_stock_orig = sync_stock
 def _gem_vid():
     if not VENTE_KEY:
         return None
-    v = _vt_conf().get("link", {}).get(GEMINI_ID)
-    return int(v) if v and str(v).isdigit() else None
+    return _vt_link_map().get(GEMINI_ID)
 
 def _gem_vprod():
     vid = _gem_vid()
@@ -2472,7 +2532,7 @@ def vente_catalog_command(message):
     parts = (message.text or "").split(maxsplit=1)
     q = parts[1].strip().lower() if len(parts) == 2 else ""
     conf = _vt_conf()
-    linked = {int(v): k for k, v in conf.get("link", {}).items() if str(v).isdigit()}
+    linked = {v: k for k, v in _vt_link_map().items()}
     lines = [f"📦 كتالوج المورّد: {len(_VT_PRODS)} منتج | ربح {VENTE_MARGIN_PCT}%",
              "✅ معروض | 🙈 مخفي | ⛔ غير تلقائي (يحتاج بيانات/مورّد) | 🔗 مربوط | ❌ مخزون 0", ""]
     for p in sorted(_VT_PRODS.values(), key=lambda x: (x["brand"], x["cost"])):
@@ -2535,7 +2595,7 @@ def vente_link_command(message):
         if len(parts) < 2:
             bot.reply_to(message, "الاستعمال: /vente_unlink gemini_18m")
             return
-        link.pop(parts[1], None)
+        link[parts[1]] = 0     # 0 = ملغى (يتجاوز الربط الافتراضي)
         conf["link"] = link
         _vt_conf_save(conf)
         bot.reply_to(message, "🔓 تم فك الربط.")
