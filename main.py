@@ -22,6 +22,7 @@ MATCH_REMIND_MINUTES = 10   # التذكير قبل صافرة البداية (�
 PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
 REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
 REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
+REDOTPAY_ID = "1947886487"   # معرّف حسابك في RedotPay الذي يستقبل التحويلات اليدوية
 REDOTPAY_PCT = 3       # كاش باك المنتجات العادية عند الدفع عبر RedotPay فقط (بدل 5%)
 REDOTPAY_GIFT_PCT = 1  # كاش باك بطاقات الهدايا عند الدفع عبر RedotPay فقط (بدل 2%)
 MATCH_BONUS_PCT = 50   # مكافأة تلقائية للفائز في التوقعات: نسبة من مبلغ مشاركته
@@ -1637,6 +1638,26 @@ PM_TEXTS["fr"].update({
     "rdp_paid_topup": "✅ Votre paiement RedotPay a été reçu.",
 })
 
+PM_NAME["rd"] = {"ar": "RedotPay (يدوي)", "en": "RedotPay", "fr": "RedotPay"}
+PM_ICON["rd"] = "💳"
+PM_DEFAULT_RATE["rd"] = Decimal("1")   # بالدولار مباشرة
+RDP_MANUAL_ID = REDOTPAY_ID
+PM_TEXTS["ar"].update({
+    "copy_rd": "📋 نسخ المعرّف",
+    "pay_rd": "💳 <b>الدفع عبر RedotPay</b>\n\n📦 {what}\n💵 المبلغ: <b>{usd}$</b>\n\n1️⃣ افتح تطبيق RedotPay وحوّل <b>{usd}$</b> إلى المعرّف التالي:\n<code>{dest}</code>\n⚠️ تأكد أن المبلغ الواصل هو <b>{usd}$</b> بالضبط.\n\n2️⃣ بعد التحويل ابعث هنا <b>لقطة شاشة</b> للتحويل.\n\n{after}",
+})
+PM_TEXTS["en"].update({
+    "copy_rd": "📋 Copy ID",
+    "pay_rd": "💳 <b>Pay with RedotPay</b>\n\n📦 {what}\n💵 Amount: <b>{usd}$</b>\n\n1️⃣ Open the RedotPay app and send <b>{usd}$</b> to this ID:\n<code>{dest}</code>\n⚠️ Make sure the received amount is exactly <b>{usd}$</b>.\n\n2️⃣ After the transfer, send a <b>screenshot</b> of it here.\n\n{after}",
+})
+PM_TEXTS["fr"].update({
+    "copy_rd": "📋 Copier l'ID",
+    "pay_rd": "💳 <b>Paiement via RedotPay</b>\n\n📦 {what}\n💵 Montant : <b>{usd}$</b>\n\n1️⃣ Ouvrez l'application RedotPay et envoyez <b>{usd}$</b> à cet ID :\n<code>{dest}</code>\n⚠️ Assurez-vous que le montant reçu est exactement <b>{usd}$</b>.\n\n2️⃣ Après le transfert, envoyez ici une <b>capture d'écran</b>.\n\n{after}",
+})
+
+def _pp_amt(req):
+    return f"${req['usd']}" if req.get("m") == "rd" else f"${req['usd']} = {req['da']} DA"
+
 def rdp_ready():
     return bool(RDP_APP_KEY and RDP_PRIV_RAW)
 
@@ -1967,7 +1988,7 @@ def pm_da(usd, m):
     return int((Decimal(str(usd)) * pm_rate(m)).to_integral_value(rounding=ROUND_CEILING))
 
 # ---------- قوائم "أعلمني عند التوفر" ----------
-_mem_pmw = {"bd": set(), "fx": set(), "rp": set(), "bb": set()}
+_mem_pmw = {"bd": set(), "fx": set(), "rd": set(), "rp": set(), "bb": set()}
 
 def pmw_add(m, uid):
     if db:
@@ -2113,7 +2134,7 @@ def build_invoice_markup(lang, invoice_id, wallet=False):
     _pm_method_rows(lang, mk, {
         "bn": f"pm_bn_{invoice_id}", "bd": f"pm_bd_{invoice_id}",
         "fx": f"pm_fx_{invoice_id}",
-        "rp": (f"pm_rp_{invoice_id}" if rdp_visible(inv["user_id"]) else f"pm_soon_rp_{invoice_id}"),
+        "rp": (f"pm_rp_{invoice_id}" if rdp_visible(inv["user_id"]) else f"pm_rd_{invoice_id}"),
         "bb": f"pm_soon_bb_{invoice_id}",
     })
     mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data=f"cancel_{invoice_id}"))
@@ -2121,7 +2142,7 @@ def build_invoice_markup(lang, invoice_id, wallet=False):
 
 def topup_method_picker(call, lang):
     mk = InlineKeyboardMarkup(row_width=1)
-    _pm_method_rows(lang, mk, {"bn": "pm_tbn", "bd": "pm_tbd", "fx": "pm_tfx", "rp": ("pm_trp" if rdp_visible(call.from_user.id) else "pm_tsoon_rp"), "bb": "pm_tsoon_bb"})
+    _pm_method_rows(lang, mk, {"bn": "pm_tbn", "bd": "pm_tbd", "fx": "pm_tfx", "rp": ("pm_trp" if rdp_visible(call.from_user.id) else "pm_trd"), "bb": "pm_tsoon_bb"})
     mk.add(InlineKeyboardButton(text=t(lang, "cancel"), callback_data="pf_wallet"))
     _pf_show(call, pmt(lang, "pick_topup"), mk)
 
@@ -2150,7 +2171,7 @@ def _pm_soon_screen(call, lang, back_cb, m=None):
 
 def _pm_pay_text(lang, req):
     m = req["m"]
-    dest = BARIDI_RIP if m == "bd" else FLEXY_NUMBER
+    dest = BARIDI_RIP if m == "bd" else (RDP_MANUAL_ID if m == "rd" else FLEXY_NUMBER)
     after = pmt(lang, "after_buy" if req["kind"] == "buy" else "after_topup")
     return pmt(lang, "pay_" + m).format(
         what=html.escape(req["what"]), usd=req["usd"], rate=_fmt_rate(req["rate"]),
@@ -2224,7 +2245,7 @@ def handle_pm(call):
     arg = parts[2] if len(parts) > 2 else ""
 
     if cmd == "cp":
-        bot.answer_callback_query(call.id, BARIDI_RIP if arg == "bd" else FLEXY_NUMBER, show_alert=True)
+        bot.answer_callback_query(call.id, BARIDI_RIP if arg == "bd" else (RDP_MANUAL_ID if arg == "rd" else FLEXY_NUMBER), show_alert=True)
         return
 
     if cmd == "nt":
@@ -2320,7 +2341,7 @@ def handle_pm(call):
             bot.answer_callback_query(call.id)
         return
 
-    if cmd in ("bd", "fx"):
+    if cmd in ("bd", "fx", "rd"):
         inv = _pm_inv(call, arg, lang)
         if not inv:
             return
@@ -2353,7 +2374,7 @@ def handle_pm(call):
         bot.answer_callback_query(call.id)
         return
 
-    if cmd in ("tbd", "tfx"):
+    if cmd in ("tbd", "tfx", "trd"):
         m = cmd[1:]
         if not pm_enabled(m):
             _pm_full_screen(call, lang, m, "pf_top")
@@ -2361,12 +2382,12 @@ def handle_pm(call):
             return
         mk = InlineKeyboardMarkup(row_width=2)
         mk.row(*[
-            InlineKeyboardButton(text=f"{a}$ = {pm_da(a, m)} DA", callback_data=f"pm_ta_{m}_{a}")
+            InlineKeyboardButton(text=(f"{a}$" if m == "rd" else f"{a}$ = {pm_da(a, m)} DA"), callback_data=f"pm_ta_{m}_{a}")
             for a in TOPUP_AMOUNTS
         ])
         mk.add(InlineKeyboardButton(text=wt(lang, "btn_topup_other"), callback_data=f"pm_to_{m}"))
         mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="pf_top"))
-        _pf_show(call, pmt(lang, "topup_amounts").format(method=PM_NAME[m][lang], rate=_fmt_rate(pm_rate(m))), mk)
+        _pf_show(call, pmt(lang, "rdp_amounts" if m == "rd" else "topup_amounts").format(method=PM_NAME[m][lang], rate=_fmt_rate(pm_rate(m))), mk)
         bot.answer_callback_query(call.id)
         return
 
@@ -2453,7 +2474,7 @@ def _pp_notify(req):
     kind = "شراء" if req["kind"] == "buy" else "شحن محفظة"
     txt = (
         f"💳 <b>دفعة {mname} معلقة</b> ({kind})\n\n👤 {_user_link(req['uid'])}\n"
-        f"📦 {html.escape(req['what'])}\n💵 ${req['usd']} = {req['da']} DA\n🆔 #{req['id']}\n\n"
+        f"📦 {html.escape(req['what'])}\n💵 {_pp_amt(req)}\n🆔 #{req['id']}\n\n"
         f"ادخل /admin ← 💳 الدفعات المعلقة للتأكد."
     )
     alert_admin(txt)
@@ -2492,7 +2513,7 @@ def _pp_submit(message, photo):
         req["file_id"] = message.photo[-1].file_id
     else:
         txt = (message.text or "").strip()
-        if req["m"] == "bd":
+        if req["m"] in ("bd", "rd"):
             bot.send_message(message.chat.id, pmt(lang, "proof_hint_bd"), parse_mode="HTML")
             return True
         parsed = _parse_flexy(txt)
@@ -2625,7 +2646,7 @@ def _pp_detail_text(req):
     s = (
         f"{PM_ICON[req['m']]} <b>دفعة {PM_NAME[req['m']]['ar']}</b> — {kind}\n\n"
         f"🆔 #{req['id']}\n👤 {_user_link(req['uid'])} (<code>{req['uid']}</code>)\n"
-        f"📦 {html.escape(req['what'])}\n💵 ${req['usd']} = <b>{req['da']} DA</b> (1$ = {_fmt_rate(req['rate'])})\n"
+        f"📦 {html.escape(req['what'])}\n💵 " + (f"<b>${req['usd']}</b>" if req["m"] == "rd" else f"${req['usd']} = <b>{req['da']} DA</b> (1$ = {_fmt_rate(req['rate'])})") + "\n"
         f"🕒 {_fmt_date(req.get('sub_ts', 0))}"
     )
     if req.get("claimed_da"):
@@ -2783,17 +2804,18 @@ def show_desc_langs(chat_id, msg_id, pid):
 def show_pm_settings(chat_id, msg_id=None):
     lines = ["⚙️ <b>طرق الدفع</b>\n"]
     mk = InlineKeyboardMarkup(row_width=2)
-    for m in ("bd", "fx"):
+    for m in ("bd", "fx", "rd"):
         on = pm_enabled(m)
         lines.append(
             f"{PM_ICON[m]} <b>{PM_NAME[m]['ar']}</b>: {'✅ مفعّلة' if on else '⛔ موقوفة'} | "
-            f"1$ = {_fmt_rate(pm_rate(m))} DA | ⏳ {len(pmw_list(m))} ينتظرون"
+            + ("بالدولار مباشرة" if m == "rd" else f"1$ = {_fmt_rate(pm_rate(m))} DA") + f" | ⏳ {len(pmw_list(m))} ينتظرون"
         )
         mk.row(
             InlineKeyboardButton(text=f"✅ تفعيل {PM_NAME[m]['ar']}", callback_data=f"ap_on_{m}"),
             InlineKeyboardButton(text=f"⛔ إيقاف {PM_NAME[m]['ar']}", callback_data=f"ap_off_{m}"),
         )
-        mk.add(InlineKeyboardButton(text=f"💱 سعر صرف {PM_NAME[m]['ar']}", callback_data=f"ap_rt_{m}"))
+        if m != "rd":
+            mk.add(InlineKeyboardButton(text=f"💱 سعر صرف {PM_NAME[m]['ar']}", callback_data=f"ap_rt_{m}"))
     for m in ("rp", "bb"):
         n = len(pmw_list(m))
         if m == "rp" and rdp_ready():
@@ -2850,14 +2872,14 @@ def handle_ap(call):
             return
         _ap_set(aid, op="credit", rid=arg)
         mk = InlineKeyboardMarkup(row_width=1)
-        mk.add(InlineKeyboardButton(text=f"✅ مبلغ الطلب كاملاً: {req['da']} DA = {req['usd']}$",
+        mk.add(InlineKeyboardButton(text=(f"✅ مبلغ الطلب كاملاً: {req['usd']}$" if req["m"] == "rd" else f"✅ مبلغ الطلب كاملاً: {req['da']} DA = {req['usd']}$"),
                                     callback_data=f"ap_amt_{arg}_{req['usd']}"))
         mk.add(InlineKeyboardButton(text="❌ إلغاء", callback_data="ap_l"))
         bot.send_message(
             chat_id,
             f"💵 أرسل المبلغ الذي وصلك لشحن محفظة الزبون <code>{req['uid']}</code>:\n"
-            f"• بالدينار: <code>500</code>\n• أو بالدولار: <code>5$</code>\n\n"
-            f"💱 سعر الصرف المعتمد: 1$ = {_fmt_rate(req['rate'])} DA",
+            (f"• أرسل المبلغ بالدولار: <code>5</code>" if req["m"] == "rd" else f"• بالدينار: <code>500</code>\n• أو بالدولار: <code>5$</code>\n\n"
+            f"💱 سعر الصرف المعتمد: 1$ = {_fmt_rate(req['rate'])} DA"),
             parse_mode="HTML", reply_markup=mk,
         )
     elif cmd == "amt":
