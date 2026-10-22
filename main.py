@@ -1457,7 +1457,7 @@ STORE_SLOTS = [
     "vente:all",
     ("canva_edu_500", "canva_edu_5000"),
     "freefire_diamonds",
-    "sep:sep_gift_cards", "next:gifts",
+    "next:gifts",
 ]
 
 # صفحة بطاقات الهدايا (الصفحة الثانية): فواصل طويلة + بطاقات
@@ -1469,6 +1469,35 @@ GIFT_SLOTS = [
 ]
 GIFT_NEXT_TEXT = {"ar": "🎁 بطاقات الهدايا — التالي ◀️", "en": "Next ▶️ 🎁 Gift Cards", "fr": "Suivant ▶️ 🎁 Cartes cadeaux"}
 GIFT_BACK_TEXT = {"ar": "🔙 العودة", "en": "🔙 Back", "fr": "🔙 Retour"}
+
+# شريط التنقل بين الصفحتين: [اشتراكات متنوعة] (يسار) | [بطاقات الهدايا] (يمين). الصفحة الحالية رمادية لا تفتح.
+NAV_HEAD = {
+    "subs": {"ar": "⬇️ اشتراكات متنوعة ⬇️", "en": "⬇️ Various Subscriptions ⬇️", "fr": "⬇️ Abonnements divers ⬇️"},
+    "gifts": {"ar": "⬇️ بطاقات الهدايا ⬇️", "en": "⬇️ Gift Cards ⬇️", "fr": "⬇️ Cartes cadeaux ⬇️"},
+}
+NAV_BTN = {
+    "subs": {"ar": "اشتراكات متنوعة", "en": "Subscriptions", "fr": "Abonnements"},
+    "gifts": {"ar": "بطاقات الهدايا", "en": "Gift Cards", "fr": "Cartes cadeaux"},
+}
+
+def _nav_rows(mk, lang, current):
+    """current = الصفحة التي نحن فيها الآن ('subs' أو 'gifts')."""
+    other = "gifts" if current == "subs" else "subs"
+    mk.add(InlineKeyboardButton(text=NAV_HEAD[other].get(lang, NAV_HEAD[other]["ar"]), callback_data="noop"))
+    subs_t = NAV_BTN["subs"].get(lang, NAV_BTN["subs"]["ar"])
+    gifts_t = NAV_BTN["gifts"].get(lang, NAV_BTN["gifts"]["ar"])
+    if current == "subs":
+        left = InlineKeyboardButton(text=f"📍 {subs_t}", callback_data="noop")
+        right = InlineKeyboardButton(text=f"🎁 {gifts_t} ◀️", callback_data="gcp")
+    else:
+        left = InlineKeyboardButton(text=f"▶️ 🛍️ {subs_t}", callback_data="back_to_main")
+        right = InlineKeyboardButton(text=f"📍 {gifts_t}", callback_data="noop")
+    try:
+        if not _vt_conf().get("nostyle"):
+            (right if current == "subs" else left).style = "success"   # الزر الذي يمكن الضغط عليه أخضر
+    except Exception:
+        pass
+    mk.row(left, right)
 GIFT_PAGE_TEXT = {
     "ar": "🎁 <b>بطاقات الهدايا</b>\n\n👇 اختر البطاقة التي تريدها:",
     "en": "🎁 <b>Gift Cards</b>\n\n👇 Choose the card you want:",
@@ -1651,7 +1680,7 @@ def generate_store_keyboard(lang):
             except Exception as e:
                 print(f"vente buttons failed: {e}")
         elif slot == "next:gifts":
-            markup.add(InlineKeyboardButton(text=GIFT_NEXT_TEXT.get(lang, GIFT_NEXT_TEXT["ar"]), callback_data="gcp"))
+            _nav_rows(markup, lang, "subs")
         elif slot.startswith("grp:"):
             gid = slot[4:]
             g = STORE_GROUPS.get(gid)
@@ -1716,9 +1745,14 @@ def generate_gift_keyboard(lang):
         else:
             item = find_product(slot)
             if item:
-                mk.add(_slot_button(item, lang))
-    mk.add(InlineKeyboardButton(text=GIFT_BACK_TEXT.get(lang, GIFT_BACK_TEXT["ar"]), callback_data="back_to_main"))
-    return mk
+                if _own_oos(item):
+                    _b = _slot_button(item, lang)
+                    _b.callback_data = f"oos_{item['id']}"
+                    mk.add(_b)
+                else:
+                    mk.add(_slot_button(item, lang))
+    _nav_rows(mk, lang, "gifts")
+    return _style_store(mk)
 
 @bot.callback_query_handler(func=lambda c: c.data == "gcp")
 def handle_gift_page(call):
