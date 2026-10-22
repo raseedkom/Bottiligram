@@ -22,6 +22,14 @@ MATCH_REMIND_MINUTES = 10   # التذكير قبل صافرة البداية (�
 PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
 REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
 REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
+VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
+VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
+VENTE_REFRESH_SECONDS = 300 # تحديث الكتالوج كل كم ثانية
+VENTE_LOW_BALANCE = 10      # تنبيه إذا نزل رصيدك عند المورّد عن هذا ($)
+# منتجات المورّد المخفية افتراضياً (regex على الاسم). يمكن إظهارها بـ /vente_show ID
+VENTE_DEFAULT_HIDE = [r"higgsfield.*pro.*year", r"mobbin", r"railway.*hobby", r"crunchyroll.*link"]
+# منتجاتك التي يحلّ محلها منتج المورّد (إذا وُجد عنده منتج مطابق للاسم) — تتغيّر بـ /vente_replace
+VENTE_REPLACE_DEFAULT = {"capcut_1m": r"capcut", "duolingo_12m": r"duolingo", "duolingo_link_12m": r"duolingo", "iptv_14m": r"iptv"}
 REDOTPAY_ID = "1947886487"   # معرّف حسابك في RedotPay الذي يستقبل التحويلات اليدوية
 REDOTPAY_PCT = 3       # كاش باك المنتجات العادية عند الدفع عبر RedotPay فقط (بدل 5%)
 REDOTPAY_GIFT_PCT = 1  # كاش باك بطاقات الهدايا عند الدفع عبر RedotPay فقط (بدل 2%)
@@ -1436,7 +1444,9 @@ STORE_SLOTS = [
     "iptv_14m",
     "nordvpn_3m", "n8n_starter_12m",
     "grp:snapchat",
-    "canva_edu_500", "canva_edu_5000", "freefire_diamonds",
+    "vente:all",
+    ("canva_edu_500", "canva_edu_5000"),
+    "freefire_diamonds",
     "sep:sep_gift_cards", "next:gifts",
 ]
 
@@ -1520,12 +1530,17 @@ def generate_store_keyboard(lang):
     for slot in STORE_SLOTS:
         if isinstance(slot, tuple):
             items = [find_product(pid) for pid in slot]
-            items = [i for i in items if i]
+            items = [i for i in items if i and not _own_hidden(i["id"])]
             shown.update(i["id"] for i in items)
             if len(items) == 2:
                 markup.row(_pair_button(items[0], lang), _pair_button(items[1], lang))
             elif items:
                 markup.add(_slot_button(items[0], lang))
+        elif slot == "vente:all":
+            try:
+                _vt_add_buttons(markup, lang)
+            except Exception as e:
+                print(f"vente buttons failed: {e}")
         elif slot == "next:gifts":
             markup.add(InlineKeyboardButton(text=GIFT_NEXT_TEXT.get(lang, GIFT_NEXT_TEXT["ar"]), callback_data="gcp"))
         elif slot.startswith("grp:"):
@@ -1547,13 +1562,13 @@ def generate_store_keyboard(lang):
                 markup.add(InlineKeyboardButton(text=tr(item, "text", lang), callback_data="noop"))
         else:
             item = find_product(slot)
-            if item:
+            if item and not _own_hidden(item["id"]):
                 shown.add(item["id"])
                 markup.add(_slot_button(item, lang))
 
     # أي منتج يضيفه الأدمن لاحقاً ولم يوضع في الترتيب يظهر في الآخر
     for item in products:
-        if item.get("type") == "separator" or item["id"] in shown or item["id"] in group_members or item["id"] in GIFT_VARIANTS:
+        if item.get("type") == "separator" or item["id"] in shown or item["id"] in group_members or item["id"] in GIFT_VARIANTS or _own_hidden(item["id"]):
             continue
         markup.add(_slot_button(item, lang))
 
@@ -1722,6 +1737,762 @@ def fazer_match(product_id, label, cats):
             return None, "ambiguous"
     c, o = next(iter(uniq.values()))
     return _mapping(c, o), "auto"
+
+
+# ============================================================
+# ========== ربط API المورّد (VenteBot Reseller): تسليم تلقائي ==========
+# ============================================================
+VENTE_BASE = os.environ.get("VENTE_BASE_URL", "https://web-production-1c7b1.up.railway.app").rstrip("/")
+VENTE_KEY = os.environ.get("VENTE_API_KEY", "").strip()
+VENTE_CONF_KEY = "rk:vt:conf"
+
+_VT = {"raw": {}, "etag": {}, "ts": 0.0, "err": None, "tried": 0.0, "lock": threading.Lock()}
+_VT_PRODS = {}          # pid ("vt123") -> منتج جاهز للعرض
+_VT_CONF = {"ts": 0.0, "data": {}}
+
+VT_TEXTS = {
+    "ar": {
+        "delivered": "✅ تم تأكيد الدفع!\n\n📦 {product}\n—————————————\n{data}\n—————————————\n🛡️ الضمان: {warranty}\n📌 احتفظ بهذه المعلومات في مكان آمن\n\n🙏 شكراً لشرائك!",
+        "warranty_days": "{n} يوم", "no_warranty": "بدون ضمان",
+        "warranty_line": "🛡️ الضمان: {w}",
+    },
+    "en": {
+        "delivered": "✅ Payment confirmed!\n\n📦 {product}\n—————————————\n{data}\n—————————————\n🛡️ Warranty: {warranty}\n📌 Keep this information in a safe place\n\n🙏 Thank you for your purchase!",
+        "warranty_days": "{n} days", "no_warranty": "No warranty",
+        "warranty_line": "🛡️ Warranty: {w}",
+    },
+    "fr": {
+        "delivered": "✅ Paiement confirmé !\n\n📦 {product}\n—————————————\n{data}\n—————————————\n🛡️ Garantie : {warranty}\n📌 Conservez ces informations en lieu sûr\n\n🙏 Merci pour votre achat !",
+        "warranty_days": "{n} jours", "no_warranty": "Sans garantie",
+        "warranty_line": "🛡️ Garantie : {w}",
+    },
+}
+
+def _vt_warranty(p, lang):
+    tx = VT_TEXTS.get(lang, VT_TEXTS["ar"])
+    d = int(p.get("warranty") or 0)
+    return tx["warranty_days"].format(n=d) if d > 0 else tx["no_warranty"]
+
+from decimal import ROUND_HALF_UP
+
+# ---------- إعدادات الأدمن (إخفاء/ربط/استبدال) ----------
+def _vt_conf():
+    if time.time() - _VT_CONF["ts"] < 30:
+        return _VT_CONF["data"]
+    try:
+        data = kv_get_json(VENTE_CONF_KEY) or {}
+    except Exception:
+        data = _VT_CONF["data"] or {}
+    for k in ("hide", "show", "replace", "unreplace"):
+        data.setdefault(k, [])
+    data.setdefault("link", {})
+    _VT_CONF["data"] = data
+    _VT_CONF["ts"] = time.time()
+    return data
+
+def _vt_conf_save(data):
+    kv_set(VENTE_CONF_KEY, json.dumps(data))
+    _VT_CONF["data"] = data
+    _VT_CONF["ts"] = time.time()
+
+# ---------- الاتصال بالـAPI ----------
+class VenteError(Exception):
+    pass
+
+def _vt_headers(extra=None):
+    h = {"X-Reseller-Key": VENTE_KEY, "Accept": "application/json"}
+    if extra:
+        h.update(extra)
+    return h
+
+def vt_get(path, params=None, headers=None, timeout=20):
+    return requests.get(VENTE_BASE + path, headers=_vt_headers(headers), params=params, timeout=timeout)
+
+def vt_order(vid, qty, idem, ref):
+    body = {"product_id": int(vid), "quantity": int(qty), "customer_reference": str(ref)[:120], "idempotency_key": str(idem)[:120]}
+    try:
+        r = requests.post(VENTE_BASE + "/api/reseller/orders",
+                          headers=_vt_headers({"Content-Type": "application/json"}), json=body, timeout=45)
+    except Exception as e:
+        raise VenteError(f"network: {e}")
+    try:
+        data = r.json()
+    except Exception:
+        data = {"raw": (r.text or "")[:300]}
+    return r.status_code, data, r
+
+def vt_me():
+    r = vt_get("/api/reseller/me", timeout=15)
+    return r.status_code, (r.json() if r.content else {})
+
+# ---------- تنظيف الأوصاف ----------
+_VT_BAD_LINE = re.compile(r"قناة المبيعات|sales channel|canal de ventes|بشكل مجهول|anonymous", re.I)
+
+def _vt_clean(text):
+    s = str(text or "")
+    for _ in range(2):
+        s = html.unescape(s)
+    s = re.sub(r"<[^>]*>", "", s)
+    s = re.sub(r"Step number background\s*(\d+)", r"\1)", s)
+    lines = [ln.rstrip() for ln in s.split("\n")]
+    lines = [ln for ln in lines if not _VT_BAD_LINE.search(ln)]
+    s = "\n".join(lines)
+    s = re.sub(r"[*_`\[\]]", " ", s)
+    s = re.sub(r"[ \t]{2,}", " ", s)
+    s = re.sub(r"\n{3,}", "\n\n", s).strip()
+    return s
+
+def _vt_trunc(s, n=700):
+    if len(s) <= n:
+        return s
+    cut = s[:n]
+    k = max(cut.rfind("\n"), cut.rfind(" "))
+    if k > n * 0.6:
+        cut = cut[:k]
+    return cut.rstrip() + "…"
+
+_VT_ICONS = [
+    ("chatgpt", "🤖"), ("gpt", "🤖"), ("claude", "🧠"), ("codex", "🧠"), ("gemini", "✨"), ("google", "✨"),
+    ("capcut", "🎬"), ("canva", "🎨"), ("netflix", "🎞️"), ("prime", "📺"), ("duolingo", "🦉"), ("vpn", "🛡️"),
+    ("proton", "🛡️"), ("hma", "🛡️"), ("office", "📎"), ("microsoft", "📎"), ("zoom", "🎥"), ("miro", "🧩"),
+    ("quizlet", "📚"), ("scribd", "📚"), ("wordwall", "📚"), ("linear", "📐"), ("autodesk", "📐"),
+    ("gamma", "🖼️"), ("ilovepdf", "📄"), ("spotify", "🎵"), ("youtube", "▶️"), ("grok", "⚡"),
+    ("iptv", "📡"), ("magic", "🪄"), ("mobbin", "📱"),
+]
+
+def _vt_icon(name):
+    n = str(name).lower()
+    for k, ic in _VT_ICONS:
+        if k in n:
+            return ic
+    return "🛍️"
+
+def _vt_brand(name):
+    n = re.sub(r"[^a-z0-9 ]", " ", str(name).lower())
+    if "gemini" in n or "google ai" in n:
+        return "gemini"
+    tok = n.split()
+    return tok[0] if tok else str(name).lower()
+
+_VT_KEEP_WORDS = {"month", "months", "mon", "year", "years", "day", "days", "pro", "plus", "max", "ultra",
+                  "business", "team", "edu", "premium", "basic", "standard", "lite", "starter"}
+_VT_UNIT_WORDS = {"month", "months", "mon", "year", "years", "day", "days", "m", "y", "d"}
+
+def _vt_short(name):
+    tok = str(name).split()
+    if not tok:
+        return str(name)[:22]
+    keep = [tok[0]]
+    i = 1
+    while i < len(tok):
+        w = tok[i]
+        wl = w.lower().strip("()")
+        if re.fullmatch(r"\d+(?:\.\d+)?(?:m|y|mo|d|gb|tb|x)", wl):
+            keep.append(w)
+        elif re.fullmatch(r"\d+", wl) and i + 1 < len(tok) and tok[i + 1].lower().strip("()") in _VT_UNIT_WORDS:
+            keep.append(w + " " + tok[i + 1])
+            i += 1
+        elif wl in _VT_KEEP_WORDS:
+            keep.append(w)
+        i += 1
+    s = " ".join(keep)
+    if len(keep) <= 1:
+        s = str(name)
+    return s if len(s) <= 22 else s[:21].rstrip() + "…"
+
+# ---------- جلب الكتالوج وبناء المنتجات ----------
+def _vt_eligible(p):
+    try:
+        if p.get("price_usd") is None:
+            return False
+        if p.get("api_test"):
+            return True          # منتج الاختبار: يظهر للأدمن فقط عبر /vente_test
+        return p.get("delivery_type") == "stock" and p.get("stock") is not None
+    except Exception:
+        return False
+
+def _vt_hidden(p):
+    conf = _vt_conf()
+    sid = str(p["id"])
+    if sid in [str(x) for x in conf.get("show", [])]:
+        return False
+    if sid in [str(x) for x in conf.get("hide", [])]:
+        return True
+    return any(re.search(pat, str(p.get("name", "")), re.I) for pat in VENTE_DEFAULT_HIDE)
+
+def _vt_sell_price(cost):
+    c = Decimal(str(cost))
+    s = (c * (Decimal(100) + Decimal(VENTE_MARGIN_PCT)) / Decimal(100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return s if s >= Decimal("0.01") else Decimal("0.01")
+
+def _vt_rebuild():
+    ar = {int(p["id"]): p for p in (_VT["raw"].get("ar") or []) if isinstance(p, dict) and "id" in p}
+    en = {int(p["id"]): p for p in (_VT["raw"].get("en") or []) if isinstance(p, dict) and "id" in p}
+    fr = {int(p["id"]): p for p in (_VT["raw"].get("fr") or []) if isinstance(p, dict) and "id" in p}
+    base = ar or en or fr
+    out = {}
+    for vid, p in base.items():
+        try:
+            cost = Decimal(str(p.get("price_usd")))
+        except Exception:
+            continue
+        name = str(p.get("name") or ("#" + str(vid))).strip()
+        d_ar = _vt_trunc(_vt_clean(p.get("description")))
+        d_en = _vt_trunc(_vt_clean((en.get(vid) or p).get("description")))
+        d_fr = _vt_trunc(_vt_clean((fr.get(vid) or p).get("description")))
+        try:
+            stock = int(p.get("stock")) if p.get("stock") is not None else (5 if p.get("api_test") else 0)
+        except Exception:
+            stock = 0
+        out["vt" + str(vid)] = {
+            "id": "vt" + str(vid), "vid": vid, "name": name, "price": "$" + str(_vt_sell_price(cost)),
+            "cost": float(cost), "stock": max(0, stock), "icon": _vt_icon(name),
+            "image": p.get("image_url") or None, "description": d_ar,
+            "loc": {"en": {"name": name, "description": d_en or d_ar}, "fr": {"name": name, "description": d_fr or d_en or d_ar}},
+            "warranty": int(p.get("warranty_days") or 0), "brand": _vt_brand(name),
+            "delivery_type": p.get("delivery_type"), "api_test": bool(p.get("api_test")),
+            "eligible": _vt_eligible(p), "raw_name": name,
+        }
+    _VT_PRODS.clear()
+    _VT_PRODS.update(out)
+
+def vt_refresh(force=False):
+    """يحدّث الكتالوج (ar/en/fr) مع ETag. يرجع True إذا نجح جلب واحد على الأقل."""
+    if not VENTE_KEY:
+        return False
+    with _VT["lock"]:
+        now = time.time()
+        if not force and _VT["raw"] and now - _VT["ts"] < VENTE_REFRESH_SECONDS:
+            return True
+        _VT["tried"] = now
+        ok = False
+        for lang in ("ar", "en", "fr"):
+            try:
+                hdr = {}
+                et = _VT["etag"].get(lang)
+                if et and not force and lang in _VT["raw"]:
+                    hdr["If-None-Match"] = et
+                r = vt_get("/api/reseller/products", {"lang": lang}, hdr, 20)
+                if r.status_code == 304 and lang in _VT["raw"]:
+                    ok = True
+                    continue
+                if r.status_code != 200:
+                    raise VenteError(f"http {r.status_code}: {r.text[:200]}")
+                data = r.json()
+                _VT["raw"][lang] = data.get("products") or []
+                _VT["etag"][lang] = r.headers.get("ETag")
+                ok = True
+            except Exception as e:
+                _VT["err"] = str(e)[:300]
+                print(f"vente refresh {lang} failed: {e}")
+                if re.search(r"http (401|403)", str(e)):
+                    monitor_send("🚨 <b>مفتاح VENTE_API_KEY مرفوض (401/403)</b>\nتحقق من المفتاح أو قيود IP.",
+                                 key="vt_auth", cooldown=3600)
+        if ok:
+            _VT["err"] = None
+            _VT["ts"] = time.time()
+            try:
+                _vt_rebuild()
+            except Exception as e:
+                print(f"vente rebuild failed: {e}")
+        else:
+            _VT["ts"] = time.time() - max(0, VENTE_REFRESH_SECONDS - 60)  # إعادة المحاولة بعد دقيقة
+        return ok
+
+def vt_refresh_loop():
+    while True:
+        try:
+            vt_refresh(force=True)
+        except Exception as e:
+            print(f"vt_refresh_loop error: {e}")
+        time.sleep(VENTE_REFRESH_SECONDS)
+
+def _vt_kick():
+    """تحديث غير حاجب إذا كان الكتالوج فارغاً."""
+    if VENTE_KEY and not _VT_PRODS and time.time() - _VT["tried"] > 60:
+        _VT["tried"] = time.time()
+        threading.Thread(target=vt_refresh, kwargs={"force": True}, daemon=True).start()
+
+# ---------- إدارة الظهور ----------
+def _vt_linked_vids():
+    return {int(v) for v in _vt_conf().get("link", {}).values() if str(v).isdigit()}
+
+def _vt_replacing(p):
+    return any(re.search(pat, p["name"], re.I) for pat in VENTE_REPLACE_DEFAULT.values())
+
+def _vt_listed(p):
+    """هل يظهر المنتج للزبائن في القائمة؟"""
+    if not p.get("eligible") or p.get("api_test"):
+        return False
+    raw_p = {"id": p["vid"], "name": p["name"]}
+    if _vt_hidden(raw_p) or p["vid"] in _vt_linked_vids():
+        return False
+    return p["stock"] > 0 or _vt_replacing(p)
+
+def _vt_visible():
+    return [p for p in _VT_PRODS.values() if _vt_listed(p)]
+
+def _own_hidden(pid):
+    """منتجك الخاص يُخفى إذا حلّ محله منتج من API."""
+    if not VENTE_KEY or not _VT_PRODS:
+        return False
+    conf = _vt_conf()
+    if pid in conf.get("unreplace", []):
+        return False
+    if pid in conf.get("replace", []):
+        return True
+    pat = VENTE_REPLACE_DEFAULT.get(pid)
+    if not pat:
+        return False
+    return any(re.search(pat, p["name"], re.I) for p in _vt_visible())
+
+# ---------- find_product / tr يعرفان منتجات API ----------
+_find_product_orig = find_product
+def find_product(product_id):
+    p = _find_product_orig(product_id)
+    if p is not None:
+        return p
+    return _VT_PRODS.get(product_id)
+
+_tr_orig = tr
+def tr(item, field, lang):
+    loc = item.get("loc") if isinstance(item, dict) else None
+    if loc and lang != "ar":
+        v = (loc.get(lang) or {}).get(field)
+        if v:
+            return v
+    return _tr_orig(item, field, lang)
+
+def _vt_is_pid(pid):
+    return bool(re.fullmatch(r"vt\d+", str(pid)))
+
+def _vt_stock(pid):
+    p = _VT_PRODS.get(pid)
+    return int(p["stock"]) if p else 0
+
+def _vt_qty(label):
+    m = re.search(r"x(\d+)$", str(label))
+    return int(m.group(1)) if m else 1
+
+# ---------- أزرار الصفحة الرئيسية ----------
+def _vt_pair_button(p):
+    return InlineKeyboardButton(text=f"{p['icon']} {_vt_short(p['name'])}", callback_data=f"buy_{p['id']}")
+
+def _vt_add_buttons(markup, lang):
+    items = _vt_visible()
+    groups = {}
+    for p in items:
+        groups.setdefault(p["brand"], []).append(p)
+    for g in groups.values():
+        g.sort(key=lambda x: x["cost"])
+        i = 0
+        while i + 1 < len(g):
+            markup.row(_vt_pair_button(g[i]), _vt_pair_button(g[i + 1]))
+            i += 2
+        if i < len(g):
+            markup.add(_slot_button(g[i], lang))
+
+# ---------- صفحة المنتج وشراؤه ----------
+def _vt_view(call, pid):
+    p = _VT_PRODS.get(pid)
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    is_admin = str(uid) == str(ADMIN_CHAT_ID)
+    if not p or not p.get("eligible") and not (p and p.get("api_test") and is_admin):
+        bot.answer_callback_query(call.id)
+        return True
+    if p.get("api_test") and not is_admin:
+        bot.answer_callback_query(call.id)
+        return True
+    if call.message.chat.type == "private":
+        register_user(uid)
+    notify_admin(call.from_user, p, lang)
+    gt = GEMINI_TEXTS.get(lang, GEMINI_TEXTS["ar"])
+    tx = VT_TEXTS.get(lang, VT_TEXTS["ar"])
+    stock = p["stock"]
+    mk = InlineKeyboardMarkup(row_width=1)
+    if stock > 0:
+        sell = Decimal(p["price"].lstrip("$"))
+        for q in range(1, min(stock, VENTE_MAX_QTY) + 1):
+            total = (sell * q).quantize(Decimal("0.01"))
+            mk.add(InlineKeyboardButton(text=f"{q} × | ${total}", callback_data=f"vq_{p['vid']}_{q}"))
+        bottom = gt["choose_qty"]
+    else:
+        bottom = t(lang, "out_of_stock")
+        mk.add(InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+    caption = (
+        f"{t(lang, 'chosen')} *{tr(p, 'name', lang)}*\n"
+        f"{t(lang, 'price')} *{p['price']}*\n"
+        f"{t(lang, 'available')} *{stock}*\n\n"
+        f"{t(lang, 'description')}\n{tr(p, 'description', lang)}\n\n"
+        f"{tx['warranty_line'].format(w=_vt_warranty(p, lang))}\n\n{bottom}"
+    )
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    send_card(call.message.chat.id, p, caption, mk)
+    bot.answer_callback_query(call.id)
+    return True
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("vq_"))
+def handle_vente_qty(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    try:
+        vid_s, q_s = call.data[3:].rsplit(chr(95), 1)
+        pid = "vt" + str(int(vid_s))
+        q = int(q_s)
+    except Exception:
+        bot.answer_callback_query(call.id)
+        return
+    p = _VT_PRODS.get(pid)
+    is_admin = str(uid) == str(ADMIN_CHAT_ID)
+    if (not p or not 1 <= q <= VENTE_MAX_QTY or not (p.get("eligible") or (p.get("api_test") and is_admin))
+            or (p.get("api_test") and not is_admin)):
+        bot.answer_callback_query(call.id)
+        return
+    if p["stock"] < q:
+        bot.answer_callback_query(call.id, t(lang, "out_variant"), show_alert=True)
+        return
+    price = str((Decimal(p["price"].lstrip("$")) * q).quantize(Decimal("0.01")))
+    label = f"x{q}"
+    full_name = f"{p['name']} — {label}"
+    notify_admin(call.from_user, {"name": full_name, "price": f"${price}"}, lang)
+    try:
+        invoice_id = create_invoice(uid, pid, label, price, full_name)
+    except StorageError:
+        bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
+        return
+    invoice = get_invoice(invoice_id) or {"label": label, "price_usdt": price}
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    sent = bot.send_message(
+        call.message.chat.id, build_invoice_text(lang, invoice, p), parse_mode="HTML",
+        reply_markup=build_invoice_markup(lang, invoice_id, _wallet_covers(uid, invoice.get("price_usdt"))),
+    )
+    attach_invoice_msg(invoice_id, sent)
+    bot.answer_callback_query(call.id)
+
+# ---------- التسليم ----------
+def _vt_err_text(data):
+    if isinstance(data, dict):
+        return f"{data.get('code', '')} {data.get('message', '')} {data.get('raw', '')}".strip()
+    return str(data)[:200]
+
+def _fulfill_vente(chat_id, uid, lang, claim, canon, retry, mark, failed, vid=None):
+    pid = claim["product_id"]
+    if vid is None:
+        vid = int(str(pid)[2:])
+    qty = _vt_qty(claim.get("label"))
+    pname = html.escape(claim.get("product_name") or str(pid))
+    price = _to_decimal(claim.get("price"))
+    n = int(claim.get("idem_n", 0))
+    base_key = f"rk-vt-{canon}" + (f"-{n}" if n else "")
+    idem = base_key if len(base_key) <= 110 else "rk-vt-" + hashlib.sha1(base_key.encode()).hexdigest()
+    claim["vt"] = vid
+    try:
+        status, data, resp = vt_order(vid, qty, idem, f"tg{uid}")
+    except VenteError as e:
+        failed(f"⚠️ <b>فشل الاتصال بالمورّد أثناء الشراء</b>\n\n📦 {pname}\n👤 <code>{uid}</code>\n"
+               f"🧾 <code>{html.escape(canon)}</code>\n{html.escape(str(e))[:300]}\n\nالبوت سيعيد المحاولة تلقائياً بنفس المفتاح (آمن ضد التكرار).")
+        return
+
+    ok = status == 200 and isinstance(data, dict) and data.get("success") is not False and isinstance(data.get("order"), dict)
+    if ok:
+        order = data["order"]
+        ost = str(order.get("status") or "")
+        accts = [str(i.get("account_data")) for i in (order.get("items") or [])
+                 if isinstance(i, dict) and i.get("account_data")]
+        if ost == "COMPLETED" and accts:
+            tx = VT_TEXTS.get(lang, VT_TEXTS["ar"])
+            prod = _VT_PRODS.get("vt" + str(vid)) or {}
+            data_html = "\n\n".join(f"<code>{html.escape(a)}</code>" for a in accts)
+            text = tx["delivered"].format(product=pname, data=data_html, warranty=_vt_warranty(prod, lang))
+            delivered_ok = True
+            try:
+                bot.send_message(chat_id, text, parse_mode="HTML", disable_web_page_preview=True)
+            except Exception as e:
+                delivered_ok = False
+                alert_admin(f"⚠️ <b>تعذر إرسال الحساب للزبون</b> <code>{uid}</code>\n🧾 <code>{html.escape(canon)}</code>\n" + data_html)
+                print(f"vente deliver failed: {e}")
+            mark("delivered")
+            clear_pending(uid)
+            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))
+            order_log_auto(uid, claim.get("product_name"), claim.get("price"), canon, "\n".join(accts))
+            if delivered_ok:
+                try:
+                    bot.send_message(chat_id, t(lang, "thanks"))
+                except Exception as e:
+                    print(f"thanks failed: {e}")
+            try:
+                prod = _VT_PRODS.get("vt" + str(vid))
+                if prod:
+                    prod["stock"] = max(0, int(prod["stock"]) - qty)
+            except Exception:
+                pass
+            cost = None
+            try:
+                cost = Decimal(str(data.get("total"))) if data.get("total") is not None else Decimal(str(order.get("amount_usd")))
+            except Exception:
+                cost = None
+            margin = ""
+            if cost is not None and price:
+                diff = price - cost
+                margin = f"\n💹 الربح التقريبي: {diff:.2f}$" + (" ⚠️ خسارة!" if diff < 0 else "")
+            if len(accts) < qty:
+                alert_admin(f"⚠️ <b>وصل عدد حسابات أقل من المطلوب</b>\n📦 {pname}\n🧾 <code>{html.escape(canon)}</code>\nمطلوب {qty}، وصل {len(accts)}.")
+            alert_admin(
+                ("✅ <b>بيع تلقائي من المورّد (بعد إعادة المحاولة)</b>" if retry else "✅ <b>بيع تلقائي من المورّد</b>")
+                + f"\n📦 {pname}\n👤 <code>{uid}</code>\n💵 مدفوع: {claim.get('paid')} USDT"
+                + (f" | تكلفة: {cost}$" if cost is not None else "") + margin
+            )
+            monitor_send(f"✅ <b>شراء جديد</b>\n\n📦 {pname}\n👤 {_user_link(uid)}\n💵 {claim.get('paid')} USDT" + margin)
+            try:
+                bal = data.get("balance_after")
+                if bal is not None and Decimal(str(bal)) < Decimal(str(VENTE_LOW_BALANCE)):
+                    monitor_send(f"💸 <b>رصيدك عند المورّد منخفض</b>: {bal}$\nاشحن المحفظة (USDT BEP20) لكي لا تتوقف الطلبات.",
+                                 key="vt_low_balance", cooldown=3600)
+            except Exception:
+                pass
+            return
+        if ost == "CANCELLED":
+            claim["idem_n"] = n + 1
+            failed(f"🚨 <b>المورّد ألغى الطلب</b>\n📦 {pname}\n👤 <code>{uid}</code>\n🧾 <code>{html.escape(canon)}</code>\n"
+                   f"الحالة: {html.escape(ost)}\nسيعاد المحاولة تلقائياً.")
+            return
+        # قيد التسليم / بانتظار التفعيل: لا نُرجع المال ولا نعيد الشراء (نفس المفتاح يرجع نفس الطلب)
+        claim["fz_created"] = True
+        failed(f"⚠️ <b>طلب المورّد لم يكتمل بعد</b>\n📦 {pname}\n👤 <code>{uid}</code>\n🧾 <code>{html.escape(canon)}</code>\n"
+               f"الحالة: <code>{html.escape(ost)}</code> | رقم الطلب: <code>{html.escape(str(order.get('id')))}</code>\n"
+               f"البوت يتابعه تلقائياً ويسلّم عند الاكتمال.")
+        return
+
+    err = _vt_err_text(data)
+    if status in (401, 403):
+        claim["idem_n"] = n + 1
+        monitor_send("🚨 <b>مفتاح المورّد مرفوض أثناء شراء</b>\nتحقق من VENTE_API_KEY وقيود IP.", key="vt_auth_order", cooldown=900)
+    elif status == 402:
+        claim["idem_n"] = n + 1
+        monitor_send("🚨 <b>رصيدك عند المورّد غير كافٍ!</b>\nاشحن المحفظة (USDT BEP20)، والبوت يكمل الطلبات المعلّقة وحده.\n"
+                     f"<code>{html.escape(err)[:200]}</code>", key="vt_balance", cooldown=1800)
+    elif status in (400, 404, 409, 422):
+        claim["idem_n"] = n + 1   # رفض واضح: لم يُنشأ طلب
+    # 429 و5xx و غيرها: نفس المفتاح في المحاولة القادمة
+    wait = ""
+    try:
+        if status == 429:
+            wait = f"\nانتظر {resp.headers.get('Retry-After', '?')} ثانية."
+    except Exception:
+        pass
+    failed(f"🚨 <b>فشل شراء من المورّد</b> (HTTP {status})\n📦 {pname}\n👤 <code>{uid}</code>\n"
+           f"🧾 <code>{html.escape(canon)}</code>\n{html.escape(err)[:300]}{wait}")
+
+# ---------- Gemini: مخزونك أولاً ثم المورّد ----------
+_gemini_stock_orig = gemini_stock
+_gemini_unit_price_orig = gemini_unit_price
+_sync_stock_orig = sync_stock
+
+def _gem_vid():
+    if not VENTE_KEY:
+        return None
+    v = _vt_conf().get("link", {}).get(GEMINI_ID)
+    return int(v) if v and str(v).isdigit() else None
+
+def _gem_vprod():
+    vid = _gem_vid()
+    return _VT_PRODS.get(f"vt{vid}") if vid else None
+
+def gemini_stock():
+    own = _gemini_stock_orig()
+    if own > 0:
+        return own
+    vp = _gem_vprod()
+    return max(0, int(vp["stock"])) if vp else own
+
+def gemini_unit_price():
+    if _gemini_stock_orig() <= 0:
+        vp = _gem_vprod()
+        if vp:
+            return _to_decimal(vp["price"].lstrip("$"))
+    return _gemini_unit_price_orig()
+
+def sync_stock():
+    _sync_stock_orig()
+    p = _find_product_orig(GEMINI_ID)
+    if p and _gemini_stock_orig() <= 0:
+        vp = _gem_vprod()
+        if vp:
+            p["price"] = vp["price"]
+
+def _gem_use_vente(claim):
+    if claim.get("vt"):
+        return True
+    if not _gem_vid():
+        return False
+    try:
+        n = int(str(claim.get("label", "x1")).lstrip("x"))
+    except ValueError:
+        n = 1
+    return _gemini_stock_orig() < n
+
+# ---------- أوامر الأدمن ----------
+def _vt_need_key(message):
+    if not VENTE_KEY:
+        bot.reply_to(message, "⚠️ لم يُضبط VENTE_API_KEY في Render بعد.")
+        return False
+    return True
+
+def _own_similar(name):
+    b = _vt_brand(name)
+    hits = []
+    for p in products:
+        if p.get("type") == "separator" or str(p.get("id", "")).startswith("vt"):
+            continue
+        low = (str(p.get("name", "")) + " " + str(p.get("id", ""))).lower()
+        if b and len(b) >= 4 and b in low:
+            hits.append(p["id"])
+    return hits[:3]
+
+@bot.message_handler(commands=["vente_catalog"])
+def vente_catalog_command(message):
+    if not is_admin_msg(message) or not _vt_need_key(message):
+        return
+    if not vt_refresh(force=True) and not _VT_PRODS:
+        bot.reply_to(message, f"❌ تعذر جلب الكتالوج: {html.escape(str(_VT['err']))[:300]}")
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    q = parts[1].strip().lower() if len(parts) == 2 else ""
+    conf = _vt_conf()
+    linked = {int(v): k for k, v in conf.get("link", {}).items() if str(v).isdigit()}
+    lines = [f"📦 كتالوج المورّد: {len(_VT_PRODS)} منتج | ربح {VENTE_MARGIN_PCT}%",
+             "✅ معروض | 🙈 مخفي | ⛔ غير تلقائي (يحتاج بيانات/مورّد) | 🔗 مربوط | ❌ مخزون 0", ""]
+    for p in sorted(_VT_PRODS.values(), key=lambda x: (x["brand"], x["cost"])):
+        if q and q not in p["name"].lower() and q not in str(p["vid"]):
+            continue
+        raw_p = {"id": p["vid"], "name": p["name"]}
+        if p["vid"] in linked:
+            flag = f"🔗 {linked[p['vid']]}"
+        elif p.get("api_test"):
+            flag = "🧪"
+        elif not p["eligible"]:
+            flag = "⛔"
+        elif _vt_hidden(raw_p):
+            flag = "🙈"
+        elif p["stock"] <= 0:
+            flag = "❌"
+        else:
+            flag = "✅"
+        sim = _own_similar(p["name"])
+        extra = f" ≈ {','.join(sim)}" if sim else ""
+        sell = p["price"]
+        lines.append(f"{flag} {p['vid']} | {p['name'][:42]} | {p['cost']:.2f}→{sell} | 📦{p['stock']} | {p['delivery_type']} | 🛡️{p['warranty']}{extra}")
+    send_long(message.chat.id, "\n".join(lines))
+
+def _vt_arg_id(message):
+    parts = (message.text or "").split()
+    if len(parts) < 2 or not parts[1].isdigit():
+        return None
+    return int(parts[1])
+
+@bot.message_handler(commands=["vente_hide", "vente_show"])
+def vente_hide_show_command(message):
+    if not is_admin_msg(message):
+        return
+    vid = _vt_arg_id(message)
+    if vid is None:
+        bot.reply_to(message, "الاستعمال: /vente_hide ID   أو   /vente_show ID  (ID من /vente_catalog)")
+        return
+    cmd = (message.text or "").split()[0].lstrip("/").split("@")[0]
+    conf = dict(_vt_conf())
+    hide = [x for x in conf.get("hide", []) if str(x) != str(vid)]
+    show = [x for x in conf.get("show", []) if str(x) != str(vid)]
+    if cmd == "vente_hide":
+        hide.append(vid)
+    else:
+        show.append(vid)
+    conf["hide"], conf["show"] = hide, show
+    _vt_conf_save(conf)
+    bot.reply_to(message, "🙈 تم إخفاؤه." if cmd == "vente_hide" else "👁️ تم إظهاره.")
+
+@bot.message_handler(commands=["vente_link", "vente_unlink"])
+def vente_link_command(message):
+    if not is_admin_msg(message):
+        return
+    parts = (message.text or "").split()
+    cmd = parts[0].lstrip("/").split("@")[0]
+    conf = dict(_vt_conf())
+    link = dict(conf.get("link", {}))
+    if cmd == "vente_unlink":
+        if len(parts) < 2:
+            bot.reply_to(message, "الاستعمال: /vente_unlink gemini_18m")
+            return
+        link.pop(parts[1], None)
+        conf["link"] = link
+        _vt_conf_save(conf)
+        bot.reply_to(message, "🔓 تم فك الربط.")
+        return
+    if len(parts) < 3 or not parts[2].isdigit() or not _find_product_orig(parts[1]):
+        bot.reply_to(message, "الاستعمال: /vente_link gemini_18m ID  (منتجك الخاص ثم رقم المنتج عند المورّد). يعمل مع Gemini فقط حالياً.")
+        return
+    if parts[1] != GEMINI_ID:
+        bot.reply_to(message, "الربط (مخزونك أولاً ثم المورّد) مفعّل لـ Gemini فقط. لباقي المنتجات استعمل /vente_replace.")
+        return
+    link[parts[1]] = int(parts[2])
+    conf["link"] = link
+    _vt_conf_save(conf)
+    bot.reply_to(message, f"🔗 تم: {parts[1]} ← {parts[2]}. يبيع من مخزونك، وعند نفاده يشتري من المورّد.")
+
+@bot.message_handler(commands=["vente_replace", "vente_unreplace"])
+def vente_replace_command(message):
+    if not is_admin_msg(message):
+        return
+    parts = (message.text or "").split()
+    cmd = parts[0].lstrip("/").split("@")[0]
+    if len(parts) < 2 or not _find_product_orig(parts[1]):
+        bot.reply_to(message, "الاستعمال: /vente_replace own_id  (يخفي منتجك ويبقى منتج المورّد)\nأو /vente_unreplace own_id")
+        return
+    conf = dict(_vt_conf())
+    rep = [x for x in conf.get("replace", []) if x != parts[1]]
+    unrep = [x for x in conf.get("unreplace", []) if x != parts[1]]
+    if cmd == "vente_replace":
+        rep.append(parts[1])
+    else:
+        unrep.append(parts[1])
+    conf["replace"], conf["unreplace"] = rep, unrep
+    _vt_conf_save(conf)
+    bot.reply_to(message, "✅ تم." )
+
+@bot.message_handler(commands=["vente_balance"])
+def vente_balance_command(message):
+    if not is_admin_msg(message) or not _vt_need_key(message):
+        return
+    try:
+        st, d = vt_me()
+    except Exception as e:
+        bot.reply_to(message, f"❌ {html.escape(str(e))[:300]}")
+        return
+    if st != 200:
+        bot.reply_to(message, f"❌ HTTP {st}: {html.escape(_vt_err_text(d))[:300]}")
+        return
+    bot.reply_to(message, f"✅ الاتصال يعمل\n💰 رصيدك عند المورّد: {d.get('wallet_balance')}$\n🔑 {html.escape(str(d.get('key_name')))}")
+
+@bot.message_handler(commands=["vente_test"])
+def vente_test_command(message):
+    if not is_admin_msg(message) or not _vt_need_key(message):
+        return
+    vt_refresh(force=True)
+    tests = [p for p in _VT_PRODS.values() if p.get("api_test")]
+    if not tests:
+        bot.reply_to(message, "لا يوجد منتج اختبار في الكتالوج.")
+        return
+    mk = InlineKeyboardMarkup(row_width=1)
+    for p in tests:
+        mk.add(InlineKeyboardButton(text=f"🧪 {p['name']} | {p['price']}", callback_data=f"buy_{p['id']}"))
+    bot.send_message(message.chat.id, "🧪 منتج اختبار API (يظهر لك أنت فقط):", reply_markup=mk)
 
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("grp_"))
@@ -5146,6 +5917,46 @@ patch(r"""# ========== استقبال رقم العملية من الزبون (�
 patch(r"""monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)""",
       r"""threading.Thread(target=order_autoconfirm_loop, daemon=True).start()
 monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)""", "start_autoconfirm")
+
+
+# ===== ربط API المورّد (Vente) =====
+patch(r"""    # منتجات يدوية (A/B): تسجيل الطلب + جمع البيانات / إشعار الأدمن
+    if pid in MANUAL_IDS:
+        _fulfill_manual(chat_id, uid, lang, claim, canon, retry, mark, failed)
+        return
+""", r"""    # منتجات يدوية (A/B): تسجيل الطلب + جمع البيانات / إشعار الأدمن
+    if pid in MANUAL_IDS:
+        _fulfill_manual(chat_id, uid, lang, claim, canon, retry, mark, failed)
+        return
+
+    # منتجات المورّد (Vente) + Gemini عند نفاد مخزونك
+    if _vt_is_pid(pid):
+        _fulfill_vente(chat_id, uid, lang, claim, canon, retry, mark, failed)
+        return
+    if pid == GEMINI_ID and _gem_use_vente(claim):
+        _fulfill_vente(chat_id, uid, lang, claim, canon, retry, mark, failed, vid=_gem_vid() or claim.get("vt"))
+        return
+""", "vente_fulfill_branch")
+patch(r"""        if pid == GEMINI_ID:
+            out = gemini_stock() < int(str(label).lstrip("x") or 1)""",
+      r"""        if _vt_is_pid(pid):
+            out = _vt_stock(pid) < _vt_qty(label)
+        elif pid == GEMINI_ID:
+            out = gemini_stock() < int(str(label).lstrip("x") or 1)""", "vente_wpay_stock")
+patch(r"""def handle_product_view(call):
+    product_id = call.data.replace("buy_", "")
+""", r"""def handle_product_view(call):
+    product_id = call.data.replace("buy_", "")
+    if _vt_is_pid(product_id):
+        _vt_view(call, product_id)
+        return
+""", "vente_product_view")
+patch(r"""threading.Thread(target=order_autoconfirm_loop, daemon=True).start()
+monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)""",
+      r"""threading.Thread(target=order_autoconfirm_loop, daemon=True).start()
+if VENTE_KEY:
+    threading.Thread(target=vt_refresh_loop, daemon=True).start()
+monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)""", "vente_start")
 
 if _errors:
     sys.exit("❌ فشل تطبيق التعديلات (هل bot_base.py هو الكود القديم نفسه؟):\n" + "\n".join(_errors))
