@@ -3531,7 +3531,7 @@ def build_reply_keyboard(lang):
 # ============================================================
 # ========== الألعاب: Raseedkom Coins + الهدية اليومية + الترتيب الشهري ==========
 # ============================================================
-LB_TOP_N = 20
+LB_TOP_N = 10
 LB_MASK_NAMES = False   # True = إخفاء جزء من الأسماء (مثل Ah***)
 
 def _now_dz():
@@ -3770,14 +3770,14 @@ def gm_leaderboard(call, lang, which):
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     rows = []
     for i, (u, s) in enumerate(pairs[:LB_TOP_N], 1):
-        rows.append(f"{medals.get(i, f'#{i}')} {_lb_name(u)} — <b>{int(s)}</b> 🪙")
+        rows.append(f"{medals.get(i, f'#{i}')} {_lb_name(u)}\n└ 🪙 <b>{int(s)}</b> Raseedkom Coins")
     rank, pts = _my_rank(pairs, uid)
     mk = InlineKeyboardMarkup(row_width=1)
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_cur" if which == "prev" else "btn_prev"),
                                 callback_data="gm_lb_cur" if which == "prev" else "gm_lb_prev"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_hub"), callback_data="gm_hub"))
     _pf_show(call, gt(lang, "lb").format(
-        month=_month_label(month, lang), rows="\n".join(rows) or gt(lang, "lb_empty"), rank=rank, pts=pts), mk)
+        month=_month_label(month, lang), rows="\n\n".join(rows) or gt(lang, "lb_empty"), rank=rank, pts=pts), mk)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gm" + SEP))
 def handle_games(call):
