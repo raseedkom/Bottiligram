@@ -3720,6 +3720,12 @@ G_TEXTS = {
     },
 }
 
+G_TEXTS["ar"].update({"btn_next": "التالي ➡️ (11-20)", "btn_first": "⬅️ السابق (1-10)"})
+G_TEXTS["en"].update({"btn_next": "Next ➡️ (11-20)", "btn_first": "⬅️ Previous (1-10)"})
+G_TEXTS["fr"].update({"btn_next": "Suivant ➡️ (11-20)", "btn_first": "⬅️ Précédent (1-10)"})
+LB_PAGE = 10        # عدد اللاعبين في كل صفحة
+LB_MAX_PAGES = 2    # أقصى عدد صفحات (الأولى 1-10 والثانية 11-20)
+
 def gt(lang, key):
     return G_TEXTS.get(lang, G_TEXTS["ar"])[key]
 
@@ -3763,16 +3769,24 @@ def gm_wallet(call, lang):
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_hub"), callback_data="gm_hub"))
     _pf_show(call, gt(lang, "wallet").format(bal=coins_get(uid), pts=pts, rank=rank, gift=_gift_state(lang, uid)), mk)
 
-def gm_leaderboard(call, lang, which):
+def gm_leaderboard(call, lang, which, page=0):
     uid = call.from_user.id
     month = _month_key(1 if which == "prev" else 0)
     pairs = lb_all(month)
+    page = max(0, min(int(page), LB_MAX_PAGES - 1))
+    if page * LB_PAGE >= len(pairs):
+        page = 0
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     rows = []
-    for i, (u, s) in enumerate(pairs[:LB_TOP_N], 1):
+    chunk = pairs[page * LB_PAGE:(page + 1) * LB_PAGE]
+    for i, (u, s) in enumerate(chunk, page * LB_PAGE + 1):
         rows.append(f"{medals.get(i, f'#{i}')} {_lb_name(u)}\n└ 🪙 <b>{int(s)}</b> Raseedkom Coins")
     rank, pts = _my_rank(pairs, uid)
     mk = InlineKeyboardMarkup(row_width=1)
+    if page + 1 < LB_MAX_PAGES and len(pairs) > (page + 1) * LB_PAGE:
+        mk.add(InlineKeyboardButton(text=gt(lang, "btn_next"), callback_data=f"gm_lb_{which}{page + 1}"))
+    if page > 0:
+        mk.add(InlineKeyboardButton(text=gt(lang, "btn_first"), callback_data=f"gm_lb_{which}{page - 1 if page - 1 else ''}"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_cur" if which == "prev" else "btn_prev"),
                                 callback_data="gm_lb_cur" if which == "prev" else "gm_lb_prev"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_hub"), callback_data="gm_hub"))
@@ -3797,7 +3811,9 @@ def handle_games(call):
         elif cmd == "wallet":
             gm_wallet(call, lang)
         elif cmd == "lb":
-            gm_leaderboard(call, lang, "prev" if arg == "prev" else "cur")
+            _which = "prev" if arg.startswith("prev") else "cur"
+            _pg = arg[len(_which):]
+            gm_leaderboard(call, lang, _which, int(_pg) if _pg.isdigit() else 0)
         elif cmd == "soon":
             bot.answer_callback_query(call.id, gt(lang, "soon"), show_alert=True)
             return
