@@ -1532,9 +1532,81 @@ def _group_range(gid):
         return "-", "-", ("♾️" if inf else stock)
     return f"${min(prices):.2f}", f"${max(prices):.2f}", ("♾️" if inf else stock)
 
+# ---------- ألوان الأزرار (أخضر متوفر / أحمر نافد) + النافد يصعد للأعلى 3 في الصف ----------
+_ikb_to_dict_orig = InlineKeyboardButton.to_dict
+def _ikb_to_dict_styled(self):
+    d = _ikb_to_dict_orig(self)
+    st = getattr(self, "style", None)
+    if st:
+        d["style"] = st
+    return d
+InlineKeyboardButton.to_dict = _ikb_to_dict_styled
+
+def _own_oos(item):
+    s = item.get("stock")
+    return isinstance(s, int) and not isinstance(s, bool) and s <= 0
+
+def _oos_button(item, lang):
+    if _vt_is_pid(item["id"]):
+        label = _vt_short(item["name"])
+    else:
+        names = SHORT_NAMES.get(item["id"], {})
+        label = names.get(lang) or names.get("en") or tr(item, "name", lang)
+    if len(label) > 16:
+        label = label[:15].rstrip() + "…"
+    return InlineKeyboardButton(text=f"{item['icon']} {label}", callback_data=f"oos_{item['id']}")
+
+def _style_store(mk):
+    """أخضر لكل منتج/مجموعة متوفرة، أحمر للنافد. تعطيل: /btn_style off"""
+    try:
+        if _vt_conf().get("nostyle"):
+            return mk
+        for row in mk.keyboard:
+            for b in row:
+                cb = getattr(b, "callback_data", None) or ""
+                if cb.startswith("oos_"):
+                    b.style = "danger"
+                elif cb.startswith(("buy_", "vgrp_", "grp_")):
+                    b.style = "success"
+    except Exception as e:
+        print(f"style_store failed: {e}")
+    return mk
+
+def _assemble_store(markup, oos):
+    """النافد في الأعلى (3 في الصف) ثم باقي القائمة. حد تيليغرام 100 زر."""
+    final = InlineKeyboardMarkup(row_width=2)
+    total = sum(len(r) for r in markup.keyboard)
+    room = max(0, 100 - total)
+    oos = oos[:room]
+    for i in range(0, len(oos), 3):
+        final.row(*oos[i:i + 3])
+    final.keyboard.extend(markup.keyboard)
+    return _style_store(final)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("oos_"))
+def handle_oos_button(call):
+    lang = get_lang(call.from_user.id)
+    txt = {"ar": "❌ نفد المخزون حالياً", "en": "❌ Out of stock right now", "fr": "❌ Rupture de stock"}.get(lang, "❌ Out of stock")
+    try:
+        bot.answer_callback_query(call.id, txt)
+    except Exception:
+        pass
+
+@bot.message_handler(commands=["btn_style"])
+def btn_style_command(message):
+    if not is_admin_msg(message):
+        return
+    parts = (message.text or "").split()
+    conf = _vt_conf()
+    if len(parts) > 1 and parts[1].lower() in ("on", "off"):
+        conf["nostyle"] = (parts[1].lower() == "off")
+        _vt_conf_save(conf)
+    bot.reply_to(message, "🎨 ألوان الأزرار: " + ("❌ مطفأة" if conf.get("nostyle") else "✅ مفعّلة") + "\n/btn_style on | off")
+
 def generate_store_keyboard(lang):
     sync_stock()
     markup = InlineKeyboardMarkup(row_width=2)
+    oos = []
     shown = set()
     group_members = {m for g in STORE_GROUPS.values() for m in g["members"]}
 
@@ -1543,10 +1615,16 @@ def generate_store_keyboard(lang):
             items = [find_product(pid) for pid in slot]
             items = [i for i in items if i and not _own_hidden(i["id"])]
             shown.update(i["id"] for i in items)
-            if len(items) == 2:
-                markup.row(_pair_button(items[0], lang), _pair_button(items[1], lang))
-            elif items:
-                markup.add(_slot_button(items[0], lang))
+            live = []
+            for i in items:
+                if _own_oos(i):
+                    oos.append(_oos_button(i, lang))
+                else:
+                    live.append(i)
+            if len(live) == 2:
+                markup.row(_pair_button(live[0], lang), _pair_button(live[1], lang))
+            elif live:
+                markup.add(_slot_button(live[0], lang))
         elif slot == "row:prime_netflix":
             _g = STORE_GROUPS["netflix"]
             shown.update(_g["members"])
@@ -1556,7 +1634,11 @@ def generate_store_keyboard(lang):
             except Exception as e:
                 print(f"prime cell failed: {e}")
             lo, hi, stock = _group_range("netflix")
-            if _pc:
+            if isinstance(stock, int) and stock <= 0:
+                oos.append(InlineKeyboardButton(text=f"{_g['icon']} {_g['name']}", callback_data="oos_netflix"))
+                if _pc:
+                    markup.add(_vt_cell_button(_pc, lang, False))
+            elif _pc:
                 markup.row(_vt_cell_button(_pc, lang, True),
                            InlineKeyboardButton(text=f"{_g['icon']} {_g['name']} | {lo}+", callback_data="grp_netflix"))
             else:
@@ -1565,7 +1647,7 @@ def generate_store_keyboard(lang):
                 markup.add(InlineKeyboardButton(text=f"{_g['icon']} {_g['name']} | {price} | {stock_txt}", callback_data="grp_netflix"))
         elif slot == "vente:all":
             try:
-                _vt_add_buttons(markup, lang)
+                _vt_add_buttons(markup, lang, oos)
             except Exception as e:
                 print(f"vente buttons failed: {e}")
         elif slot == "next:gifts":
@@ -1578,6 +1660,9 @@ def generate_store_keyboard(lang):
             if gid == "claude_api" and not _own_claude_shown():
                 continue          # Claude/Codex عند المورّد داخل قائمته
             lo, hi, stock = _group_range(gid)
+            if isinstance(stock, int) and stock <= 0:
+                oos.append(InlineKeyboardButton(text=f"{g['icon']} {g['name']}", callback_data=f"oos_grp_{gid}"))
+                continue
             price = lo if lo == hi else f"{lo} - {hi}"
             stock_txt = stock if stock == "♾️" else f"📦 {stock}"
             markup.add(InlineKeyboardButton(
@@ -1593,13 +1678,19 @@ def generate_store_keyboard(lang):
             item = find_product(slot)
             if item and not _own_hidden(item["id"]):
                 shown.add(item["id"])
-                markup.add(_slot_button(item, lang))
+                if _own_oos(item):
+                    oos.append(_oos_button(item, lang))
+                else:
+                    markup.add(_slot_button(item, lang))
 
     # أي منتج يضيفه الأدمن لاحقاً ولم يوضع في الترتيب يظهر في الآخر
     for item in products:
         if item.get("type") == "separator" or item["id"] in shown or item["id"] in group_members or item["id"] in GIFT_VARIANTS or _own_hidden(item["id"]):
             continue
-        markup.add(_slot_button(item, lang))
+        if _own_oos(item):
+            oos.append(_oos_button(item, lang))
+        else:
+            markup.add(_slot_button(item, lang))
 
     markup.row(
         InlineKeyboardButton(text=t(lang, "cmd_update"), callback_data="mn_refresh"),
@@ -1610,7 +1701,7 @@ def generate_store_keyboard(lang):
         InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"),
     )
     markup.add(InlineKeyboardButton(text=smt(lang, "game"), callback_data="gm_hub_m"))
-    return markup
+    return _assemble_store(markup, oos)
 
 # ============================================================
 # ========== صفحة بطاقات الهدايا (الصفحة الثانية) ==========
@@ -2186,7 +2277,7 @@ VT_ALWAYS_GROUP = {"claude", "codex"}   # دائماً زر مجموعة حتى 
 
 def _vt_cells():
     """يرجع (صفوف الخلايا حسب VT_LAYOUT, باقي المنتجات غير المذكورة)."""
-    vis = _vt_visible()
+    vis = [p for p in _vt_visible() if p["stock"] > 0]   # النافد يذهب لكتلة الأحمر في الأعلى
     used = set()
     rows = []
     for row in VT_LAYOUT:
@@ -2219,7 +2310,20 @@ def _vt_cell_button(cell, lang, pair):
     text = f"{its[0]['icon']} {title} | ${lo}+" if pair else f"{its[0]['icon']} {title} | {_vt_price_txt(its)} | 📦 {stock}"
     return InlineKeyboardButton(text=text, callback_data=f"vgrp_{key}")
 
-def _vt_add_buttons(markup, lang):
+def _vt_oos_items():
+    out = []
+    for p in _VT_PRODS.values():
+        if not p.get("eligible") or p.get("api_test") or p["stock"] > 0:
+            continue
+        if _vt_hidden({"id": p["vid"], "name": p["name"]}) or p["vid"] in _vt_linked_vids():
+            continue
+        out.append(p)
+    return sorted(out, key=lambda x: x["name"].lower())
+
+def _vt_add_buttons(markup, lang, oos=None):
+    if oos is not None:
+        for p in _vt_oos_items():
+            oos.append(_oos_button(p, lang))
     rows, left = _vt_cells()
     for cells in rows:
         cells = [c for c in cells if c[0] not in VT_SKIP_RENDER]
@@ -2647,6 +2751,37 @@ def vente_replace_command(message):
     conf["replace"], conf["unreplace"] = rep, unrep
     _vt_conf_save(conf)
     bot.reply_to(message, "✅ تم." )
+
+def _has_custom_emoji(message):
+    try:
+        if not is_admin_msg(message):
+            return False
+        ents = (message.entities or []) + (message.caption_entities or [])
+        return any(getattr(e, "type", "") == "custom_emoji" for e in ents)
+    except Exception:
+        return False
+
+@bot.message_handler(func=_has_custom_emoji, content_types=["text", "photo", "video", "document"])
+def custom_emoji_ids_handler(message):
+    """Admin: send a message containing custom emojis -> bot replies with their IDs."""
+    ents = (message.entities or []) + (message.caption_entities or [])
+    txt = message.text or message.caption or ""
+    lines = []
+    seen = set()
+    for e in ents:
+        if getattr(e, "type", "") != "custom_emoji":
+            continue
+        cid = str(getattr(e, "custom_emoji_id", "") or "")
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        try:
+            u16 = txt.encode("utf-16-le")
+            ch = u16[e.offset * 2:(e.offset + e.length) * 2].decode("utf-16-le")
+        except Exception:
+            ch = "•"
+        lines.append(f"{ch} <code>{cid}</code>")
+    bot.reply_to(message, "🆔 معرّفات الإيموجي:\n\n" + "\n".join(lines), parse_mode="HTML")
 
 @bot.message_handler(commands=["vente_balance"])
 def vente_balance_command(message):
