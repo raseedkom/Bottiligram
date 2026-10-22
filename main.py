@@ -29,7 +29,11 @@ VENTE_LOW_BALANCE = 10      # تنبيه إذا نزل رصيدك عند الم�
 # منتجات المورّد المخفية افتراضياً (regex على الاسم). يمكن إظهارها بـ /vente_show ID
 VENTE_DEFAULT_HIDE = [r"higgsfield.*pro.*year", r"mobbin", r"railway.*hobby", r"crunchyroll.*link"]
 # منتجاتك التي يحلّ محلها منتج المورّد (إذا وُجد عنده منتج مطابق للاسم) — تتغيّر بـ /vente_replace
-VENTE_REPLACE_DEFAULT = {"capcut_1m": r"capcut", "duolingo_12m": r"duolingo", "duolingo_link_12m": r"duolingo", "iptv_14m": r"iptv"}
+VENTE_REPLACE_DEFAULT = {
+    "capcut_1m": r"capcut", "duolingo_12m": r"duolingo", "duolingo_link_12m": r"duolingo", "iptv_14m": r"iptv",
+    "prime_video_ultra_6m": r"\bprime\b", "amazon_prime_6m": r"\bprime\b", "nordvpn_3m": r"nord",
+    "n8n_starter_12m": r"n8n", "office365_1y": r"office|microsoft", "elevenlabs_3m": r"eleven",
+}
 REDOTPAY_ID = "1947886487"   # معرّف حسابك في RedotPay الذي يستقبل التحويلات اليدوية
 REDOTPAY_PCT = 3       # كاش باك المنتجات العادية عند الدفع عبر RedotPay فقط (بدل 5%)
 REDOTPAY_GIFT_PCT = 1  # كاش باك بطاقات الهدايا عند الدفع عبر RedotPay فقط (بدل 2%)
@@ -1548,7 +1552,12 @@ def generate_store_keyboard(lang):
             g = STORE_GROUPS.get(gid)
             if not g:
                 continue
-            lo, hi, stock = _group_range(gid)
+            if gid == "claude_api" and not _own_claude_shown():
+                _its = _vt_claude_items()
+                _pr = [Decimal(x["price"].lstrip("$")) for x in _its]
+                lo, hi, stock = f"${min(_pr):.2f}", f"${max(_pr):.2f}", sum(x["stock"] for x in _its)
+            else:
+                lo, hi, stock = _group_range(gid)
             price = lo if lo == hi else f"{lo} - {hi}"
             stock_txt = stock if stock == "♾️" else f"📦 {stock}"
             markup.add(InlineKeyboardButton(
@@ -1867,10 +1876,22 @@ def _vt_icon(name):
             return ic
     return "🛍️"
 
+VT_BRAND_ALIASES = [
+    (r"\bprime\b", "prime"), (r"office|microsoft", "microsoft"), (r"nord", "nordvpn"),
+    (r"notion", "notion"), (r"n8n", "n8n"), (r"eleven", "elevenlabs"),
+]
+VT_BRAND_TITLES = {"prime": "Prime Video", "microsoft": "Microsoft Office", "nordvpn": "NordVPN", "notion": "Notion",
+                   "n8n": "n8n", "elevenlabs": "ElevenLabs", "gemini": "Gemini", "claude": "Claude API"}
+
 def _vt_brand(name):
     n = re.sub(r"[^a-z0-9 ]", " ", str(name).lower())
     if "gemini" in n or "google ai" in n:
         return "gemini"
+    if "claude" in n or "codex" in n:
+        return "claude"
+    for _pat, _b in VT_BRAND_ALIASES:
+        if re.search(_pat, n):
+            return _b
     tok = n.split()
     return tok[0] if tok else str(name).lower()
 
@@ -2075,22 +2096,106 @@ def _vt_qty(label):
     return int(m.group(1)) if m else 1
 
 # ---------- أزرار الصفحة الرئيسية ----------
-def _vt_pair_button(p):
-    return InlineKeyboardButton(text=f"{p['icon']} {_vt_short(p['name'])}", callback_data=f"buy_{p['id']}")
+def _vt_gkey(brand):
+    return re.sub(r"[^a-z0-9]", "", str(brand).lower())[:20] or "x"
 
-def _vt_add_buttons(markup, lang):
-    items = _vt_visible()
+def _vt_norm(name):
+    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+
+def _vt_by_brand():
     groups = {}
-    for p in items:
+    for p in _vt_visible():
         groups.setdefault(p["brand"], []).append(p)
     for g in groups.values():
         g.sort(key=lambda x: x["cost"])
-        i = 0
-        while i + 1 < len(g):
-            markup.row(_vt_pair_button(g[i]), _vt_pair_button(g[i + 1]))
-            i += 2
-        if i < len(g):
-            markup.add(_slot_button(g[i], lang))
+    return groups
+
+def _vt_claude_items():
+    """منتجات Claude/Codex عند المورّد التي تُضاف داخل مجموعة Claude API (بدون المكرر باسمك)."""
+    return list(_vt_by_brand().get("claude", []))
+
+def _own_claude_shown():
+    """منتجاتك القديمة (Claude API) تُحذف من القائمة ما دام عند المورّد منتجات Claude. يرجعها /vente_unreplace claude_api"""
+    if not VENTE_KEY or "claude_api" in _vt_conf().get("unreplace", []):
+        return True
+    return not _vt_claude_items()
+
+def _vt_brand_title(items):
+    return VT_BRAND_TITLES.get(items[0].get("brand")) or str(items[0]["name"]).split()[0]
+
+def _vt_add_buttons(markup, lang):
+    for brand, g in _vt_by_brand().items():
+        if brand == "claude":
+            continue          # داخل مجموعة Claude API
+        if len(g) == 1:
+            markup.add(_slot_button(g[0], lang))
+            continue
+        lo = min(Decimal(x["price"].lstrip("$")) for x in g)
+        hi = max(Decimal(x["price"].lstrip("$")) for x in g)
+        price = f"${lo}" if lo == hi else f"${lo} - ${hi}"
+        stock = sum(x["stock"] for x in g)
+        markup.add(InlineKeyboardButton(
+            text=f"{g[0]['icon']} {_vt_brand_title(g)} | {price} | 📦 {stock}",
+            callback_data=f"vgrp_{_vt_gkey(brand)}"))
+
+def _vt_back_cb(p):
+    if p.get("brand") == "claude":
+        return "grp_claude_api"
+    g = _vt_by_brand().get(p.get("brand"), [])
+    return f"vgrp_{_vt_gkey(p['brand'])}" if len(g) > 1 else "back_to_main"
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("vgrp_"))
+def handle_vente_group(call):
+    key = call.data[5:]
+    lang = get_lang(call.from_user.id)
+    items = next((g for b, g in _vt_by_brand().items() if _vt_gkey(b) == key and b != "claude"), None)
+    if not items:
+        bot.answer_callback_query(call.id)
+        return
+    lo = min(Decimal(x["price"].lstrip("$")) for x in items)
+    hi = max(Decimal(x["price"].lstrip("$")) for x in items)
+    mk = InlineKeyboardMarkup(row_width=1)
+    for p in items:
+        mk.add(_slot_button(p, lang))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(call.message.chat.id,
+        GROUP_TEXTS.get(lang, GROUP_TEXTS["ar"]).format(name=html.escape(_vt_brand_title(items)), lo=f"${lo}", hi=f"${hi}"),
+        parse_mode="HTML", reply_markup=mk)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda c: c.data == "grp_claude_api")
+def handle_claude_group_vente(call):
+    """مجموعة Claude API: منتجاتك + منتجات المورّد (يسبق المعالج الأصلي لأنه مسجّل قبله)."""
+    g = STORE_GROUPS["claude_api"]
+    lang = get_lang(call.from_user.id)
+    sync_stock()
+    mk = InlineKeyboardMarkup(row_width=1)
+    prices = []
+    for pid in (g["members"] if _own_claude_shown() else []):
+        item = _find_product_orig(pid)
+        if item:
+            mk.add(_slot_button(item, lang))
+            try:
+                prices.append(Decimal(item["price"].lstrip("$")))
+            except Exception:
+                pass
+    for p in _vt_claude_items():
+        mk.add(_slot_button(p, lang))
+        prices.append(Decimal(p["price"].lstrip("$")))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+    lo, hi = (min(prices), max(prices)) if prices else (Decimal(0), Decimal(0))
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(call.message.chat.id,
+        GROUP_TEXTS.get(lang, GROUP_TEXTS["ar"]).format(name=html.escape(g["name"]), lo=f"${lo:.2f}", hi=f"${hi:.2f}"),
+        parse_mode="HTML", reply_markup=mk)
+    bot.answer_callback_query(call.id)
 
 # ---------- صفحة المنتج وشراؤه ----------
 def _vt_view(call, pid):
@@ -2120,7 +2225,7 @@ def _vt_view(call, pid):
     else:
         bottom = t(lang, "out_of_stock")
         mk.add(InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK))
-    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=_vt_back_cb(p)))
     caption = (
         f"{t(lang, 'chosen')} *{tr(p, 'name', lang)}*\n"
         f"{t(lang, 'price')} *{p['price']}*\n"
