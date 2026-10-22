@@ -1916,6 +1916,34 @@ def _rdp_topup_request(call, chat_id, uid, lang, amount):
         return
     _rdp_checkout(chat, lang, uid, inv_id, inv, call, "pf_top")
 
+@bot.message_handler(commands=["rdpsim"])
+def rdp_sim_command(message):
+    """للأدمن في Sandbox فقط: يحاكي وصول إشعار دفع RedotPay لفاتورة. الاستعمال: /rdpsim رقم_الطلب"""
+    if not _is_admin_user(message.from_user.id):
+        return
+    if not RDP_SANDBOX:
+        bot.reply_to(message, "⛔ هذا الأمر متاح في وضع Sandbox فقط.")
+        return
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        bot.reply_to(message, "الاستعمال: /rdpsim رقم_الطلب\nمثال: /rdpsim 2c319d9e09\n(رقم الطلب هو ما بعد rk- في صفحة الدفع)")
+        return
+    inv_id = parts[1].replace("rk-", "").strip()
+    try:
+        inv = get_invoice(inv_id)
+    except Exception:
+        inv = None
+    if not inv:
+        bot.reply_to(message, "❌ فاتورة غير موجودة أو منتهية. أنشئ طلب RedotPay جديداً ثم أعد المحاولة.")
+        return
+    try:
+        amount = Decimal(str(inv["price_usdt"]))
+    except Exception:
+        bot.reply_to(message, "❌ مبلغ الفاتورة غير صالح.")
+        return
+    bot.reply_to(message, "🧪 جاري محاكاة دفعة RedotPay بقيمة $%s ..." % amount)
+    threading.Thread(target=_rdp_settle, args=(inv_id, "rk-" + inv_id, amount), daemon=True).start()
+
 
 # ---------- إعدادات (تفعيل/إيقاف + سعر الصرف) ----------
 def pm_enabled(m):
