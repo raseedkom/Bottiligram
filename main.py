@@ -2878,8 +2878,8 @@ def handle_ap(call):
         bot.send_message(
             chat_id,
             f"💵 أرسل المبلغ الذي وصلك لشحن محفظة الزبون <code>{req['uid']}</code>:\n"
-            (f"• أرسل المبلغ بالدولار: <code>5</code>" if req["m"] == "rd" else f"• بالدينار: <code>500</code>\n• أو بالدولار: <code>5$</code>\n\n"
-            f"💱 سعر الصرف المعتمد: 1$ = {_fmt_rate(req['rate'])} DA"),
+            + (f"• أرسل المبلغ بالدولار: <code>5</code>" if req["m"] == "rd" else (f"• بالدينار: <code>500</code>\n• أو بالدولار: <code>5$</code>\n\n"
+            f"💱 سعر الصرف المعتمد: 1$ = {_fmt_rate(req['rate'])} DA")),
             parse_mode="HTML", reply_markup=mk,
         )
     elif cmd == "amt":
