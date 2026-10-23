@@ -1486,11 +1486,18 @@ def _nav_rows(mk, lang, current):
     mk.add(InlineKeyboardButton(text=NAV_HEAD[other].get(lang, NAV_HEAD[other]["ar"]), callback_data="noop"))
     subs_t = NAV_BTN["subs"].get(lang, NAV_BTN["subs"]["ar"])
     gifts_t = NAV_BTN["gifts"].get(lang, NAV_BTN["gifts"]["ar"])
+    # الأسهم تشير نحو حافة الهاتف: يسار ◀️ ويمين ▶️. العربية تُكتب من اليمين فترتيب النص المنطقي معكوس.
+    if lang == "ar":
+        subs_go = f"🛍️ {subs_t} ◀️"
+        gifts_go = f"▶️ {gifts_t} 🎁"
+    else:
+        subs_go = f"◀️ 🛍️ {subs_t}"
+        gifts_go = f"🎁 {gifts_t} ▶️"
     if current == "subs":
         left = InlineKeyboardButton(text=f"📍 {subs_t}", callback_data="noop")
-        right = InlineKeyboardButton(text=f"🎁 {gifts_t} ◀️", callback_data="gcp")
+        right = InlineKeyboardButton(text=gifts_go, callback_data="gcp")
     else:
-        left = InlineKeyboardButton(text=f"▶️ 🛍️ {subs_t}", callback_data="back_to_main")
+        left = InlineKeyboardButton(text=subs_go, callback_data="back_to_main")
         right = InlineKeyboardButton(text=f"📍 {gifts_t}", callback_data="noop")
     try:
         if not _vt_conf().get("nostyle"):
