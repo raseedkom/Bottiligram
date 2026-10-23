@@ -1578,8 +1578,83 @@ def _ikb_to_dict_styled(self):
     ic = getattr(self, "icon_custom_emoji_id", None)
     if ic:
         d["icon_custom_emoji_id"] = str(ic)
+    else:
+        try:
+            r = _dyn_icon(d.get("callback_data"), d.get("text"))
+            if r:
+                d["icon_custom_emoji_id"], d["text"] = r
+        except Exception:
+            pass
     return d
 InlineKeyboardButton.to_dict = _ikb_to_dict_styled
+
+# أيقونات تُطبَّق وقت الإرسال على أزرار محددة (ابدأ / اشتري الآن / اللغة / الدعم)
+ICON_START = "5463392464314315076"
+ICON_BUY = "5440841102871517055"
+ICON_LANG = "5424818078833715060"
+ICON_SUPPORT = "5443038326535759644"
+_ICON_STATE = {"off": False}
+
+def _icons_off():
+    try:
+        return bool(_ICON_STATE["off"] or _vt_conf().get("noicons"))
+    except Exception:
+        return bool(_ICON_STATE["off"])
+
+def _strip_emoji_edge(text):
+    """يحذف الإيموجي العادي من أول النص أو آخره (الرمز الذي بلا حروف/أرقام)."""
+    parts = str(text).split(" ")
+    if len(parts) > 1 and not re.search(r"\w", parts[0]):
+        return " ".join(parts[1:])
+    if len(parts) > 1 and not re.search(r"\w", parts[-1]):
+        return " ".join(parts[:-1])
+    return str(text)
+
+def _kb_icon_for_text(text):
+    for l in SUPPORTED_LANGS:
+        tx = TEXTS.get(l, {})
+        if text == tx.get("kb_start"):
+            return ICON_START
+        if text == tx.get("kb_support"):
+            return ICON_SUPPORT
+        if text == tx.get("kb_lang"):
+            return ICON_LANG
+    return None
+
+def _dyn_icon(cb, text):
+    if not text or _icons_off():
+        return None
+    cb = cb or ""
+    if cb == "mn_start":
+        return ICON_START, _strip_emoji_edge(text)
+    if cb.startswith(("mbuy_", "qb_")):
+        return ICON_BUY, _strip_emoji_edge(text)
+    return None
+
+_kbb_to_dict_orig = KeyboardButton.to_dict
+def _kbb_to_dict_icon(self):
+    d = _kbb_to_dict_orig(self)
+    try:
+        if isinstance(d, str):
+            d = {"text": d}
+        tx = d.get("text")
+        eid = None if _icons_off() else _kb_icon_for_text(tx)
+        if eid:
+            d["icon_custom_emoji_id"] = eid
+            d["text"] = _strip_emoji_edge(tx)
+    except Exception:
+        pass
+    return d
+KeyboardButton.to_dict = _kbb_to_dict_icon
+
+# النص بلا إيموجي (بعد حذفه من الزر) يجب أن تعرفه معالجات لوحة المفاتيح السفلية
+for _setname, _key in (("KB_START_TEXTS", "kb_start"), ("KB_SUPPORT_TEXTS", "kb_support"), ("KB_LANG_TEXTS", "kb_lang")):
+    try:
+        _s = globals().get(_setname)
+        if _s is not None:
+            _s.update({_strip_emoji_edge(TEXTS[_l][_key]) for _l in SUPPORTED_LANGS})
+    except Exception as _e:
+        print(f"kb text update {_setname} failed: {_e}")
 
 # ---------- أيقونات الإيموجي المخصص أمام الأزرار (تحتاج Premium عند صاحب البوت) ----------
 # (regex على نص الزر بالترتيب → معرّف الإيموجي). الترتيب مهم: الأخص أولاً.
@@ -1675,7 +1750,9 @@ def _wrap_icon_fallback(name):
             rm = k.get("reply_markup")
             msg = str(e).lower()
             if rm is not None and any(x in msg for x in ("icon", "emoji", "inline keyboard button", "button_")):
-                if _strip_icons(rm):
+                _n = _strip_icons(rm)
+                if _n or not _icons_off():
+                    _ICON_STATE["off"] = True
                     try:
                         c = dict(_vt_conf())
                         c["noicons"] = True
@@ -1705,6 +1782,7 @@ def btn_icons_command(message):
     conf = dict(_vt_conf())
     if len(parts) > 1 and parts[1].lower() in ("on", "off"):
         conf["noicons"] = (parts[1].lower() == "off")
+        _ICON_STATE["off"] = conf["noicons"]
         _vt_conf_save(conf)
     bot.reply_to(message, "🎨 أيقونات المنتجات: " + ("❌ مطفأة" if conf.get("noicons") else "✅ مفعّلة") + "\n/btn_icons on | off")
 
