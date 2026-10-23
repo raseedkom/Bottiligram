@@ -1500,6 +1500,18 @@ def _nav_rows(mk, lang, current):
         left = InlineKeyboardButton(text=subs_go, callback_data="back_to_main")
         right = InlineKeyboardButton(text=f"📍 {gifts_t}", callback_data="noop")
     try:
+        if not _icons_off():
+            if current == "subs":      # بطاقات الهدايا: سهم مخصص عند الحافة اليمنى + 🎁 عند اليسرى
+                right._icon_orig_text = right.text
+                right.text = f"{gifts_t} 🎁"
+                right.icon_custom_emoji_id = ICON_ARROW_R
+            else:                      # اشتراكات متنوعة: شعار مخصص عند اليمنى + ◀️ عند الحافة اليسرى
+                left._icon_orig_text = left.text
+                left.text = f"{subs_t} ◀️"
+                left.icon_custom_emoji_id = ICON_SUBS
+    except Exception as e:
+        print(f"nav icons failed: {e}")
+    try:
         if not _vt_conf().get("nostyle"):
             (right if current == "subs" else left).style = "success"   # الزر الذي يمكن الضغط عليه أخضر
     except Exception:
@@ -1619,16 +1631,53 @@ def _kb_icon_for_text(text):
             return ICON_SUPPORT
         if text == tx.get("kb_lang"):
             return ICON_LANG
+        if text == tx.get("kb_update"):
+            return ICON_REFRESH
     return None
+
+ICON_REFRESH = "5451636889717062286"
+ICON_REFERRAL = "5258203794772085854"
+ICON_GAME = "5409125874651903587"
+ICON_WALLET = "5443127283898405358"
+ICON_BINANCE = "5454205576512818013"
+ICON_CARD = "5472250091332993630"      # بريدي موب + RedotPay
+ICON_FLIXY = "5440410042773824003"
+ICON_BYBIT = "5201873447554145566"
+ICON_CHAT = "5215334566549540768"
+ICON_ARROW_R = "5416117059207572332"
+ICON_SUBS = "5381975814415866082"
+
+_DYN_CB_EXACT = {"mn_start": ICON_START, "mn_refresh": ICON_REFRESH, "pf_wallet": ICON_WALLET}
+_DYN_CB_PREFIX = (
+    ("mbuy_", ICON_BUY), ("qb_", ICON_BUY),
+    ("pm_bn_", ICON_BINANCE), ("pm_bd_", ICON_CARD), ("pm_fx_", ICON_FLIXY),
+    ("pm_rp_", ICON_CARD), ("pm_rd_", ICON_CARD), ("pm_soon_bb", ICON_BYBIT),
+    ("wpay_", ICON_WALLET), ("rf_o", ICON_REFERRAL), ("gm_hub", ICON_GAME),
+)
+_DYN_TEXT = (
+    (r"binance", ICON_BINANCE), (r"baridimob|بريدي\s*موب|بديدي\s*موب", ICON_CARD), (r"flixy", ICON_FLIXY),
+    (r"redotpay", ICON_CARD), (r"bybit", ICON_BYBIT),
+    (r"الشراء عبر الدردشة|buy via chat|acheter via le chat", ICON_CHAT),
+)
 
 def _dyn_icon(cb, text):
     if not text or _icons_off():
         return None
     cb = cb or ""
-    if cb == "mn_start":
-        return ICON_START, _strip_emoji_edge(text)
-    if cb.startswith(("mbuy_", "qb_")):
-        return ICON_BUY, _strip_emoji_edge(text)
+    eid = _DYN_CB_EXACT.get(cb)
+    if not eid:
+        for pre, e in _DYN_CB_PREFIX:
+            if cb.startswith(pre):
+                eid = e
+                break
+    if not eid and not cb.startswith(("buy_", "vgrp_", "grp_", "oos_")):
+        low = str(text).lower()
+        for rx, e in _DYN_TEXT:
+            if re.search(rx, low):
+                eid = e
+                break
+    if eid:
+        return eid, _strip_emoji_edge(text)
     return None
 
 _kbb_to_dict_orig = KeyboardButton.to_dict
@@ -1648,7 +1697,7 @@ def _kbb_to_dict_icon(self):
 KeyboardButton.to_dict = _kbb_to_dict_icon
 
 # النص بلا إيموجي (بعد حذفه من الزر) يجب أن تعرفه معالجات لوحة المفاتيح السفلية
-for _setname, _key in (("KB_START_TEXTS", "kb_start"), ("KB_SUPPORT_TEXTS", "kb_support"), ("KB_LANG_TEXTS", "kb_lang")):
+for _setname, _key in (("KB_START_TEXTS", "kb_start"), ("KB_SUPPORT_TEXTS", "kb_support"), ("KB_LANG_TEXTS", "kb_lang"), ("KB_UPDATE_TEXTS", "kb_update")):
     try:
         _s = globals().get(_setname)
         if _s is not None:
@@ -1794,15 +1843,27 @@ WELCOME_BANNER_IDS = [
     "5361625615122319358", "5402435230432775363",
 ]
 
+WELCOME_BANNER_PAD = 4        # عدد الفراغات قبل الشعار في العربية (زدها لتحريكه نحو الوسط)
+WELCOME_BANNER_PAD_LTR = 3    # في الإنجليزية/الفرنسية
+
+def _u16(s):
+    return len(str(s).encode("utf-16-le")) // 2
+
 _send_main_menu_plain = send_main_menu
 
 def send_main_menu(chat_id, lang):
     if _icons_off():
         return _send_main_menu_plain(chat_id, lang)
-    caption = "⭐" * len(WELCOME_BANNER_IDS) + "\n" + t(lang, "welcome")
+    # الشعار في آخر الرسالة ومتوسّط تقريباً: علامة اتجاه + فراغات بريل (لا تُحذف) قبل الإيموجي
+    welcome = t(lang, "welcome")
+    mark = "‏" if lang == "ar" else "‎"
+    pad = "⠀" * (WELCOME_BANNER_PAD if lang == "ar" else WELCOME_BANNER_PAD_LTR)
+    head = welcome + "\n\n" + mark + pad
+    caption = head + "⭐" * len(WELCOME_BANNER_IDS)
     mk = generate_store_keyboard(lang)
     try:
-        ents = [telebot.types.MessageEntity("custom_emoji", i, 1, custom_emoji_id=eid)
+        base = _u16(head)
+        ents = [telebot.types.MessageEntity("custom_emoji", base + i, 1, custom_emoji_id=eid)
                 for i, eid in enumerate(WELCOME_BANNER_IDS)]
     except Exception as e:
         print(f"welcome banner entities failed: {e}")
