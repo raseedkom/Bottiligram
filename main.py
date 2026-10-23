@@ -1786,6 +1786,106 @@ def btn_icons_command(message):
         _vt_conf_save(conf)
     bot.reply_to(message, "🎨 أيقونات المنتجات: " + ("❌ مطفأة" if conf.get("noicons") else "✅ مفعّلة") + "\n/btn_icons on | off")
 
+# ---------- شعار RASEEDKOM★ المضيء أعلى رسالة الترحيب (إيموجي مخصص) ----------
+# الحروف بالترتيب: R A S E E D K O M ★
+WELCOME_BANNER_IDS = [
+    "5364023048687078741", "5357372145800334358", "5364149466754468020", "5361794927028096622",
+    "5361794927028096622", "5359648590136361323", "5359549406456598104", "5375319963726793021",
+    "5361625615122319358", "5402435230432775363",
+]
+
+_send_main_menu_plain = send_main_menu
+
+def send_main_menu(chat_id, lang):
+    if _icons_off():
+        return _send_main_menu_plain(chat_id, lang)
+    caption = "⭐" * len(WELCOME_BANNER_IDS) + "\n" + t(lang, "welcome")
+    mk = generate_store_keyboard(lang)
+    try:
+        ents = [telebot.types.MessageEntity("custom_emoji", i, 1, custom_emoji_id=eid)
+                for i, eid in enumerate(WELCOME_BANNER_IDS)]
+    except Exception as e:
+        print(f"welcome banner entities failed: {e}")
+        return _send_main_menu_plain(chat_id, lang)
+    try:
+        bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=caption, caption_entities=ents, reply_markup=mk)
+        return
+    except Exception as e:
+        print(f"welcome banner photo failed: {e}")
+    try:
+        bot.send_message(chat_id, caption, entities=ents, reply_markup=mk)
+        return
+    except Exception as e:
+        print(f"welcome banner message failed: {e}")
+    _send_main_menu_plain(chat_id, lang)
+
+# ---------- بطاقة المنتج: إيموجي مخصص أمام «السعر» و«المتوفر» ----------
+ICON_PRICE = "5197434882321567830"
+ICON_STOCK = "5429518319243775957"
+_send_card_orig = send_card
+
+def _u16(s):
+    return len(str(s).encode("utf-16-le")) // 2
+
+def _caption_to_entities(caption):
+    """يحوّل نص Markdown البسيط (*غامق*) إلى نص + entities، ويضع إيموجي مخصصاً في سطري السعر والمتوفر."""
+    labels = {}
+    for l in SUPPORTED_LANGS:
+        tx = TEXTS.get(l, {})
+        for k, eid in (("price", ICON_PRICE), ("available", ICON_STOCK)):
+            v = tx.get(k)
+            if v:
+                labels[v] = eid
+    out, ents, pos = [], [], 0
+    for line in str(caption).split("\n"):
+        eid = None
+        for lab, e in labels.items():
+            if line.startswith(lab):
+                head = lab.split(" ", 1)
+                if len(head) == 2 and not re.search(r"\w", head[0]):
+                    line = "⭐" + line[len(head[0]):]
+                    eid = e
+                break
+        res, last, bolds = "", 0, []
+        for m in re.finditer(r"\*([^*\n]+)\*", line):
+            res += line[last:m.start()]
+            b0 = _u16(res)
+            res += m.group(1)
+            bolds.append((b0, _u16(m.group(1))))
+            last = m.end()
+        res += line[last:]
+        if eid:
+            ents.append(telebot.types.MessageEntity("custom_emoji", pos, 1, custom_emoji_id=eid))
+        for b0, bl in bolds:
+            ents.append(telebot.types.MessageEntity("bold", pos + b0, bl))
+        out.append(res)
+        pos += _u16(res) + 1
+    return "\n".join(out), ents
+
+def send_card(chat_id, product, caption, markup):
+    if _icons_off():
+        return _send_card_orig(chat_id, product, caption, markup)
+    try:
+        text, ents = _caption_to_entities(caption)
+    except Exception as e:
+        print(f"card entities failed: {e}")
+        return _send_card_orig(chat_id, product, caption, markup)
+    if len(text) <= 1024:
+        for photo in (product.get("image"), UNIFIED_IMAGE_URL):
+            if not photo:
+                continue
+            try:
+                bot.send_photo(chat_id, photo, caption=text, caption_entities=ents, reply_markup=markup)
+                return
+            except Exception as e:
+                print(f"card photo failed: {e}")
+    try:
+        bot.send_message(chat_id, text, entities=ents, reply_markup=markup)
+        return
+    except Exception as e:
+        print(f"card message failed: {e}")
+    return _send_card_orig(chat_id, product, caption, markup)
+
 def _own_oos(item):
     s = item.get("stock")
     return isinstance(s, int) and not isinstance(s, bool) and s <= 0
