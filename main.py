@@ -2824,6 +2824,12 @@ def custom_emoji_ids_handler(message):
         lines.append(f"{ch} <code>{cid}</code>")
     bot.reply_to(message, "🆔 معرّفات الإيموجي:\n\n" + "\n".join(lines), parse_mode="HTML")
 
+# يتقدم على معالجات «بانتظار إيميل/مبلغ...» حتى لا تبتلع رسالة الإيموجي
+try:
+    bot.message_handlers.insert(0, bot.message_handlers.pop())
+except Exception as _e:
+    print(f"emoji handler priority failed: {_e}")
+
 @bot.message_handler(commands=["vente_balance"])
 def vente_balance_command(message):
     if not is_admin_msg(message) or not _vt_need_key(message):
