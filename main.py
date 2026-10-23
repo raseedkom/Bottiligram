@@ -1575,8 +1575,124 @@ def _ikb_to_dict_styled(self):
     st = getattr(self, "style", None)
     if st:
         d["style"] = st
+    ic = getattr(self, "icon_custom_emoji_id", None)
+    if ic:
+        d["icon_custom_emoji_id"] = str(ic)
     return d
 InlineKeyboardButton.to_dict = _ikb_to_dict_styled
+
+# ---------- أيقونات الإيموجي المخصص أمام الأزرار (تحتاج Premium عند صاحب البوت) ----------
+# (regex على نص الزر بالترتيب → معرّف الإيموجي). الترتيب مهم: الأخص أولاً.
+BTN_ICON_IDS = [
+    (r"eleven\s*reader", "5949555742582251295"),
+    (r"eleven\s*labs", "6219689196722854904"),
+    (r"apple\s*music", "5292133684223157453"),
+    (r"apple\s*gift", "5334955749409834455"),
+    (r"google\s*play", "5373130604147654226"),
+    (r"netflix", "5318911503938634641"),
+    (r"chatgpt", "5359726582447487916"),
+    (r"steam", "5373144051690258848"),
+    (r"cap\s*cut", "5364339557712020484"),
+    (r"nord", "5346134750417403743"),
+    (r"n8n", "6133957427541843855"),
+    (r"lovable", "6104729848675050039"),
+    (r"duolingo", "5069087043175318384"),
+    (r"claude", "6174520215376763867"),
+    (r"prime", "4961180134506758889"),
+    (r"gemini|google\s*ai", "5321197740800120767"),
+    (r"surfshark", "5816931709442068156"),
+    (r"mobbin", "6312141558929956627"),
+    (r"linear", "6134000510358789940"),
+    (r"proton", "6237995064597945583"),
+    (r"magic\s*patterns", "5373246052868571826"),
+    (r"microsoft|office", "5372937764411031477"),
+    (r"\bmiro\b", "5794356184513257269"),
+    (r"ilovepdf", "5251558986443932784"),
+    (r"framer", "5363810946022131056"),
+    (r"figma", "5461087475625634452"),
+    (r"bolt\.new", "5942592544033479493"),
+]
+
+def _apply_icons(mk):
+    try:
+        conf = _vt_conf()
+        if conf.get("noicons"):
+            return
+        for row in mk.keyboard:
+            for b in row:
+                cb = getattr(b, "callback_data", None) or ""
+                if not cb.startswith(("buy_", "vgrp_", "grp_", "oos_")):
+                    continue
+                txt = getattr(b, "text", "") or ""
+                low = txt.lower()
+                for rx, eid in BTN_ICON_IDS:
+                    if re.search(rx, low):
+                        parts = txt.split(" ", 1)
+                        b._icon_orig_text = txt
+                        if len(parts) == 2 and not re.search(r"\w", parts[0]):
+                            b.text = parts[1]          # نحذف الإيموجي العادي ليحل المخصص مكانه
+                        b.icon_custom_emoji_id = eid
+                        break
+    except Exception as e:
+        print(f"apply_icons failed: {e}")
+
+def _strip_icons(rm):
+    n = 0
+    try:
+        for row in getattr(rm, "keyboard", []) or []:
+            for b in row:
+                if getattr(b, "icon_custom_emoji_id", None):
+                    b.icon_custom_emoji_id = None
+                    if getattr(b, "_icon_orig_text", None):
+                        b.text = b._icon_orig_text
+                    n += 1
+    except Exception:
+        pass
+    return n
+
+def _wrap_icon_fallback(name):
+    orig = getattr(bot, name, None)
+    if not orig:
+        return
+    def w(*a, **k):
+        try:
+            return orig(*a, **k)
+        except Exception as e:
+            rm = k.get("reply_markup")
+            msg = str(e).lower()
+            if rm is not None and any(x in msg for x in ("icon", "emoji", "inline keyboard button", "button_")):
+                if _strip_icons(rm):
+                    try:
+                        c = dict(_vt_conf())
+                        c["noicons"] = True
+                        _vt_conf_save(c)
+                    except Exception:
+                        pass
+                    try:
+                        monitor_send("⚠️ <b>رفض تيليغرام أيقونات الأزرار المخصصة</b> (غالباً انتهى Premium). تم إطفاؤها تلقائياً. بعد التجديد: /btn_icons on",
+                                     key="icons_off", cooldown=3600)
+                    except Exception:
+                        pass
+                    return orig(*a, **k)
+            raise
+    setattr(bot, name, w)
+
+for _m in ("send_message", "edit_message_text", "edit_message_reply_markup", "send_photo"):
+    try:
+        _wrap_icon_fallback(_m)
+    except Exception as _e:
+        print(f"icon fallback wrap {_m} failed: {_e}")
+
+@bot.message_handler(commands=["btn_icons"])
+def btn_icons_command(message):
+    if not is_admin_msg(message):
+        return
+    parts = (message.text or "").split()
+    conf = dict(_vt_conf())
+    if len(parts) > 1 and parts[1].lower() in ("on", "off"):
+        conf["noicons"] = (parts[1].lower() == "off")
+        _vt_conf_save(conf)
+    bot.reply_to(message, "🎨 أيقونات المنتجات: " + ("❌ مطفأة" if conf.get("noicons") else "✅ مفعّلة") + "\n/btn_icons on | off")
 
 def _own_oos(item):
     s = item.get("stock")
@@ -1594,6 +1710,7 @@ def _oos_button(item, lang):
 
 def _style_store(mk):
     """أخضر لكل منتج/مجموعة متوفرة، أحمر للنافد. تعطيل: /btn_style off"""
+    _apply_icons(mk)
     try:
         if _vt_conf().get("nostyle"):
             return mk
