@@ -1843,7 +1843,7 @@ WELCOME_BANNER_IDS = [
     "5361625615122319358", "5402435230432775363",
 ]
 
-WELCOME_BANNER_PAD = 4        # عدد الفراغات قبل الشعار في العربية (زدها لتحريكه نحو الوسط)
+WELCOME_BANNER_PAD = 5        # عدد الفراغات قبل الشعار في العربية (زدها لتحريكه نحو اليمين)
 WELCOME_BANNER_PAD_LTR = 3    # في الإنجليزية/الفرنسية
 
 def _u16(s):
@@ -1856,7 +1856,7 @@ def send_main_menu(chat_id, lang):
         return _send_main_menu_plain(chat_id, lang)
     # الشعار في آخر الرسالة ومتوسّط تقريباً: علامة اتجاه + فراغات بريل (لا تُحذف) قبل الإيموجي
     welcome = t(lang, "welcome")
-    mark = "‏" if lang == "ar" else "‎"
+    mark = "‎"   # اتجاه يسار→يمين دائماً حتى لا تنعكس الحروف
     pad = "⠀" * (WELCOME_BANNER_PAD if lang == "ar" else WELCOME_BANNER_PAD_LTR)
     head = welcome + "\n\n" + mark + pad
     caption = head + "⭐" * len(WELCOME_BANNER_IDS)
