@@ -343,7 +343,8 @@ patch(r"""    if data != "pf_topo":""",
 
 # 11) لوحة الأدمن
 patch(r"""    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callback_data="adm_view"))""",
-      r"""    markup.add(InlineKeyboardButton(text="📦 الطلبات المعلقة", callback_data="adm_pend"))
+      r"""    markup.add(InlineKeyboardButton(text="💰 ربح الصافي", callback_data="adm_profit"))
+    markup.add(InlineKeyboardButton(text="📦 الطلبات المعلقة", callback_data="adm_pend"))
     markup.add(InlineKeyboardButton(text=f"💳 الدفعات المعلقة ({_pp_count()})", callback_data="ap_l"))
     markup.add(InlineKeyboardButton(text="💳 شحن محفظة زبون", callback_data="ap_wt"))
     markup.add(InlineKeyboardButton(text="✏️ تعديل وصف منتج", callback_data="ap_dp"))
@@ -366,10 +367,12 @@ patch(r"""    st = _adm_wait[aid]
 # 12) حفظ التسليم التلقائي في سجل الطلبات
 patch(r"""    record_purchase(uid, GEMINI_ID, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))""",
       r"""    record_purchase(uid, GEMINI_ID, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))
-    order_log_auto(uid, claim.get("product_name"), claim.get("price"), canon, "\n".join(links))""", "log_gemini")
+    order_log_auto(uid, claim.get("product_name"), claim.get("price"), canon, "\n".join(links))
+    profit_log(canon, GEMINI_ID, claim.get("product_name"), claim.get("price"), None)""", "log_gemini")
 patch(r"""            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))""",
       r"""            record_purchase(uid, pid, claim.get("product_name"), claim.get("price"), canon, via=claim.get("via", "binance"))
-            order_log_auto(uid, claim.get("product_name"), claim.get("price"), canon, "\n".join(codes))""", "log_fazer")
+            order_log_auto(uid, claim.get("product_name"), claim.get("price"), canon, "\n".join(codes))
+            profit_log(canon, pid, claim.get("product_name"), claim.get("price"), cost)""", "log_fazer")
 
 
 # 15) كميات: Gemini حتى GEMINI_MAX_QTY، وبطاقات الهداية حتى GIFT_MAX_QTY
@@ -962,6 +965,7 @@ def _fulfill_manual(chat_id, uid, lang, claim, canon, retry, mark, failed):
     clear_pending(uid)
     was_out = not _manual_in_stock(pid)
     record_purchase(uid, pid, pname, claim.get("price"), canon, via=claim.get("via", "binance"))
+    profit_log(canon, pid, pname, claim.get("price"), None)
     _manual_stock_dec(pid)
     _sadd(ORDSET_KEY, oid)
     spname = html.escape(pname)
@@ -1195,7 +1199,152 @@ def deliver_manual_order(oid, text):
     monitor_send(f"📬 <b>تم تسليم طلب</b> (ينتظر تأكيد الزبون 20 د)\n\n📦 {html.escape(o['product_name'])}\n👤 {_user_link(uid)}")
     return True, "✅ تم إرسال البيانات للزبون."
 
+PROFIT_FIXED = {          # ربحك الثابت لكل طلبية (بالدولار) — يمكن تغييره بـ /setprofit
+    "netflix_full": "1", "netflix_profile": "1",
+    "canva_edu_500": "3",       # Canva Pro panel
+    "canva_edu_5000": "0.20",   # Canva (الثاني)
+    "iptv_14m": "5",
+}
+
+PROFIT_PCT = {            # منتجات ربحها 30% من سعر البيع
+    "gemini_18m": 30, "capcut_1m": 30, "duolingo_12m": 30, "duolingo_link_12m": 30,
+    "chatgpt_plus_1m": 30, "chatgpt_k12_edu": 30,
+}
+
+def _fixed_profit(pid):
+    try:
+        v = (_vt_conf().get("pf") or {}).get(pid)
+        if v is None:
+            v = PROFIT_FIXED.get(pid)
+        return Decimal(str(v)) if v is not None else None
+    except Exception:
+        return None
+
+def _pl_local(ts):
+    return time.gmtime(int(ts) + 3600)      # توقيت الجزائر UTC+1
+
+def _pl_mkey(ts):
+    g = _pl_local(ts)
+    return f"{g.tm_year}-{g.tm_mon:02d}"
+
+def profit_log(canon, pid, pname, price, cost=None):
+    """يسجل بيعة واحدة وربحها الصافي (آمن ضد التكرار). لا يكسر الشراء أبداً."""
+    try:
+        if not db:
+            return
+        if not kv_set(f"rk:plg:{canon}", "1", nx=True):
+            return
+        ts = int(time.time())
+        pid_s = str(pid or "")
+        pr = None
+        pc = None
+        try:
+            pc = Decimal(str(price).replace("$", "").strip())
+        except Exception:
+            pc = None
+        fx = _fixed_profit(pid_s)
+        if fx is not None:
+            pr = fx
+        elif cost is not None and pc is not None:
+            pr = pc - Decimal(str(cost))
+        elif pid_s in PROFIT_PCT and pc is not None:
+            pr = pc * Decimal(PROFIT_PCT[pid_s]) / Decimal(100)      # نسبة من سعر البيع
+        elif pid_s.startswith("vt") and pc is not None:
+            pr = pc * Decimal(VENTE_MARGIN_PCT) / Decimal(100 + VENTE_MARGIN_PCT)
+        rec = {"t": ts, "p": pid_s, "n": str(pname or "")[:60], "s": str(pc if pc is not None else price),
+               "g": None if pr is None else float(round(pr, 4))}
+        db.lpush(f"rk:pl:{_pl_mkey(ts)}", json.dumps(rec, ensure_ascii=False))
+    except Exception as e:
+        print(f"profit_log error: {e}")
+
+def _pl_stats(mkey, day=None):
+    """(عدد الطلبات، الربح الصافي، عدد الطلبات بلا ربح محدد)"""
+    n, total, unk = 0, 0.0, 0
+    try:
+        for raw in (db.lrange(f"rk:pl:{mkey}", 0, -1) or []):
+            try:
+                r = raw if isinstance(raw, dict) else json.loads(raw)
+            except Exception:
+                continue
+            if day is not None:
+                g = _pl_local(r.get("t", 0))
+                if (g.tm_year, g.tm_mon, g.tm_mday) != day:
+                    continue
+            n += 1
+            if r.get("g") is None:
+                unk += 1
+            else:
+                total += float(r["g"])
+    except Exception as e:
+        print(f"pl_stats error: {e}")
+    return n, total, unk
+
+def _profit_screen(which):
+    now = int(time.time())
+    g = _pl_local(now)
+    cur = f"{g.tm_year}-{g.tm_mon:02d}"
+    py, pm = (g.tm_year, g.tm_mon - 1) if g.tm_mon > 1 else (g.tm_year - 1, 12)
+    prev = f"{py}-{pm:02d}"
+    if which == "m":
+        n, p, u = _pl_stats(cur)
+        title = f"🗓️ <b>الشهر الحالي</b> ({cur})"
+    elif which == "l":
+        n, p, u = _pl_stats(prev)
+        title = f"⏮️ <b>الشهر الماضي</b> ({prev})"
+    else:
+        n, p, u = _pl_stats(cur, day=(g.tm_year, g.tm_mon, g.tm_mday))
+        title = f"📅 <b>اليوم</b> ({g.tm_year}-{g.tm_mon:02d}-{g.tm_mday:02d})"
+    text = f"💰 <b>ربح الصافي</b>\n\n{title}\n🛒 الطلبيات المباعة: <b>{n}</b>\n💵 الربح الصافي: <b>{p:.2f}$</b>"
+    if u:
+        text += f"\n\n⚠️ {u} طلبية بلا ربح محدد (لم تُحسب). حدّد ربح المنتج بـ: /setprofit رمز_المنتج المبلغ"
+    mk = InlineKeyboardMarkup(row_width=1)
+    if which != "d":
+        mk.add(InlineKeyboardButton(text="📅 ربح اليوم", callback_data="adm_profit"))
+    if which != "m":
+        mk.add(InlineKeyboardButton(text="🗓️ الشهر الحالي", callback_data="adm_profit_m"))
+    if which != "l":
+        mk.add(InlineKeyboardButton(text="⏮️ ربح الشهر الماضي", callback_data="adm_profit_l"))
+    return text, mk
+
+@bot.message_handler(commands=["setprofit"])
+def setprofit_cmd(message):
+    if str(message.chat.id) != str(ADMIN_CHAT_ID):
+        return
+    a = (message.text or "").split()
+    if len(a) == 1:
+        conf = _vt_conf().get("pf") or {}
+        rows = {**PROFIT_FIXED, **conf}
+        bot.reply_to(message, "💰 أرباح ثابتة لكل طلبية:\n" + "\n".join(f"• {k} = {v}$" for k, v in rows.items())
+                     + "\n\nلتغيير: /setprofit رمز_المنتج المبلغ\nللحذف: /setprofit رمز_المنتج -")
+        return
+    if len(a) < 3:
+        bot.reply_to(message, "الاستعمال: /setprofit رمز_المنتج المبلغ")
+        return
+    conf = dict(_vt_conf())
+    pf = dict(conf.get("pf") or {})
+    if a[2] == "-":
+        pf.pop(a[1], None)
+        PROFIT_FIXED.pop(a[1], None)
+    else:
+        try:
+            pf[a[1]] = str(Decimal(a[2].replace(",", ".")))
+        except Exception:
+            bot.reply_to(message, "❌ مبلغ غير صالح")
+            return
+    conf["pf"] = pf
+    _vt_conf_save(conf)
+    bot.reply_to(message, "✅ تم الحفظ")
+
 def _admin_panel_extra(call, op):
+    if op in ("profit", "profit_m", "profit_l"):
+        text, mk = _profit_screen({"profit": "d", "profit_m": "m", "profit_l": "l"}[op])
+        try:
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode="HTML", reply_markup=mk)
+        except Exception as e:
+            if "not modified" not in str(e).lower():
+                bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=mk)
+        bot.answer_callback_query(call.id)
+        return True
     if op == "pend":
         show_pending_orders(call.message.chat.id)
         bot.answer_callback_query(call.id)
@@ -3015,6 +3164,7 @@ def _fulfill_vente(chat_id, uid, lang, claim, canon, retry, mark, failed, vid=No
             if cost is not None and price:
                 diff = price - cost
                 margin = f"\n💹 الربح التقريبي: {diff:.2f}$" + (" ⚠️ خسارة!" if diff < 0 else "")
+            profit_log(canon, pid, claim.get("product_name"), price, cost)
             if len(accts) < qty:
                 alert_admin(f"⚠️ <b>وصل عدد حسابات أقل من المطلوب</b>\n📦 {pname}\n🧾 <code>{html.escape(canon)}</code>\nمطلوب {qty}، وصل {len(accts)}.")
             alert_admin(
