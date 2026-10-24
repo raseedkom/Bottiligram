@@ -1930,7 +1930,8 @@ ICON_BELL = "5458603043203327669"       # أعلمني بالمباريات ال
 ICON_NOTIF_OFF = "5240241223632954241"  # إيقاف الإشعارات
 ICON_STOP_TIMER = "5359543311897998264" # إيقاف العداد
 VS_EMOJI_ID = "5467412991790043938"     # VS بين الفريقين
-ICON_LANG_GLOBE = "5224450179368767019"  # 🌍 عنوان اختيار اللغة
+LB_MEDAL_IDS = ("5440539497383087970", "5447203607294265305", "5453902265922376865")  # ميداليات الترتيب 1/2/3
+ICON_LANG_GLOBE ="5224450179368767019"  # 🌍 عنوان اختيار اللغة
 ICON_LANG_AR = "5269400778807720624"     # علم الجزائر
 ICON_LANG_FR = "5202132623060640759"     # علم فرنسا
 ICON_LANG_EN = "5458416160586342331"     # علم بريطانيا
@@ -6213,10 +6214,17 @@ def gm_leaderboard(call, lang, which, page=0):
     if page * LB_PAGE >= len(pairs):
         page = 0
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    rows = []
+    _plain_medals = dict(medals)
+    if not _icons_off():
+        for _n, _mid in ((1, LB_MEDAL_IDS[0]), (2, LB_MEDAL_IDS[1]), (3, LB_MEDAL_IDS[2])):
+            medals[_n] = f'<tg-emoji emoji-id="{_mid}">{_plain_medals[_n]}</tg-emoji>'
     chunk = pairs[page * LB_PAGE:(page + 1) * LB_PAGE]
-    for i, (u, s) in enumerate(chunk, page * LB_PAGE + 1):
-        rows.append(f"{medals.get(i, f'#{i}')} {_lb_name(u)}\n└ 🪙 <b>{int(s)}</b> Raseedkom Coins")
+    def _lb_rows(md):
+        out = []
+        for i, (u, s) in enumerate(chunk, page * LB_PAGE + 1):
+            out.append(f"{md.get(i, f'#{i}')} {_lb_name(u)}\n└ 🪙 <b>{int(s)}</b> Raseedkom Coins")
+        return out
+    rows = _lb_rows(medals)
     rank, pts = _my_rank(pairs, uid)
     mk = InlineKeyboardMarkup(row_width=1)
     if page + 1 < LB_MAX_PAGES and len(pairs) > (page + 1) * LB_PAGE:
@@ -6226,8 +6234,13 @@ def gm_leaderboard(call, lang, which, page=0):
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_cur" if which == "prev" else "btn_prev"),
                                 callback_data="gm_lb_cur" if which == "prev" else "gm_lb_prev"))
     mk.add(InlineKeyboardButton(text=gt(lang, "btn_hub"), callback_data="gm_hub"))
-    _pf_show(call, gt(lang, "lb").format(
-        month=_month_label(month, lang), rows="\n\n".join(rows) or gt(lang, "lb_empty"), rank=rank, pts=pts), mk)
+    try:
+        _pf_show(call, gt(lang, "lb").format(
+            month=_month_label(month, lang), rows="\n\n".join(rows) or gt(lang, "lb_empty"), rank=rank, pts=pts), mk)
+    except Exception as e:
+        print(f"leaderboard custom medals failed: {e}")
+        _pf_show(call, gt(lang, "lb").format(
+            month=_month_label(month, lang), rows="\n\n".join(_lb_rows(_plain_medals)) or gt(lang, "lb_empty"), rank=rank, pts=pts), mk)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gm" + SEP))
 def handle_games(call):
