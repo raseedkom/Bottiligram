@@ -436,7 +436,9 @@ patch(r"""    },
 # ========== التحكم في الأسعار من تيليغرام (الأدمن فقط) ==========""", "new_gift_products")
 patch(r""""text": "⬇️ بطقات الهداية ⬇️",""", r""""text": "⬇️ اشتراكات متنوعة ⬇️",""", "sep_rename")
 patch(r"""    gift_markup.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))""",
-      r"""    gift_markup.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="gcp"))""", "gift_back_btn")
+      r"""    _gb = InlineKeyboardButton(text=t(lang, "back"), callback_data="gcp")
+    _gb.icon_dyn = ICON_GIFT_BACK
+    gift_markup.add(_gb)""", "gift_back_btn")
 
 
 # 17) الرجوع من منتج تابع لمجموعة (Claude / Snapchat) يرجع لصفحة المجموعة
@@ -1916,6 +1918,17 @@ ICON_LB = "6145275873252612254"         # الترتيب الشهري
 ICON_COINS = "5276071069176842299"      # محفظة الكوينز
 ICON_MATCH = "5776422093302273080"      # ساحة المباريات
 ICON_TIMER = "6003478739155949455"      # تحدي التوقيت
+ICON_GIFT_BACK = "5294258473263978209"  # رجوع (صفحة بطاقات الهدايا)
+ICON_GPLAY = "5373130604147654226"      # شعار Google Play
+ICON_APPLE_GIFT = "5334955749409834455" # شعار Apple
+ICON_STEAM_GIFT = "5373144051690258848" # شعار Steam
+ICON_BC_CHEST = "6134110852363586757"   # صندوق BC (PUBG)
+ICON_FF_CHEST = "6014802042474731668"   # صندوق Free Fire
+ICON_MYPRED = "5472026645659401564"     # توقعاتي (تقويم)
+ICON_BELL = "5458603043203327669"       # أعلمني بالمباريات الجديدة
+ICON_NOTIF_OFF = "5240241223632954241"  # إيقاف الإشعارات
+ICON_STOP_TIMER = "5359543311897998264" # إيقاف العداد
+VS_EMOJI_ID = "5467412991790043938"     # VS بين الفريقين
 ICON_MENU_GAME = "4972415571384599106"  # لعبة (القائمة الرئيسية)
 ICON_MENU_API = "5271604874419647061"   # API
 ICON_MENU_CHANNEL = "5424818078833715060"  # القناة الرئيسية
@@ -1939,6 +1952,10 @@ _DYN_TEXT_FIRST = (
     (r"محفظة الكوينز|coins wallet|portefeuille de coins", ICON_COINS, False),
     (r"ساحة المباريات|match arena|arène des matchs|arene des matchs", ICON_MATCH, False),
     (r"تحدي التوقيت|timing challenge|défi chrono|defi chrono", ICON_TIMER, False),
+    (r"إيقاف الإشعارات|turn off notifications|désactiver les notifications|desactiver les notifications", ICON_NOTIF_OFF, False),
+    (r"أعلمني بالمباريات|notify me of new matches|avertir des nouveaux matchs", ICON_BELL, False),
+    (r"توقعاتي|my predictions|mes pronostics", ICON_MYPRED, False),
+    (r"إيقاف العداد|stop counter|arrêter le compteur|arreter le compteur", ICON_STOP_TIMER, False),
     (r"تواصل مع الدعم|contact support|contacter l'assistance", ICON_CONTACT, False),
     (r"^\W*buy now(?!\w)", ICON_BUY, False),
     (r"نسخ الرابط|copy link|copier le lien", "5386379624773066504", False),
@@ -1951,7 +1968,7 @@ def _clean_arrows(s):
         s = s.replace(a, " ")
     return re.sub(r"\s+", " ", s).strip()
 _DYN_CB_PREFIX = (
-    ("mbuy_", ICON_BUY), ("qb_", ICON_BUY),
+    ("mbuy_", ICON_BUY), ("qb_", ICON_BUY), ("var_gplay_", ICON_GPLAY), ("var_apple_gift_", ICON_APPLE_GIFT), ("var_steam_", ICON_STEAM_GIFT), ("var_pubg_", ICON_BC_CHEST), ("var_freefire_", ICON_FF_CHEST),
     ("pm_bn_", ICON_BINANCE), ("pm_bd_", ICON_CARD), ("pm_fx_", ICON_FLIXY),
     ("pm_rp_", ICON_CARD), ("pm_rd_", ICON_CARD), ("pm_soon_bb", ICON_BYBIT),
     ("wpay_", ICON_WALLET), ("rf_o", ICON_REFERRAL), ("gm_hub", ICON_GAME),
@@ -2216,6 +2233,11 @@ def _caption_to_entities(caption):
     out, ents, pos = [], [], 0
     for line in str(caption).split("\n"):
         eid = None
+        for _lp, _le in (("🤖 Google Play", ICON_GPLAY), ("🍎 Apple Gift Card", ICON_APPLE_GIFT), ("🎮 Steam Wallet", ICON_STEAM_GIFT), ("🔫 PUBG", ICON_BC_CHEST), ("🔥 Free Fire", ICON_FF_CHEST)):
+            if line.startswith(_lp):
+                line = "⭐" + line[len(_lp.split(" ", 1)[0]):]
+                eid = _le
+                break
         for lab, e in labels.items():
             if line.startswith(lab):
                 head = lab.split(" ", 1)
@@ -6603,7 +6625,10 @@ AT = {
 }
 
 def at(lang, key):
-    return AT.get(lang, AT["ar"])[key]
+    v = AT.get(lang, AT["ar"])[key]
+    if "🆚" in v and not _icons_off():
+        v = v.replace("🆚", '<tg-emoji emoji-id="' + VS_EMOJI_ID + '">🆚</tg-emoji>')
+    return v
 
 # ---------- تخزين المباريات ----------
 def _mk(mid):
