@@ -343,7 +343,8 @@ patch(r"""    if data != "pf_topo":""",
 
 # 11) لوحة الأدمن
 patch(r"""    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callback_data="adm_view"))""",
-      r"""    markup.add(InlineKeyboardButton(text="💰 ربح الصافي", callback_data="adm_profit"))
+      r"""    markup.add(InlineKeyboardButton(text=_maint_label(), callback_data="adm_maint"))
+    markup.add(InlineKeyboardButton(text="💰 ربح الصافي", callback_data="adm_profit"))
     markup.add(InlineKeyboardButton(text="📦 الطلبات المعلقة", callback_data="adm_pend"))
     markup.add(InlineKeyboardButton(text=f"💳 الدفعات المعلقة ({_pp_count()})", callback_data="ap_l"))
     markup.add(InlineKeyboardButton(text="💳 شحن محفظة زبون", callback_data="ap_wt"))
@@ -1410,6 +1411,28 @@ def setprofit_cmd(message):
     bot.reply_to(message, "✅ تم الحفظ")
 
 def _admin_panel_extra(call, op):
+    if op == "maint":
+        was = _maint_on()
+        on = not was
+        _maint_set(on)
+        extra = ""
+        if was and not on:
+            extra = f"\n🔔 أُرسل إشعار العودة لـ {_maint_broadcast_back()} زبون."
+        try:
+            rm = call.message.reply_markup
+            for row in rm.keyboard:
+                for b in row:
+                    if getattr(b, "callback_data", None) == "adm_maint":
+                        b.text = _maint_label()
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=rm)
+        except Exception as e:
+            print(f"maint label update failed: {e}")
+        bot.answer_callback_query(
+            call.id,
+            ("🛠️ تم تشغيل وضع التحديث: البوت متوقف عند الزبائن، وأنت تبقى تستعمله عادياً." if on
+             else "✅ تم إيقاف وضع التحديث: البوت يعمل للجميع.") + extra,
+            show_alert=True)
+        return True
     if op in ("profit", "profit_m", "profit_l"):
         text, mk = _profit_screen({"profit": "d", "profit_m": "m", "profit_l": "l"}[op])
         try:
@@ -1911,6 +1934,7 @@ _DYN_TEXT_FIRST = (
     (r"ساحة المباريات|match arena|arène des matchs|arene des matchs", ICON_MATCH, False),
     (r"تحدي التوقيت|timing challenge|défi chrono|defi chrono", ICON_TIMER, False),
     (r"تواصل مع الدعم|contact support|contacter l'assistance", ICON_CONTACT, False),
+    (r"^\W*buy now(?!\w)", ICON_BUY, False),
     (r"نسخ الرابط|copy link|copier le lien", "5386379624773066504", False),
     (r"إلى المحفظة|to wallet|au portefeuille", "5386380500946414098", False),
     (r"baridimob|بريدي\s*موب|بديدي\s*موب", ICON_BARIDI, False),
@@ -2232,6 +2256,97 @@ def send_card(chat_id, product, caption, markup):
     except Exception as e:
         print(f"card message failed: {e}")
     return _send_card_orig(chat_id, product, caption, markup)
+
+# ---------- منشورات المنتجات الدورية (القناة/الزبائن): إيموجي مخصص كما في المتجر ----------
+_send_channel_post_orig = send_channel_post
+_send_user_post_orig = send_user_post
+
+def _logo_id(item):
+    low = str(item.get("name") or "").lower()
+    for rx, eid in BTN_ICON_IDS:
+        if re.search(rx, low):
+            return eid
+    return None
+
+def _lead_swap(label):
+    """يحذف الإيموجي العادي من أول التسمية ('📦 المتوفر:' → 'المتوفر:')."""
+    parts = str(label).split(" ", 1)
+    if len(parts) == 2 and not re.search(r"\w", parts[0]):
+        return parts[1]
+    return str(label)
+
+def _post_build(item, name, lbl_stock, stock_val, lbl_price, price_val):
+    ents = []
+    logo = _logo_id(item)
+    text = ("⭐" if logo else str(item.get("icon") or "")) + " "
+    if logo:
+        ents.append(telebot.types.MessageEntity("custom_emoji", 0, 1, custom_emoji_id=logo))
+    b0 = _u16(text)
+    text += name
+    ents.append(telebot.types.MessageEntity("bold", b0, _u16(name)))
+    text += "\n\n"
+    for eid, lbl, val in ((ICON_STOCK, lbl_stock, stock_val), (ICON_PRICE, lbl_price, price_val)):
+        pos = _u16(text)
+        text += "⭐ " + _lead_swap(lbl) + " " + str(val)
+        ents.append(telebot.types.MessageEntity("custom_emoji", pos, 1, custom_emoji_id=eid))
+        text += "\n"
+    return text.rstrip("\n"), ents
+
+def _send_post_ents(chat_id, item, text, ents, markup, fallback):
+    photo = item.get("image", UNIFIED_IMAGE_URL)
+    for _ in range(3):
+        try:
+            try:
+                if len(text) > 1024:
+                    bot.send_message(chat_id, text, entities=ents, reply_markup=markup)
+                else:
+                    bot.send_photo(chat_id, photo, caption=text, caption_entities=ents, reply_markup=markup)
+            except ApiTelegramException as e:
+                if e.error_code in (403, 429):
+                    raise
+                bot.send_message(chat_id, text, entities=ents, reply_markup=markup)
+            return True
+        except ApiTelegramException as e:
+            if e.error_code == 429:
+                time.sleep(_retry_after(e) + 1)
+                continue
+            if e.error_code == 403 or "chat not found" in str(e).lower():
+                return False
+            print(f"post entities failed: {e}")
+            return fallback()
+        except Exception as e:
+            print(f"post entities failed: {e}")
+            return fallback()
+    return None
+
+def send_channel_post(chat_id, item):
+    if _icons_off():
+        return _send_channel_post_orig(chat_id, item)
+    try:
+        sync_stock()
+        sv = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
+        text, ents = _post_build(item, item["name"], "Current stock:", sv, "Price:", item["price"])
+        mk = InlineKeyboardMarkup()
+        mk.add(InlineKeyboardButton(text="🛒 Buy now", url=BOT_LINK + "?start=qb" + chr(95) + item["id"]))
+        return _send_post_ents(chat_id, item, text, ents, mk, lambda: _send_channel_post_orig(chat_id, item))
+    except Exception as e:
+        print(f"channel post build failed: {e}")
+        return _send_channel_post_orig(chat_id, item)
+
+def send_user_post(user_id, item):
+    if _icons_off():
+        return _send_user_post_orig(user_id, item)
+    try:
+        sync_stock()
+        lang = get_lang(user_id)
+        sv = item["stock"] if item["stock"] == "♾️" else str(item["stock"])
+        text, ents = _post_build(item, tr(item, "name", lang), t(lang, "available"), sv, t(lang, "price"), item["price"])
+        mk = InlineKeyboardMarkup()
+        mk.add(InlineKeyboardButton(text=t(lang, "order_now"), callback_data="qb" + chr(95) + item["id"]))
+        return _send_post_ents(int(user_id), item, text, ents, mk, lambda: _send_user_post_orig(user_id, item))
+    except Exception as e:
+        print(f"user post build failed: {e}")
+        return _send_user_post_orig(user_id, item)
 
 def _own_oos(item):
     s = item.get("stock")
@@ -5657,6 +5772,14 @@ bot.answer_callback_query = _safe_answer_cq
 
 def _qb_dispatch(call, pid):
     """يفتح مسار الشراء مباشرة: طرق الدفع، أو اختيار الكمية/القيمة أولاً."""
+    try:
+        if _maint_blocked_user(call.from_user):          # وضع التحديث: لا شراء مباشر
+            _lg = get_lang(call.from_user.id) if str(call.from_user.id) in user_lang else "ar"
+            send_maintenance(call.message.chat.id, _lg)
+            bot.answer_callback_query(call.id)
+            return
+    except Exception as e:
+        print(f"maint qb check failed: {e}")
     product = find_product(pid)
     if not product or product.get("type") == "separator":
         bot.answer_callback_query(call.id)
@@ -7032,6 +7155,201 @@ def arena_admin(message):
             bot.reply_to(message, "الاستعمال: /matchvoid ID")
             return
         bot.reply_to(message, void_match(a[0]))
+
+# ============================================================
+# ========== وضع التحديث (صيانة): يوقف البوت عند الزبائن ويبقى للأدمن ==========
+# ============================================================
+MAINT_KEY = "rk:maint"
+MAINT_SUBS = "rk:maint:subs"
+_maint_cache = {"t": 0.0, "v": False}
+
+def _maint_on():
+    now = time.time()
+    if now - _maint_cache["t"] < 3:
+        return _maint_cache["v"]
+    try:
+        v = str(kv_get(MAINT_KEY)) == "1"
+    except Exception:
+        v = _maint_cache["v"]
+    _maint_cache.update(t=now, v=v)
+    return v
+
+def _maint_set(on):
+    kv_set(MAINT_KEY, "1" if on else "0")
+    _maint_cache.update(t=time.time(), v=bool(on))
+
+def _maint_label():
+    return "🛠️ وضع التحديث: " + ("✅ شغّال (اضغط للإيقاف)" if _maint_on() else "⛔ مطفأ (اضغط للتشغيل)")
+
+MAINT_TEXTS = {
+    "ar": {
+        "msg": "🛠️ <b>البوت قيد التحديث</b>\n\nمرحباً بك في RASEEDKOM!\nنعمل حالياً على تحديث جديد لنقدّم لك تجربة أفضل ومنتجات أكثر.\n\n⏳ لن يستغرق التحديث وقتاً طويلاً، وسيعود البوت للعمل قريباً بإذن الله.\n\n🔔 اضغط على زر «أعلمني عند البدء»، وسيصلك إشعار فور عودة البوت للعمل.\n\nشكراً لصبرك وثقتك بنا 🤍",
+        "notify": "🔔 أعلمني عند البدء", "channel": "📢 القناة الرسمية", "support": "💬 الدعم",
+        "ok": "✅ تم! سنخبرك فور عودة البوت للعمل.", "already": "✅ أنت مسجّل مسبقاً، سنخبرك فور عودة البوت.",
+        "back": "✅ <b>عاد البوت للعمل!</b>\n\nيمكنك الآن متابعة التسوق والاستفادة من خدماتنا. شكراً لصبرك 🤍",
+        "go": "🚀 ابدأ الآن",
+    },
+    "en": {
+        "msg": "🛠️ <b>The bot is being updated</b>\n\nWelcome to RASEEDKOM!\nWe are working on a new update to bring you a better experience and more products.\n\n⏳ The update won't take long, and the bot will be back soon, God willing.\n\n🔔 Tap «Notify me when it starts» and you'll get a message as soon as the bot is back.\n\nThank you for your patience and trust 🤍",
+        "notify": "🔔 Notify me when it starts", "channel": "📢 Official channel", "support": "💬 Support",
+        "ok": "✅ Done! We'll let you know as soon as the bot is back.", "already": "✅ You're already subscribed, we'll notify you when the bot is back.",
+        "back": "✅ <b>The bot is back online!</b>\n\nYou can now continue shopping and enjoy our services. Thank you for your patience 🤍",
+        "go": "🚀 Start now",
+    },
+    "fr": {
+        "msg": "🛠️ <b>Le bot est en cours de mise à jour</b>\n\nBienvenue sur RASEEDKOM !\nNous travaillons sur une nouvelle mise à jour pour vous offrir une meilleure expérience et plus de produits.\n\n⏳ La mise à jour ne sera pas longue, le bot sera de retour très bientôt, si Dieu le veut.\n\n🔔 Appuyez sur « Me prévenir au démarrage » et vous recevrez une notification dès le retour du bot.\n\nMerci pour votre patience et votre confiance 🤍",
+        "notify": "🔔 Me prévenir au démarrage", "channel": "📢 Canal officiel", "support": "💬 Assistance",
+        "ok": "✅ C'est noté ! Nous vous préviendrons dès le retour du bot.", "already": "✅ Vous êtes déjà inscrit, nous vous préviendrons au retour du bot.",
+        "back": "✅ <b>Le bot est de retour !</b>\n\nVous pouvez reprendre vos achats et profiter de nos services. Merci pour votre patience 🤍",
+        "go": "🚀 Commencer",
+    },
+}
+
+def _maint_tx(lang):
+    return MAINT_TEXTS.get(lang) or MAINT_TEXTS["ar"]
+
+def _maint_markup(lang):
+    tx = _maint_tx(lang)
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=tx["notify"], callback_data="mnt_notify"))
+    b2 = InlineKeyboardButton(text=tx["channel"], url=CHANNEL_LINK)
+    b2.icon_dyn = ICON_MENU_CHANNEL
+    mk.add(b2)
+    b3 = InlineKeyboardButton(text=tx["support"], url=MY_PRIVATE_CHAT_LINK)
+    b3.icon_dyn = ICON_SUPPORT
+    mk.add(b3)
+    return mk
+
+def send_maintenance(chat_id, lang):
+    tx = _maint_tx(lang)
+    mk = _maint_markup(lang)
+    try:
+        if len(tx["msg"]) <= 1000:
+            bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=tx["msg"], parse_mode="HTML", reply_markup=mk)
+            return
+    except Exception as e:
+        print(f"maintenance photo failed: {e}")
+    try:
+        bot.send_message(chat_id, tx["msg"], parse_mode="HTML", reply_markup=mk)
+    except Exception as e:
+        print(f"maintenance message failed: {e}")
+
+_send_main_menu_pre_maint = send_main_menu
+
+def send_main_menu(chat_id, lang):
+    if _maint_on() and str(chat_id) != str(ADMIN_CHAT_ID):
+        return send_maintenance(chat_id, lang)
+    return _send_main_menu_pre_maint(chat_id, lang)
+
+_maint_last = {}
+
+def _maint_blocked_user(user):
+    return bool(user) and str(user.id) != str(ADMIN_CHAT_ID) and _maint_on()
+
+_MAINT_PASS_CMDS = ("/start", "/language", "/lang", "/update", "/refresh")
+
+def _maint_msg_filter(m):
+    try:
+        if m.chat.type != "private" or not _maint_blocked_user(m.from_user):
+            return False
+        txt = (m.text or "").strip()
+        if txt.split(" ")[0].split("@")[0].lower() in _MAINT_PASS_CMDS:
+            return False
+        if txt in KB_UPDATE_TEXTS or txt in KB_LANG_TEXTS:
+            return False
+        return True
+    except Exception:
+        return False
+
+@bot.message_handler(func=_maint_msg_filter, content_types=["text", "photo", "video", "document", "sticker", "voice", "audio", "contact", "location"])
+def maint_block_message(message):
+    uid = str(message.from_user.id)
+    now = time.time()
+    if now - _maint_last.get(uid, 0) < 20:
+        return
+    _maint_last[uid] = now
+    if uid in user_lang:
+        send_maintenance(message.chat.id, get_lang(uid))
+    elif gate_ok(message.chat.id, message.from_user.id):
+        send_language_menu(message.chat.id)
+
+bot.message_handlers.insert(0, bot.message_handlers.pop())
+
+_MAINT_PASS_CB = ("gate_verify", "change_lang", "mnt_notify", "mn_refresh")
+
+def _maint_cb_filter(c):
+    try:
+        if not _maint_blocked_user(c.from_user):
+            return False
+        d = c.data or ""
+        if d in _MAINT_PASS_CB or d.startswith("lang_"):
+            return False
+        return True
+    except Exception:
+        return False
+
+@bot.callback_query_handler(func=_maint_cb_filter)
+def maint_block_callback(call):
+    lang = get_lang(call.from_user.id) if str(call.from_user.id) in user_lang else "ar"
+    try:
+        bot.answer_callback_query(call.id, re.sub(r"<[^>]+>", "", _maint_tx(lang)["msg"].split("\n")[0]), show_alert=True)
+    except Exception:
+        pass
+
+bot.callback_query_handlers.insert(0, bot.callback_query_handlers.pop())
+
+@bot.callback_query_handler(func=lambda c: c.data == "mnt_notify")
+def maint_notify_cb(call):
+    uid = str(call.from_user.id)
+    lang = get_lang(uid) if uid in user_lang else "ar"
+    tx = _maint_tx(lang)
+    try:
+        was = uid in _smembers(MAINT_SUBS)
+        if not was:
+            _sadd(MAINT_SUBS, uid)
+        bot.answer_callback_query(call.id, tx["already" if was else "ok"], show_alert=True)
+    except Exception as e:
+        print(f"maint notify error: {e}")
+
+def _maint_broadcast_back():
+    subs = _smembers(MAINT_SUBS)
+    if not subs:
+        return 0
+
+    def _run():
+        sent = 0
+        for uid in subs:
+            try:
+                lang = get_lang(uid) if str(uid) in user_lang else "ar"
+                tx = _maint_tx(lang)
+                mk = InlineKeyboardMarkup()
+                mk.add(InlineKeyboardButton(text=tx["go"], callback_data="mn_refresh"))
+                bot.send_message(int(uid), tx["back"], parse_mode="HTML", reply_markup=mk)
+                sent += 1
+            except Exception:
+                pass
+            _srem(MAINT_SUBS, uid)
+            time.sleep(0.06)
+        monitor_send(f"🔔 <b>أُرسل إشعار عودة البوت</b> لـ {sent} زبون")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return len(subs)
+
+@bot.message_handler(commands=["maint", "maintenance"])
+def maint_command(message):
+    if not is_admin_msg(message):
+        return
+    parts = (message.text or "").split()
+    if len(parts) > 1 and parts[1].lower() in ("on", "off"):
+        on = parts[1].lower() == "on"
+        was = _maint_on()
+        _maint_set(on)
+        extra = ""
+        if was and not on:
+            extra = f"\n🔔 إشعار العودة أُرسل لـ {_maint_broadcast_back()} زبون."
+        bot.reply_to(message, f"🛠️ وضع التحديث: {'✅ شغّال' if on else '⛔ مطفأ'}" + extra)
+        return
+    bot.reply_to(message, f"🛠️ وضع التحديث: {'✅ شغّال' if _maint_on() else '⛔ مطفأ'}\nالمشتركون في الإشعار: {len(_smembers(MAINT_SUBS))}\n/maint on | off")
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
