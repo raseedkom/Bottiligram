@@ -7179,30 +7179,52 @@ def _maint_on():
     _maint_cache.update(t=now, v=v)
     return v
 
+MAINT_END_KEY = "rk:maint:end"
+_maint_end_cache = {"t": 0.0, "v": 0}
+
+def _maint_end_ts():
+    now = time.time()
+    if now - _maint_end_cache["t"] < 60:
+        return _maint_end_cache["v"]
+    try:
+        v = int(float(kv_get(MAINT_END_KEY) or 0))
+    except Exception:
+        v = _maint_end_cache["v"]
+    _maint_end_cache.update(t=now, v=v)
+    return v
+
 def _maint_set(on):
+    was = _maint_cache["v"]
     kv_set(MAINT_KEY, "1" if on else "0")
     _maint_cache.update(t=time.time(), v=bool(on))
+    if was and not on:
+        ts = int(time.time())
+        try:
+            kv_set(MAINT_END_KEY, str(ts))
+        except Exception:
+            pass
+        _maint_end_cache.update(t=time.time(), v=ts)
 
 def _maint_label():
     return "🛠️ وضع التحديث: " + ("✅ شغّال (اضغط للإيقاف)" if _maint_on() else "⛔ مطفأ (اضغط للتشغيل)")
 
 MAINT_TEXTS = {
     "ar": {
-        "msg": "🛠️ <b>البوت قيد التحديث</b>\n\nمرحباً بك في RASEEDKOM!\nنعمل حالياً على تحديث جديد لنقدّم لك تجربة أفضل ومنتجات أكثر.\n\n⏳ لن يستغرق التحديث وقتاً طويلاً، وسيعود البوت للعمل قريباً بإذن الله.\n\n🔔 اضغط على زر «أعلمني عند البدء»، وسيصلك إشعار فور عودة البوت للعمل.\n\nشكراً لصبرك وثقتك بنا 🤍",
+        "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]البوت قيد التحديث[[/b]] {S}\n\nمرحباً بك في RASEEDKOM!\nنعمل حالياً على تحديث جديد لنقدّم لك تجربة أفضل ومنتجات أكثر.\n\n{T} لن يستغرق التحديث وقتاً طويلاً، وسيعود البوت للعمل قريباً بإذن الله.\n\n{B} اضغط على زر «أعلمني عند البدء»، وسيصلك إشعار فور عودة البوت للعمل.\n\n{F} شكراً لصبرك وثقتك بنا {R}",
         "notify": "🔔 أعلمني عند البدء", "channel": "📢 القناة الرسمية", "support": "💬 الدعم",
         "ok": "✅ تم! سنخبرك فور عودة البوت للعمل.", "already": "✅ أنت مسجّل مسبقاً، سنخبرك فور عودة البوت.",
         "back": "✅ <b>عاد البوت للعمل!</b>\n\nيمكنك الآن متابعة التسوق والاستفادة من خدماتنا. شكراً لصبرك 🤍",
         "go": "🚀 ابدأ الآن",
     },
     "en": {
-        "msg": "🛠️ <b>The bot is being updated</b>\n\nWelcome to RASEEDKOM!\nWe are working on a new update to bring you a better experience and more products.\n\n⏳ The update won't take long, and the bot will be back soon, God willing.\n\n🔔 Tap «Notify me when it starts» and you'll get a message as soon as the bot is back.\n\nThank you for your patience and trust 🤍",
+        "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]The bot is being updated[[/b]] {S}\n\nWelcome to RASEEDKOM!\nWe are working on a new update to bring you a better experience and more products.\n\n{T} The update won't take long, and the bot will be back soon, God willing.\n\n{B} Tap «Notify me when it starts» and you'll get a message as soon as the bot is back.\n\n{F} Thank you for your patience and trust {R}",
         "notify": "🔔 Notify me when it starts", "channel": "📢 Official channel", "support": "💬 Support",
         "ok": "✅ Done! We'll let you know as soon as the bot is back.", "already": "✅ You're already subscribed, we'll notify you when the bot is back.",
         "back": "✅ <b>The bot is back online!</b>\n\nYou can now continue shopping and enjoy our services. Thank you for your patience 🤍",
         "go": "🚀 Start now",
     },
     "fr": {
-        "msg": "🛠️ <b>Le bot est en cours de mise à jour</b>\n\nBienvenue sur RASEEDKOM !\nNous travaillons sur une nouvelle mise à jour pour vous offrir une meilleure expérience et plus de produits.\n\n⏳ La mise à jour ne sera pas longue, le bot sera de retour très bientôt, si Dieu le veut.\n\n🔔 Appuyez sur « Me prévenir au démarrage » et vous recevrez une notification dès le retour du bot.\n\nMerci pour votre patience et votre confiance 🤍",
+        "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]Le bot est en cours de mise à jour[[/b]] {S}\n\nBienvenue sur RASEEDKOM !\nNous travaillons sur une nouvelle mise à jour pour vous offrir une meilleure expérience et plus de produits.\n\n{T} La mise à jour ne sera pas longue, le bot sera de retour très bientôt, si Dieu le veut.\n\n{B} Appuyez sur « Me prévenir au démarrage » et vous recevrez une notification dès le retour du bot.\n\n{F} Merci pour votre patience et votre confiance {R}",
         "notify": "🔔 Me prévenir au démarrage", "channel": "📢 Canal officiel", "support": "💬 Assistance",
         "ok": "✅ C'est noté ! Nous vous préviendrons dès le retour du bot.", "already": "✅ Vous êtes déjà inscrit, nous vous préviendrons au retour du bot.",
         "back": "✅ <b>Le bot est de retour !</b>\n\nVous pouvez reprendre vos achats et profiter de nos services. Merci pour votre patience 🤍",
@@ -7216,7 +7238,9 @@ def _maint_tx(lang):
 def _maint_markup(lang):
     tx = _maint_tx(lang)
     mk = InlineKeyboardMarkup(row_width=1)
-    mk.add(InlineKeyboardButton(text=tx["notify"], callback_data="mnt_notify"))
+    b1 = InlineKeyboardButton(text=tx["notify"], callback_data="mnt_notify")
+    b1.icon_dyn = MAINT_EMO["B"]
+    mk.add(b1)
     b2 = InlineKeyboardButton(text=tx["channel"], url=CHANNEL_LINK)
     b2.icon_dyn = ICON_MENU_CHANNEL
     mk.add(b2)
@@ -7225,17 +7249,62 @@ def _maint_markup(lang):
     mk.add(b3)
     return mk
 
+MAINT_EMO = {"W": "5447644880824181073", "H": "5197371802136892976", "S": "5440621591387980068",
+             "T": "5454415424319931791", "B": "5458603043203327669", "F": "5217712513847676489",
+             "R": "5300779290181262152"}
+MAINT_EMO_FALLBACK = {"W": "⚠️", "H": "🔨", "S": "🔜", "T": "⏳", "B": "🔔", "F": "🙂", "R": "🔥"}
+
+def _maint_build(text, custom=True):
+    """يحوّل {W}.. إلى إيموجي مخصص (entities) و [[b]]..[[/b]] إلى خط عريض."""
+    plain, ents, bold_start = "", [], None
+    pos = 0
+    for m in re.finditer(r"\{([WHSTBFR])\}|\[\[(/?)b\]\]", text):
+        plain += text[pos:m.start()]
+        pos = m.end()
+        if m.group(1):
+            k = m.group(1)
+            if custom:
+                ents.append(telebot.types.MessageEntity("custom_emoji", _u16(plain), 1, custom_emoji_id=MAINT_EMO[k]))
+                plain += "⭐"
+            else:
+                plain += MAINT_EMO_FALLBACK[k]
+        elif m.group(2):
+            if bold_start is not None:
+                ents.append(telebot.types.MessageEntity("bold", bold_start, _u16(plain) - bold_start))
+                bold_start = None
+        else:
+            bold_start = _u16(plain)
+    plain += text[pos:]
+    return plain, ents
+
+def _maint_alert_text(lang):
+    plain, _ = _maint_build(_maint_tx(lang)["msg"], custom=False)
+    lines = [x for x in plain.split("\n") if x.strip()]
+    return (lines[1] if len(lines) > 1 else lines[0])[:190]
+
 def send_maintenance(chat_id, lang):
     tx = _maint_tx(lang)
     mk = _maint_markup(lang)
+    if not _icons_off():
+        try:
+            plain, ents = _maint_build(tx["msg"], custom=True)
+            if len(plain) <= 1000:
+                bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=plain, caption_entities=ents, reply_markup=mk)
+            else:
+                bot.send_message(chat_id, plain, entities=ents, reply_markup=mk)
+            return
+        except Exception as e:
+            print(f"maintenance custom-emoji failed: {e}")
+    plain, ents = _maint_build(tx["msg"], custom=False)
+    ents = [x for x in ents if x.type == "bold"]
     try:
-        if len(tx["msg"]) <= 1000:
-            bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=tx["msg"], parse_mode="HTML", reply_markup=mk)
+        if len(plain) <= 1000:
+            bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=plain, caption_entities=ents, reply_markup=mk)
             return
     except Exception as e:
         print(f"maintenance photo failed: {e}")
     try:
-        bot.send_message(chat_id, tx["msg"], parse_mode="HTML", reply_markup=mk)
+        bot.send_message(chat_id, plain, entities=ents, reply_markup=mk)
     except Exception as e:
         print(f"maintenance message failed: {e}")
 
@@ -7297,9 +7366,52 @@ def _maint_cb_filter(c):
 def maint_block_callback(call):
     lang = get_lang(call.from_user.id) if str(call.from_user.id) in user_lang else "ar"
     try:
-        bot.answer_callback_query(call.id, re.sub(r"<[^>]+>", "", _maint_tx(lang)["msg"].split("\n")[0]), show_alert=True)
+        bot.answer_callback_query(call.id, _maint_alert_text(lang), show_alert=True)
     except Exception:
         pass
+
+bot.callback_query_handlers.insert(0, bot.callback_query_handlers.pop())
+
+# ---- أزرار رسائل قديمة (أُرسلت قبل نهاية آخر تحديث): لا نفتح القائمة القديمة، بل نرسل قائمة جديدة ----
+STALE_TEXTS = {
+    "ar": "✨ تم تحديث البوت! أرسلنا لك القائمة الجديدة، اضغط «المنتجات» من الأسفل.",
+    "en": "✨ The bot was updated! We sent you the new menu, tap «Products» below.",
+    "fr": "✨ Le bot a été mis à jour ! Nouveau menu envoyé, appuyez sur « Produits » en bas.",
+}
+
+def _stale_cb_filter(c):
+    try:
+        if not c.from_user or str(c.from_user.id) == str(ADMIN_CHAT_ID):
+            return False
+        m = c.message
+        if not m or getattr(m.chat, "type", "") != "private":
+            return False
+        d = c.data or ""
+        if d in _MAINT_PASS_CB or d.startswith("lang_") or d == "noop":
+            return False
+        end = _maint_end_ts()
+        if not end or _maint_on():
+            return False
+        return int(getattr(m, "date", 0) or 0) < end
+    except Exception:
+        return False
+
+@bot.callback_query_handler(func=_stale_cb_filter)
+def stale_callback(call):
+    uid = str(call.from_user.id)
+    lang = get_lang(uid) if uid in user_lang else "ar"
+    try:
+        bot.answer_callback_query(call.id, STALE_TEXTS.get(lang, STALE_TEXTS["ar"]), show_alert=True)
+    except Exception:
+        pass
+    try:
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    try:
+        send_main_menu(call.message.chat.id, lang)
+    except Exception as e:
+        print(f"stale menu error: {e}")
 
 bot.callback_query_handlers.insert(0, bot.callback_query_handlers.pop())
 
