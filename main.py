@@ -7213,22 +7213,22 @@ MAINT_TEXTS = {
         "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]البوت قيد التحديث[[/b]] {S}\n\nمرحباً بك في RASEEDKOM!\nنعمل حالياً على تحديث جديد لنقدّم لك تجربة أفضل ومنتجات أكثر.\n\n{T} لن يستغرق التحديث وقتاً طويلاً، وسيعود البوت للعمل قريباً بإذن الله.\n\n{B} اضغط على زر «أعلمني عند البدء»، وسيصلك إشعار فور عودة البوت للعمل.\n\n{F} شكراً لصبرك وثقتك بنا {R}",
         "notify": "🔔 أعلمني عند البدء", "channel": "📢 القناة الرسمية", "support": "💬 الدعم",
         "ok": "✅ تم! سنخبرك فور عودة البوت للعمل.", "already": "✅ أنت مسجّل مسبقاً، سنخبرك فور عودة البوت.",
-        "back": "✅ <b>عاد البوت للعمل!</b>\n\nاضغط على زر «{upd}» من الأسفل للبدء 👇\n\nشكراً لصبرك 🤍",
-        "go": "🚀 ابدأ الآن",
+        "back": "{X} [[b]]عاد البوت للعمل![[/b]]\n\nاضغط على زر «{upd}» للبدء {Y}\n\n{Z} شكراً لصبرك {Z}",
+        "go": "🔄 تحديث",
     },
     "en": {
         "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]The bot is being updated[[/b]] {S}\n\nWelcome to RASEEDKOM!\nWe are working on a new update to bring you a better experience and more products.\n\n{T} The update won't take long, and the bot will be back soon, God willing.\n\n{B} Tap «Notify me when it starts» and you'll get a message as soon as the bot is back.\n\n{F} Thank you for your patience and trust {R}",
         "notify": "🔔 Notify me when it starts", "channel": "📢 Official channel", "support": "💬 Support",
         "ok": "✅ Done! We'll let you know as soon as the bot is back.", "already": "✅ You're already subscribed, we'll notify you when the bot is back.",
-        "back": "✅ <b>The bot is back online!</b>\n\nTap the «{upd}» button below to start 👇\n\nThank you for your patience 🤍",
-        "go": "🚀 Start now",
+        "back": "{X} [[b]]The bot is back online![[/b]]\n\nTap the «{upd}» button to start {Y}\n\n{Z} Thank you for your patience {Z}",
+        "go": "🔄 Refresh",
     },
     "fr": {
         "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]Le bot est en cours de mise à jour[[/b]] {S}\n\nBienvenue sur RASEEDKOM !\nNous travaillons sur une nouvelle mise à jour pour vous offrir une meilleure expérience et plus de produits.\n\n{T} La mise à jour ne sera pas longue, le bot sera de retour très bientôt, si Dieu le veut.\n\n{B} Appuyez sur « Me prévenir au démarrage » et vous recevrez une notification dès le retour du bot.\n\n{F} Merci pour votre patience et votre confiance {R}",
         "notify": "🔔 Me prévenir au démarrage", "channel": "📢 Canal officiel", "support": "💬 Assistance",
         "ok": "✅ C'est noté ! Nous vous préviendrons dès le retour du bot.", "already": "✅ Vous êtes déjà inscrit, nous vous préviendrons au retour du bot.",
-        "back": "✅ <b>Le bot est de retour !</b>\n\nAppuyez sur le bouton «{upd}» en bas pour commencer 👇\n\nMerci pour votre patience 🤍",
-        "go": "🚀 Commencer",
+        "back": "{X} [[b]]Le bot est de retour ![[/b]]\n\nAppuyez sur le bouton «{upd}» pour commencer {Y}\n\n{Z} Merci pour votre patience {Z}",
+        "go": "🔄 Actualiser",
     },
 }
 
@@ -7251,14 +7251,16 @@ def _maint_markup(lang):
 
 MAINT_EMO = {"W": "5447644880824181073", "H": "5197371802136892976", "S": "5440621591387980068",
              "T": "5454415424319931791", "B": "5458603043203327669", "F": "5217712513847676489",
-             "R": "5300779290181262152"}
-MAINT_EMO_FALLBACK = {"W": "⚠️", "H": "🔨", "S": "🔜", "T": "⏳", "B": "🔔", "F": "🙂", "R": "🔥"}
+             "R": "5300779290181262152",
+             "X": "5226928895189598791", "Y": "5453957774079706024", "Z": "5447183459602669338"}
+MAINT_ICON_REFRESH = "6136212667624331858"
+MAINT_EMO_FALLBACK = {"W": "⚠️", "H": "🔨", "S": "🔜", "T": "⏳", "B": "🔔", "F": "🙂", "R": "🔥", "X": "✅", "Y": "👇", "Z": "🔻"}
 
 def _maint_build(text, custom=True):
     """يحوّل {W}.. إلى إيموجي مخصص (entities) و [[b]]..[[/b]] إلى خط عريض."""
     plain, ents, bold_start = "", [], None
     pos = 0
-    for m in re.finditer(r"\{([WHSTBFR])\}|\[\[(/?)b\]\]", text):
+    for m in re.finditer(r"\{([WHSTBFRXYZ])\}|\[\[(/?)b\]\]", text):
         plain += text[pos:m.start()]
         pos = m.end()
         if m.group(1):
@@ -7511,6 +7513,17 @@ def maint_notify_cb(call):
         if not was:
             _sadd(MAINT_SUBS, uid)
         bot.answer_callback_query(call.id, tx["already" if was else "ok"], show_alert=True)
+        if not was:
+            try:
+                total = len(_smembers(MAINT_SUBS))
+                u = call.from_user
+                nm = html.escape(((u.first_name or "") + " " + (u.last_name or "")).strip() or "—")
+                un = f" @{u.username}" if getattr(u, "username", None) else ""
+                bot.send_message(ADMIN_CHAT_ID,
+                    f"🔔 <b>زبون ضغط «أعلمني عند البدء»</b>\n👤 {nm}{un} (ID: <code>{uid}</code>)\n\n📊 المنتظرون الآن: <b>{total}</b>",
+                    parse_mode="HTML")
+            except Exception as e:
+                print(f"maint admin notify failed: {e}")
     except Exception as e:
         print(f"maint notify error: {e}")
 
@@ -7531,7 +7544,26 @@ def _maint_broadcast_back():
                 lang = get_lang(uid) if str(uid) in user_lang else "ar"
                 tx = _maint_tx(lang)
                 txt = tx["back"].replace("{upd}", re.sub(r"^[^\w]+", "", t(lang, "kb_update")).strip() or t(lang, "kb_update"))
-                bot.send_message(int(uid), txt, parse_mode="HTML", reply_markup=build_reply_keyboard(lang))
+                try:    # يثبّت زر «تحديث» في الأسفل (لوحة المفاتيح تبقى بعد حذف الرسالة)
+                    kbm = bot.send_message(int(uid), "🔄", reply_markup=build_reply_keyboard(lang))
+                    bot.delete_message(int(uid), kbm.message_id)
+                except Exception:
+                    pass
+                mk_back = InlineKeyboardMarkup()
+                bgo = InlineKeyboardButton(text=tx["go"], callback_data="mn_refresh")
+                bgo.icon_dyn = MAINT_ICON_REFRESH
+                mk_back.add(bgo)
+                sent_ok = False
+                if not _icons_off():
+                    try:
+                        pl, en = _maint_build(txt, custom=True)
+                        bot.send_message(int(uid), pl, entities=en, reply_markup=mk_back)
+                        sent_ok = True
+                    except Exception as e:
+                        print(f"back custom-emoji failed: {e}")
+                if not sent_ok:
+                    pl, en = _maint_build(txt, custom=False)
+                    bot.send_message(int(uid), pl, entities=[x for x in en if x.type == "bold"], reply_markup=mk_back)
                 sent += 1
             except Exception:
                 pass
