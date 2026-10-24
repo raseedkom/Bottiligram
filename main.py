@@ -23,7 +23,8 @@ PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
 REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
 REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
 # منتجاتك الخاصة المخفية دائماً (Prime Video: يُباع من المورّد فقط). لإرجاع منتج احذفه من هنا.
-OWN_ALWAYS_HIDDEN = {"amazon_prime_6m", "prime_video_ultra_6m", "chatgpt_plus_1m", "chatgpt_k12_edu"}
+OWN_ALWAYS_HIDDEN = {"amazon_prime_6m", "prime_video_ultra_6m", "chatgpt_plus_1m", "chatgpt_k12_edu",
+                     "claude_100_30d", "claude_10m_1d"}   # Claude القديم (قبل الربط بالمورّد) محذوف نهائياً من القائمة
 VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
 VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
 VENTE_REFRESH_SECONDS = 300 # تحديث الكتالوج كل كم ثانية
@@ -2554,13 +2555,9 @@ def generate_store_keyboard(lang):
                 print(f"prime cell failed: {e}")
             lo, hi, stock = _group_range("netflix")
             if isinstance(stock, int) and stock <= 0:
-                # المجموعة تبقى في مكانها (أحمر) وبداخلها كل الخيارات حمراء
-                _nb = InlineKeyboardButton(text=f"{_g['icon']} {_g['name']}", callback_data="grp_netflix")
-                _nb._oos_grp = True
+                oos.append(InlineKeyboardButton(text=f"{_g['icon']} {_g['name']}", callback_data="oos_netflix"))
                 if _pc:
-                    markup.row(_vt_cell_button(_pc, lang, True), _nb)
-                else:
-                    markup.add(_nb)
+                    markup.add(_vt_cell_button(_pc, lang, False))
             elif _pc:
                 markup.row(_vt_cell_button(_pc, lang, True),
                            InlineKeyboardButton(text=f"{_g['icon']} {_g['name']} | {lo}+", callback_data="grp_netflix"))
@@ -2584,9 +2581,7 @@ def generate_store_keyboard(lang):
                 continue          # Claude/Codex عند المورّد داخل قائمته
             lo, hi, stock = _group_range(gid)
             if isinstance(stock, int) and stock <= 0:
-                _gb2 = InlineKeyboardButton(text=f"{g['icon']} {g['name']}", callback_data=f"grp_{gid}")
-                _gb2._oos_grp = True
-                markup.add(_gb2)        # تبقى في مكانها بالأحمر وبداخلها الخيارات حمراء
+                oos.append(InlineKeyboardButton(text=f"{g['icon']} {g['name']}", callback_data=f"oos_grp_{gid}"))
                 continue
             price = lo if lo == hi else f"{lo} - {hi}"
             stock_txt = stock if stock == "♾️" else f"📦 {stock}"
@@ -3227,20 +3222,27 @@ def _vt_pool():
 def _vt_cells():
     """يرجع (صفوف الخلايا حسب VT_LAYOUT, باقي المنتجات غير المذكورة).
     الخلية تظهر فقط إن كان فيها منتج متوفر؛ منتجاتها النافدة تبقى داخلها (أحمر)."""
+    global _VT_OOSG
     pool = _vt_pool()
     used = set()
     rows = []
+    oosg = []
     for row in VT_LAYOUT:
         cells = []
         for key, title, rx in row:
             its = sorted([p for p in pool if p["vid"] not in used and re.search(rx, p["name"], re.I)], key=lambda x: x["cost"])
             used.update(p["vid"] for p in its)
-            if its and (any(p["stock"] > 0 for p in its) or len(its) > 1 or key in VT_ALWAYS_GROUP):
-                cells.append((key, title, its))   # المجموعة تبقى حتى لو نفدت كلها (بالأحمر)
+            if any(p["stock"] > 0 for p in its):
+                cells.append((key, title, its))
+            elif its and (len(its) > 1 or key in VT_ALWAYS_GROUP):
+                oosg.append((key, title, its))    # مجموعة نفدت كلها: زر أحمر واحد في الأعلى
         if cells:
             rows.append(cells)
+    _VT_OOSG = oosg
     left = [p for p in pool if p["vid"] not in used and p["stock"] > 0]
     return rows, left
+
+_VT_OOSG = []
 
 def _vt_grouped_vids():
     out = set()
@@ -3263,11 +3265,7 @@ def _vt_cell_button(cell, lang, pair):
             _lbl = title if key in VT_USE_TITLE else _vt_short(p["name"])
             return InlineKeyboardButton(text=f"{p['icon']} {_lbl}", callback_data=f"buy_{p['id']}")
         return _slot_button(p, lang)
-    if not any(p["stock"] > 0 for p in its):
-        _ob = InlineKeyboardButton(text=f"{its[0]['icon']} {title}", callback_data=f"vgrp_{key}")
-        _ob._oos_grp = True
-        return _ob
-    ins = [p for p in its if p["stock"] > 0] or its
+    ins =[p for p in its if p["stock"] > 0] or its
     stock = sum(p["stock"] for p in its)
     lo = min(Decimal(p["price"].lstrip("$")) for p in ins)
     text = f"{ins[0]['icon']} {title} | ${lo}+" if pair else f"{ins[0]['icon']} {title} | {_vt_price_txt(ins)} | 📦 {stock}"
@@ -3276,6 +3274,8 @@ def _vt_cell_button(cell, lang, pair):
 def _vt_oos_items():
     """النافد الذي يظهر منفرداً في الأعلى (ما كان داخل مجموعة فيها متوفر يبقى داخلها)."""
     grouped = _vt_grouped_vids()
+    for _k, _t, _its in _VT_OOSG:
+        grouped = grouped | {p["vid"] for p in _its}
     return [p for p in _vt_oos_all() if p["vid"] not in grouped]
 
 def _vt_oos_all():
@@ -3292,6 +3292,8 @@ def _vt_add_buttons(markup, lang, oos=None):
     if oos is not None:
         for p in _vt_oos_items():
             oos.append(_oos_button(p, lang))
+        for _k, _t, _its in _VT_OOSG:
+            oos.append(InlineKeyboardButton(text=f"{_its[0]['icon']} {_t}", callback_data=f"oos_vg_{_k}"))
     rows, left = _vt_cells()
     for cells in rows:
         cells = [c for c in cells if c[0] not in VT_SKIP_RENDER]
@@ -3313,9 +3315,7 @@ def _vt_find_cell(key):
 
 def _own_claude_shown():
     """منتجاتك القديمة (Claude API) تُحذف ما دام عند المورّد منتجات Claude. يرجعها /vente_unreplace claude_api"""
-    if not VENTE_KEY or "claude_api" in _vt_conf().get("unreplace", []):
-        return True
-    return not any(re.search(r"claude", p["name"], re.I) for p in _vt_visible())
+    return False      # Claude القديم محذوف نهائياً؛ كل Claude الآن من المورّد
 
 def _vt_back_cb(p):
     for cells in _vt_cells()[0]:
