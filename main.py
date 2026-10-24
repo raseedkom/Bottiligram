@@ -2034,6 +2034,8 @@ def _style_store(mk):
                     b.style = "danger"
                 elif cb.startswith(("buy_", "vgrp_", "grp_")):
                     b.style = "success"
+                elif cb == "gm_hub_m":
+                    b.style = "danger"      # زر «لعبة · من سيفوز؟» أحمر
     except Exception as e:
         print(f"style_store failed: {e}")
     return mk
@@ -5186,6 +5188,12 @@ def start_menu_markup(lang):
     mk.add(_h(InlineKeyboardButton(text=smt(lang, "buy"), callback_data="back_to_main"), ICON_BUY))
     mk.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
     mk.add(_h(InlineKeyboardButton(text=smt(lang, "game"), callback_data="sm_game"), ICON_MENU_GAME))
+    try:
+        if not _vt_conf().get("nostyle"):
+            mk.keyboard[0][0].style = "success"    # شراء أخضر
+            mk.keyboard[2][0].style = "danger"     # لعبة · من سيفوز؟ أحمر
+    except Exception:
+        pass
     mk.row(InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"),
            _h(InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"), ICON_HIST_M))
     mk.row(_h(InlineKeyboardButton(text=t(lang, "kb_support"), url=MY_PRIVATE_CHAT_LINK), ICON_SUPPORT),
