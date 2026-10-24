@@ -1592,7 +1592,13 @@ def _ikb_to_dict_styled(self):
         d["icon_custom_emoji_id"] = str(ic)
     else:
         try:
-            r = _dyn_icon(d.get("callback_data"), d.get("text"))
+            hint = getattr(self, "icon_dyn", None)
+            if hint and d.get("text") and not _icons_off():
+                d["icon_custom_emoji_id"] = str(hint)
+                d["text"] = _strip_emoji_edge(d["text"])
+                r = None
+            else:
+                r = _dyn_icon(d.get("callback_data"), d.get("text"))
             if r:
                 d["icon_custom_emoji_id"], d["text"] = r
         except Exception:
@@ -1603,8 +1609,8 @@ InlineKeyboardButton.to_dict = _ikb_to_dict_styled
 # أيقونات تُطبَّق وقت الإرسال على أزرار محددة (ابدأ / اشتري الآن / اللغة / الدعم)
 ICON_START = "5463392464314315076"
 ICON_BUY = "5440841102871517055"
-ICON_LANG = "5424818078833715060"
-ICON_SUPPORT = "5443038326535759644"
+ICON_LANG = "5452069934089641166"
+ICON_SUPPORT = "5244536513051516987"
 _ICON_STATE = {"off": False}
 
 def _icons_off():
@@ -1644,10 +1650,51 @@ ICON_CARD = "5472250091332993630"      # بريدي موب + RedotPay
 ICON_FLIXY = "5440410042773824003"
 ICON_BYBIT = "5201873447554145566"
 ICON_CHAT = "5215334566549540768"
-ICON_ARROW_R = "5416117059207572332"
-ICON_SUBS = "5381975814415866082"
+ICON_ARROW_R = "5406745015365943482"   # زر «بطاقات الهدايا»
+ICON_SUBS = "5397782960512444700"       # زر «اشتراكات متنوعة»
+ICON_TOPUP = "5456343516743483864"      # شحن المحفظة
+ICON_CONTACT = "5220115526574950412"    # تواصل مع الدعم
+ICON_HIST_W = "5231200819986047254"     # سجل المشتريات (صفحة المحفظة)
+ICON_HIST_M = "5305265301917549162"     # سجل المشتريات (القائمة الرئيسية)
+ICON_BACK = "5388781950305580591"       # رجوع / السابق
+ICON_NEXT = "5294412516561018290"       # التالي
+ICON_MONTH = "5296370519136812159"      # الشهر الماضي / هذا الشهر
+ICON_DAILY = "5314665894406805639"      # الهدية اليومية
+ICON_LB = "6145275873252612254"         # الترتيب الشهري
+ICON_COINS = "5276071069176842299"      # محفظة الكوينز
+ICON_MATCH = "5776422093302273080"      # ساحة المباريات
+ICON_TIMER = "6003478739155949455"      # تحدي التوقيت
+ICON_MENU_GAME = "4972415571384599106"  # لعبة (القائمة الرئيسية)
+ICON_MENU_API = "5271604874419647061"   # API
+ICON_MENU_CHANNEL = "5424818078833715060"  # القناة الرئيسية
+ICON_BARIDI = "6021623532872537088"     # بريدي موب
+GIFT_BANNER_IDS = [
+    "5422797979620755642", "5431452012304685092", "5393333662156604061", "5433670878309139413",
+    "5206382428775532759", "5384215120169682553", "5386505875336744038", "5433739992922868816",
+    "5386426160743729289",
+]  # G I F T : C A R D
 
-_DYN_CB_EXACT = {"mn_start": ICON_START, "mn_refresh": ICON_REFRESH, "pf_wallet": ICON_WALLET}
+_DYN_CB_EXACT = {"mn_start": ICON_START, "mn_refresh": ICON_REFRESH, "pf_wallet": ICON_WALLET,
+                 "pf_top": ICON_TOPUP, "pf_hist": ICON_HIST_W, "change_lang": ICON_LANG}
+# قواعد نصية تُفحص أولاً (الرجوع/التالي/الألعاب...): (regex, icon, حذف الأسهم من النص)
+_DYN_TEXT_FIRST = (
+    (r"^\W*(رجوع|العودة|back|retour)(?!\w)", ICON_BACK, True),
+    (r"^\W*(السابق|previous|précédent|precedent)(?!\w)", ICON_BACK, True),
+    (r"^\W*(التالي|next|suivant)(?!\w)", ICON_NEXT, True),
+    (r"الشهر الماضي|last month|mois dernier|هذا الشهر|this month|ce mois", ICON_MONTH, False),
+    (r"الهدية اليومية|daily gift|cadeau quotidien", ICON_DAILY, False),
+    (r"الترتيب الشهري|monthly leaderboard|classement mensuel", ICON_LB, False),
+    (r"محفظة الكوينز|coins wallet|portefeuille de coins", ICON_COINS, False),
+    (r"ساحة المباريات|match arena|arène des matchs|arene des matchs", ICON_MATCH, False),
+    (r"تحدي التوقيت|timing challenge|défi chrono|defi chrono", ICON_TIMER, False),
+    (r"تواصل مع الدعم|contact support|contacter l'assistance", ICON_CONTACT, False),
+    (r"baridimob|بريدي\s*موب|بديدي\s*موب", ICON_BARIDI, False),
+)
+
+def _clean_arrows(s):
+    for a in ("➡️", "⬅️", "▶️", "◀️", "➡", "⬅"):
+        s = s.replace(a, " ")
+    return re.sub(r"\s+", " ", s).strip()
 _DYN_CB_PREFIX = (
     ("mbuy_", ICON_BUY), ("qb_", ICON_BUY),
     ("pm_bn_", ICON_BINANCE), ("pm_bd_", ICON_CARD), ("pm_fx_", ICON_FLIXY),
@@ -1664,6 +1711,14 @@ def _dyn_icon(cb, text):
     if not text or _icons_off():
         return None
     cb = cb or ""
+    if not cb.startswith(("buy_", "vgrp_", "grp_", "oos_", "noop", "gcp")):
+        low0 = str(text).lower()
+        for rx, e, clean in _DYN_TEXT_FIRST:
+            if re.search(rx, low0):
+                t2 = _strip_emoji_edge(text)
+                if clean:
+                    t2 = _clean_arrows(t2)
+                return e, (t2 or str(text))
     eid = _DYN_CB_EXACT.get(cb)
     if not eid:
         for pre, e in _DYN_CB_PREFIX:
@@ -2143,10 +2198,22 @@ def handle_gift_page(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
-    bot.send_message(
-        call.message.chat.id, GIFT_PAGE_TEXT.get(lang, GIFT_PAGE_TEXT["ar"]),
-        parse_mode="HTML", reply_markup=generate_gift_keyboard(lang),
-    )
+    mk = generate_gift_keyboard(lang)
+    base = GIFT_PAGE_TEXT.get(lang, GIFT_PAGE_TEXT["ar"])
+    sent = False
+    if not _icons_off():
+        try:
+            rest = re.sub(r"<[^>]+>", "", base).split("\n\n", 1)[1]
+            head = "‎"
+            text = head + "⭐" * len(GIFT_BANNER_IDS) + "\n\n" + rest
+            ents = [telebot.types.MessageEntity("custom_emoji", _u16(head) + i, 1, custom_emoji_id=eid)
+                    for i, eid in enumerate(GIFT_BANNER_IDS)]
+            bot.send_message(call.message.chat.id, text, entities=ents, reply_markup=mk)
+            sent = True
+        except Exception as e:
+            print(f"gift banner failed: {e}")
+    if not sent:
+        bot.send_message(call.message.chat.id, base, parse_mode="HTML", reply_markup=generate_gift_keyboard(lang))
     bot.answer_callback_query(call.id)
 
 
@@ -5112,16 +5179,19 @@ def rft(lang, key):
 
 # ---------- قائمة "ابدأ" ----------
 def start_menu_markup(lang):
+    def _h(b, eid):
+        b.icon_dyn = eid     # أيقونة مخصصة لهذه القائمة (تُطبّق وقت الإرسال)
+        return b
     mk = InlineKeyboardMarkup(row_width=2)
-    mk.add(InlineKeyboardButton(text=smt(lang, "buy"), callback_data="back_to_main"))
+    mk.add(_h(InlineKeyboardButton(text=smt(lang, "buy"), callback_data="back_to_main"), ICON_BUY))
     mk.add(InlineKeyboardButton(text=wt(lang, "btn_wallet"), callback_data="pf_wallet"))
-    mk.add(InlineKeyboardButton(text=smt(lang, "game"), callback_data="sm_game"))
+    mk.add(_h(InlineKeyboardButton(text=smt(lang, "game"), callback_data="sm_game"), ICON_MENU_GAME))
     mk.row(InlineKeyboardButton(text=wt(lang, "btn_profile"), callback_data="pf_profile"),
-           InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"))
-    mk.row(InlineKeyboardButton(text=t(lang, "kb_support"), url=MY_PRIVATE_CHAT_LINK),
+           _h(InlineKeyboardButton(text=wt(lang, "btn_history"), callback_data="pf_hist"), ICON_HIST_M))
+    mk.row(_h(InlineKeyboardButton(text=t(lang, "kb_support"), url=MY_PRIVATE_CHAT_LINK), ICON_SUPPORT),
            InlineKeyboardButton(text=smt(lang, "ref"), callback_data="rf_o_s"))
-    mk.add(InlineKeyboardButton(text=smt(lang, "api"), callback_data="sm_api"))
-    mk.add(InlineKeyboardButton(text=smt(lang, "channel"), url=CHANNEL_LINK))
+    mk.add(_h(InlineKeyboardButton(text=smt(lang, "api"), callback_data="sm_api"), ICON_MENU_API))
+    mk.add(_h(InlineKeyboardButton(text=smt(lang, "channel"), url=CHANNEL_LINK), ICON_MENU_CHANNEL))
     mk.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="change_lang"))
     return mk
 
