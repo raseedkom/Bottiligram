@@ -971,6 +971,16 @@ def _fulfill_manual(chat_id, uid, lang, claim, canon, retry, mark, failed):
     spname = html.escape(pname)
     if was_out:
         alert_admin(f"⚠️ <b>بيع بينما المخزون 0</b>\n📦 {spname}\n👤 <code>{uid}</code>")
+    if cat == "B" and pid == IPTV_ID:
+        acct = _iptv_pop()
+        if acct:
+            ok, msg = deliver_manual_order(oid, acct)
+            if ok:
+                _iptv_sync_stock()
+                alert_admin(f"✅ <b>بيع IPTV تلقائي</b>\n📦 {spname}\n👤 <code>{uid}</code>\n🔑 المتبقي: {_iptv_count()}")
+                return
+            _iptv_push_back(acct)      # فشل الإرسال: يرجع الحساب للقائمة ويبقى الطلب يدوياً
+            alert_admin(f"⚠️ <b>تعذّر التسليم التلقائي لـ IPTV</b> — الطلب بقي معلقاً للتسليم اليدوي\n👤 <code>{uid}</code>\n{msg}")
     if cat == "B":
         _safe_send(chat_id, mt(lang, "paid_b"), reply_markup=support_markup(lang))
         txt = (f"📦 <b>طلب جديد (Pending)</b>\n\n📦 {spname}\n👤 {_user_link(uid)}\n"
@@ -1157,6 +1167,70 @@ def mark_executed(oid):
                       parse_mode="HTML", reply_markup=support_markup(lang))
     monitor_send(f"✅ <b>طلب نُفّذ</b>\n\n📦 {html.escape(o['product_name'])}\n👤 {_user_link(uid)}")
     return True, "✅ تم وسم الطلب كمنفّذ وأُبلغ الزبون." + ("" if sent else "\n⚠️ تعذر إبلاغ الزبون (ربما حظر البوت).")
+
+# ---------- IPTV: تسليم تلقائي من قائمة حسابات في Upstash ----------
+IPTV_ID = "iptv_14m"
+IPTV_KEY = "rk:iptv:accts"
+
+def _iptv_count():
+    try:
+        return int(db.llen(IPTV_KEY) or 0) if db else 0
+    except Exception:
+        return 0
+
+def _iptv_pop():
+    try:
+        v = db.lpop(IPTV_KEY) if db else None
+        if isinstance(v, (list, tuple)):
+            v = v[0] if v else None
+        return str(v).strip() if v else None
+    except Exception as e:
+        print(f"iptv pop error: {e}")
+        return None
+
+def _iptv_push_back(acct):
+    try:
+        db.lpush(IPTV_KEY, acct)
+    except Exception as e:
+        print(f"iptv push back error: {e}")
+
+def _iptv_sync_stock():
+    try:
+        p = find_product(IPTV_ID)
+        old = p["stock"] if p else 0
+        n = _iptv_count()
+        _save_stock(IPTV_ID, n)
+        _restock_hook(IPTV_ID, old, n)
+    except Exception as e:
+        print(f"iptv sync stock error: {e}")
+
+@bot.message_handler(commands=["addiptv", "iptvstock"])
+def iptv_admin_command(message):
+    if str(message.chat.id) != str(ADMIN_CHAT_ID):
+        return
+    cmd = (message.text or "").split()[0].lstrip("/").split("@")[0]
+    if cmd == "iptvstock":
+        bot.reply_to(message, f"📡 حسابات IPTV المخزّنة: <b>{_iptv_count()}</b>", parse_mode="HTML")
+        return
+    parts = (message.text or "").split(None, 1)
+    body = parts[1] if len(parts) > 1 else ""
+    if re.search(r"(?i)account created", body):
+        # صيغة لوحة المورّد: كل حساب يبدأ بـ «✅ Account Created Successfully!» (نحذف هذا السطر ونحتفظ بالباقي)
+        blocks = re.split(r"(?i)[^\S\n]*✅?[^\S\n]*account created successfully!?[^\S\n]*", body)
+    elif re.search(r"\n\s*\n", body):
+        blocks = re.split(r"\n\s*\n", body)          # حسابات متعددة الأسطر يفصلها سطر فارغ
+    else:
+        blocks = body.splitlines()                    # كل سطر حساب
+    lines = [b.strip() for b in blocks if b and b.strip()]
+    if not lines:
+        bot.reply_to(message, "الاستعمال: أرسل /addiptv ثم الحساب (أو عدة حسابات).\nالحساب المتعدد الأسطر: افصل بين الحسابات بسطر فارغ، أو الصق الرسالة كما جاءت من المورّد.")
+        return
+    try:
+        db.rpush(IPTV_KEY, *lines)
+        _iptv_sync_stock()
+        bot.reply_to(message, f"✅ أُضيف {len(lines)} حساب. المخزون الآن: <b>{_iptv_count()}</b>", parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(message, f"❌ خطأ: {html.escape(str(e))[:200]}")
 
 def deliver_manual_order(oid, text):
     o = order_get(oid)
