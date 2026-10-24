@@ -2280,12 +2280,22 @@ def _lead_swap(label):
         return parts[1]
     return str(label)
 
+# شعار RASEEDKOM بحروف إيموجي مخصصة (R A S E E D K O M) يظهر أعلى كل منشور
+BRAND_IDS = ["5328162635860948105", "5293991227513914037", "5332815043220225405",
+             "5327938799345349736", "5327938799345349736", "5294029641701407930",
+             "5330144144792763349", "5307644490461231051", "5330094426251344221"]
+
 def _post_build(item, name, lbl_stock, stock_val, lbl_price, price_val):
     ents = []
     logo = _logo_id(item)
-    text = ("⭐" if logo else str(item.get("icon") or "")) + " "
+    text = ""
+    for eid in BRAND_IDS:
+        ents.append(telebot.types.MessageEntity("custom_emoji", _u16(text), 1, custom_emoji_id=eid))
+        text += "⭐"
+    text += "\n"
     if logo:
-        ents.append(telebot.types.MessageEntity("custom_emoji", 0, 1, custom_emoji_id=logo))
+        ents.append(telebot.types.MessageEntity("custom_emoji", _u16(text), 1, custom_emoji_id=logo))
+    text += ("⭐" if logo else str(item.get("icon") or "")) + " "
     b0 = _u16(text)
     text += name
     ents.append(telebot.types.MessageEntity("bold", b0, _u16(name)))
