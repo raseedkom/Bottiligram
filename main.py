@@ -268,6 +268,12 @@ def patch(old, new, name):
         return
     src = src.replace(old, new, 1)
 
+# 0) إعادة تسمية دالتي منشورات المنتجات الأصليتين (نغلّفهما في NEW_BLOCK)
+patch(r"""def send_channel_post(chat_id, item):""",
+      r"""def _send_channel_post_orig(chat_id, item):""", "rename_scp")
+patch(r"""def send_user_post(user_id, item):""",
+      r"""def _send_user_post_orig(user_id, item):""", "rename_sup")
+
 # 1) عنوان الفاتورة: لا نطبع label الافتراضي
 patch(r"""{html.escape(tr(product, 'name', lang))} — {html.escape(invoice['label'])}""",
       r"""{html.escape(tr(product, 'name', lang))}{_lab_suffix(invoice)}""", "invoice_label")
@@ -2258,8 +2264,7 @@ def send_card(chat_id, product, caption, markup):
     return _send_card_orig(chat_id, product, caption, markup)
 
 # ---------- منشورات المنتجات الدورية (القناة/الزبائن): إيموجي مخصص كما في المتجر ----------
-_send_channel_post_orig = send_channel_post
-_send_user_post_orig = send_user_post
+# (الأصلان يُعرَّفان لاحقاً في bot_base بعد إعادة تسميتهما عبر patch أعلاه)
 
 def _logo_id(item):
     low = str(item.get("name") or "").lower()
