@@ -2909,22 +2909,38 @@ VT_SKIP_RENDER = {"prime"}              # يُعرض بجانب Netflix في ص�
 VT_USE_TITLE = {"prime"}                # زر قصير بالعنوان
 VT_ALWAYS_GROUP = {"claude", "codex"}   # دائماً زر مجموعة حتى لو بقي خيار واحد
 
+def _vt_pool():
+    """كل منتجات المورّد الظاهرة + النافدة (النافد من مجموعة فيها متوفر يبقى داخلها بالأحمر)."""
+    pool = {}
+    for p in list(_vt_visible()) + list(_vt_oos_all()):
+        pool[p["vid"]] = p
+    return list(pool.values())
+
 def _vt_cells():
-    """يرجع (صفوف الخلايا حسب VT_LAYOUT, باقي المنتجات غير المذكورة)."""
-    vis = [p for p in _vt_visible() if p["stock"] > 0]   # النافد يذهب لكتلة الأحمر في الأعلى
+    """يرجع (صفوف الخلايا حسب VT_LAYOUT, باقي المنتجات غير المذكورة).
+    الخلية تظهر فقط إن كان فيها منتج متوفر؛ منتجاتها النافدة تبقى داخلها (أحمر)."""
+    pool = _vt_pool()
     used = set()
     rows = []
     for row in VT_LAYOUT:
         cells = []
         for key, title, rx in row:
-            its = sorted([p for p in vis if p["vid"] not in used and re.search(rx, p["name"], re.I)], key=lambda x: x["cost"])
+            its = sorted([p for p in pool if p["vid"] not in used and re.search(rx, p["name"], re.I)], key=lambda x: x["cost"])
             used.update(p["vid"] for p in its)
-            if its:
+            if any(p["stock"] > 0 for p in its):
                 cells.append((key, title, its))
         if cells:
             rows.append(cells)
-    left = [p for p in vis if p["vid"] not in used]
+    left = [p for p in pool if p["vid"] not in used and p["stock"] > 0]
     return rows, left
+
+def _vt_grouped_vids():
+    out = set()
+    for cells in _vt_cells()[0]:
+        for key, title, its in cells:
+            if len(its) > 1 or key in VT_ALWAYS_GROUP:
+                out.update(p["vid"] for p in its)
+    return out
 
 def _vt_price_txt(its):
     pr = [Decimal(p["price"].lstrip("$")) for p in its]
@@ -2939,12 +2955,18 @@ def _vt_cell_button(cell, lang, pair):
             _lbl = title if key in VT_USE_TITLE else _vt_short(p["name"])
             return InlineKeyboardButton(text=f"{p['icon']} {_lbl}", callback_data=f"buy_{p['id']}")
         return _slot_button(p, lang)
+    ins = [p for p in its if p["stock"] > 0] or its
     stock = sum(p["stock"] for p in its)
-    lo = min(Decimal(p["price"].lstrip("$")) for p in its)
-    text = f"{its[0]['icon']} {title} | ${lo}+" if pair else f"{its[0]['icon']} {title} | {_vt_price_txt(its)} | 📦 {stock}"
+    lo = min(Decimal(p["price"].lstrip("$")) for p in ins)
+    text = f"{ins[0]['icon']} {title} | ${lo}+" if pair else f"{ins[0]['icon']} {title} | {_vt_price_txt(ins)} | 📦 {stock}"
     return InlineKeyboardButton(text=text, callback_data=f"vgrp_{key}")
 
 def _vt_oos_items():
+    """النافد الذي يظهر منفرداً في الأعلى (ما كان داخل مجموعة فيها متوفر يبقى داخلها)."""
+    grouped = _vt_grouped_vids()
+    return [p for p in _vt_oos_all() if p["vid"] not in grouped]
+
+def _vt_oos_all():
     out = []
     for p in _VT_PRODS.values():
         if not p.get("eligible") or p.get("api_test") or p["stock"] > 0:
@@ -2998,12 +3020,17 @@ def handle_vente_group(call):
         bot.answer_callback_query(call.id)
         return
     key, title, items = cell
-    lo = min(Decimal(x["price"].lstrip("$")) for x in items)
-    hi = max(Decimal(x["price"].lstrip("$")) for x in items)
+    _ins = [x for x in items if x["stock"] > 0] or items
+    lo = min(Decimal(x["price"].lstrip("$")) for x in _ins)
+    hi = max(Decimal(x["price"].lstrip("$")) for x in _ins)
     mk = InlineKeyboardMarkup(row_width=1)
     for p in items:
-        mk.add(_slot_button(p, lang))
+        _b = _slot_button(p, lang)
+        if p["stock"] <= 0:
+            _b.callback_data = f"oos_{p['id']}"      # يبقى داخل المجموعة بالأحمر
+        mk.add(_b)
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+    _style_store(mk)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
@@ -3467,8 +3494,12 @@ def handle_store_group(call):
     for pid in g["members"]:
         item = find_product(pid)
         if item:
-            mk.add(_slot_button(item, lang))
+            _b = _slot_button(item, lang)
+            if _own_oos(item):
+                _b.callback_data = f"oos_{item['id']}"   # يبقى داخل المجموعة بالأحمر
+            mk.add(_b)
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main"))
+    _style_store(mk)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
