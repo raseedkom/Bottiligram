@@ -7213,21 +7213,21 @@ MAINT_TEXTS = {
         "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]البوت قيد التحديث[[/b]] {S}\n\nمرحباً بك في RASEEDKOM!\nنعمل حالياً على تحديث جديد لنقدّم لك تجربة أفضل ومنتجات أكثر.\n\n{T} لن يستغرق التحديث وقتاً طويلاً، وسيعود البوت للعمل قريباً بإذن الله.\n\n{B} اضغط على زر «أعلمني عند البدء»، وسيصلك إشعار فور عودة البوت للعمل.\n\n{F} شكراً لصبرك وثقتك بنا {R}",
         "notify": "🔔 أعلمني عند البدء", "channel": "📢 القناة الرسمية", "support": "💬 الدعم",
         "ok": "✅ تم! سنخبرك فور عودة البوت للعمل.", "already": "✅ أنت مسجّل مسبقاً، سنخبرك فور عودة البوت.",
-        "back": "✅ <b>عاد البوت للعمل!</b>\n\nيمكنك الآن متابعة التسوق والاستفادة من خدماتنا. شكراً لصبرك 🤍",
+        "back": "✅ <b>عاد البوت للعمل!</b>\n\nاضغط على زر «{upd}» من الأسفل للبدء 👇\n\nشكراً لصبرك 🤍",
         "go": "🚀 ابدأ الآن",
     },
     "en": {
         "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]The bot is being updated[[/b]] {S}\n\nWelcome to RASEEDKOM!\nWe are working on a new update to bring you a better experience and more products.\n\n{T} The update won't take long, and the bot will be back soon, God willing.\n\n{B} Tap «Notify me when it starts» and you'll get a message as soon as the bot is back.\n\n{F} Thank you for your patience and trust {R}",
         "notify": "🔔 Notify me when it starts", "channel": "📢 Official channel", "support": "💬 Support",
         "ok": "✅ Done! We'll let you know as soon as the bot is back.", "already": "✅ You're already subscribed, we'll notify you when the bot is back.",
-        "back": "✅ <b>The bot is back online!</b>\n\nYou can now continue shopping and enjoy our services. Thank you for your patience 🤍",
+        "back": "✅ <b>The bot is back online!</b>\n\nTap the «{upd}» button below to start 👇\n\nThank you for your patience 🤍",
         "go": "🚀 Start now",
     },
     "fr": {
         "msg": "{W}RASEEDKOM:{W}\n{H} [[b]]Le bot est en cours de mise à jour[[/b]] {S}\n\nBienvenue sur RASEEDKOM !\nNous travaillons sur une nouvelle mise à jour pour vous offrir une meilleure expérience et plus de produits.\n\n{T} La mise à jour ne sera pas longue, le bot sera de retour très bientôt, si Dieu le veut.\n\n{B} Appuyez sur « Me prévenir au démarrage » et vous recevrez une notification dès le retour du bot.\n\n{F} Merci pour votre patience et votre confiance {R}",
         "notify": "🔔 Me prévenir au démarrage", "channel": "📢 Canal officiel", "support": "💬 Assistance",
         "ok": "✅ C'est noté ! Nous vous préviendrons dès le retour du bot.", "already": "✅ Vous êtes déjà inscrit, nous vous préviendrons au retour du bot.",
-        "back": "✅ <b>Le bot est de retour !</b>\n\nVous pouvez reprendre vos achats et profiter de nos services. Merci pour votre patience 🤍",
+        "back": "✅ <b>Le bot est de retour !</b>\n\nAppuyez sur le bouton «{upd}» en bas pour commencer 👇\n\nMerci pour votre patience 🤍",
         "go": "🚀 Commencer",
     },
 }
@@ -7282,31 +7282,113 @@ def _maint_alert_text(lang):
     lines = [x for x in plain.split("\n") if x.strip()]
     return (lines[1] if len(lines) > 1 else lines[0])[:190]
 
-def send_maintenance(chat_id, lang):
+import json as _json
+MAINT_SEEN = "rk:maint:seen"      # كل من ظهرت له رسالة التحديث (يصله إشعار العودة)
+MAINT_MSGS = "rk:maint:m:"        # رسائل التحديث لكل زبون (لحذفها عند العودة)
+_maint_msgs_mem = {}
+_maint_seen_mem = set()
+
+def _maint_get_msgs(uid):
+    uid = str(uid)
+    if uid in _maint_msgs_mem:
+        return list(_maint_msgs_mem[uid])
+    try:
+        raw = kv_get(MAINT_MSGS + uid)
+        return list(_json.loads(raw)) if raw else []
+    except Exception:
+        return []
+
+def _maint_track(uid, chat_id, mid):
+    uid = str(uid)
+    lst = _maint_get_msgs(uid)
+    if [chat_id, mid] not in lst:
+        lst.append([chat_id, mid])
+    lst = lst[-5:]
+    _maint_msgs_mem[uid] = lst
+    try:
+        kv_set(MAINT_MSGS + uid, _json.dumps(lst))
+    except Exception:
+        pass
+    if uid not in _maint_seen_mem:
+        _maint_seen_mem.add(uid)
+        try:
+            _sadd(MAINT_SEEN, uid)
+        except Exception:
+            pass
+
+def _maint_clear_msgs(uid, keep=None):
+    """يحذف رسائل التحديث السابقة لهذا الزبون (ما عدا keep=[chat,mid])."""
+    uid = str(uid)
+    for c, m in _maint_get_msgs(uid):
+        if keep and [c, m] == list(keep):
+            continue
+        try:
+            bot.delete_message(c, m)
+        except Exception:
+            pass
+    _maint_msgs_mem.pop(uid, None)
+    try:
+        kv_del(MAINT_MSGS + uid)
+    except Exception:
+        pass
+
+def _maint_send_new(chat_id, lang):
     tx = _maint_tx(lang)
     mk = _maint_markup(lang)
     if not _icons_off():
         try:
             plain, ents = _maint_build(tx["msg"], custom=True)
             if len(plain) <= 1000:
-                bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=plain, caption_entities=ents, reply_markup=mk)
-            else:
-                bot.send_message(chat_id, plain, entities=ents, reply_markup=mk)
-            return
+                return bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=plain, caption_entities=ents, reply_markup=mk)
+            return bot.send_message(chat_id, plain, entities=ents, reply_markup=mk)
         except Exception as e:
             print(f"maintenance custom-emoji failed: {e}")
     plain, ents = _maint_build(tx["msg"], custom=False)
     ents = [x for x in ents if x.type == "bold"]
     try:
         if len(plain) <= 1000:
-            bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=plain, caption_entities=ents, reply_markup=mk)
-            return
+            return bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=plain, caption_entities=ents, reply_markup=mk)
     except Exception as e:
         print(f"maintenance photo failed: {e}")
     try:
-        bot.send_message(chat_id, plain, entities=ents, reply_markup=mk)
+        return bot.send_message(chat_id, plain, entities=ents, reply_markup=mk)
     except Exception as e:
         print(f"maintenance message failed: {e}")
+    return None
+
+def send_maintenance(chat_id, lang):
+    _maint_clear_msgs(chat_id)      # لا نترك رسائل تحديث قديمة متراكمة
+    msg = _maint_send_new(chat_id, lang)
+    if msg is not None:
+        _maint_track(chat_id, chat_id, msg.message_id)
+
+def _maint_edit_into(call, lang):
+    """يحوّل القائمة المفتوحة عند الزبون نفسها إلى رسالة التحديث (تختفي القائمة)."""
+    m = call.message
+    ics = not _icons_off()
+    plain, ents = _maint_build(_maint_tx(lang)["msg"], custom=ics)
+    if not ics:
+        ents = [x for x in ents if x.type == "bold"]
+    mk = _maint_markup(lang)
+    try:
+        if getattr(m, "photo", None):
+            bot.edit_message_caption(caption=plain, chat_id=m.chat.id, message_id=m.message_id,
+                                     caption_entities=ents, reply_markup=mk)
+        else:
+            bot.edit_message_text(plain, m.chat.id, m.message_id, entities=ents, reply_markup=mk)
+        _maint_clear_msgs(call.from_user.id, keep=[m.chat.id, m.message_id])
+        _maint_track(call.from_user.id, m.chat.id, m.message_id)
+        return
+    except Exception as e:
+        if "not modified" in str(e):
+            _maint_track(call.from_user.id, m.chat.id, m.message_id)
+            return
+        print(f"maint edit failed: {e}")
+    try:
+        bot.delete_message(m.chat.id, m.message_id)
+    except Exception:
+        pass
+    send_maintenance(m.chat.id, lang)
 
 _send_main_menu_pre_maint = send_main_menu
 
@@ -7366,9 +7448,13 @@ def _maint_cb_filter(c):
 def maint_block_callback(call):
     lang = get_lang(call.from_user.id) if str(call.from_user.id) in user_lang else "ar"
     try:
-        bot.answer_callback_query(call.id, _maint_alert_text(lang), show_alert=True)
+        bot.answer_callback_query(call.id, _maint_alert_text(lang))
     except Exception:
         pass
+    try:
+        _maint_edit_into(call, lang)
+    except Exception as e:
+        print(f"maint edit error: {e}")
 
 bot.callback_query_handlers.insert(0, bot.callback_query_handlers.pop())
 
@@ -7429,28 +7515,38 @@ def maint_notify_cb(call):
         print(f"maint notify error: {e}")
 
 def _maint_broadcast_back():
-    subs = _smembers(MAINT_SUBS)
-    if not subs:
+    try:
+        targets = set(map(str, _smembers(MAINT_SUBS))) | set(map(str, _smembers(MAINT_SEEN)))
+    except Exception:
+        targets = set()
+    targets |= set(_maint_seen_mem)
+    if not targets:
         return 0
 
     def _run():
         sent = 0
-        for uid in subs:
+        for uid in targets:
             try:
+                _maint_clear_msgs(uid)     # تختفي رسالة التحديث
                 lang = get_lang(uid) if str(uid) in user_lang else "ar"
                 tx = _maint_tx(lang)
-                mk = InlineKeyboardMarkup()
-                mk.add(InlineKeyboardButton(text=tx["go"], callback_data="mn_refresh"))
-                bot.send_message(int(uid), tx["back"], parse_mode="HTML", reply_markup=mk)
+                txt = tx["back"].replace("{upd}", re.sub(r"^[^\w]+", "", t(lang, "kb_update")).strip() or t(lang, "kb_update"))
+                bot.send_message(int(uid), txt, parse_mode="HTML", reply_markup=build_reply_keyboard(lang))
                 sent += 1
             except Exception:
                 pass
-            _srem(MAINT_SUBS, uid)
             time.sleep(0.06)
+        for k in (MAINT_SUBS, MAINT_SEEN):
+            try:
+                kv_del(k)
+            except Exception:
+                pass
+        _maint_seen_mem.clear()
+        _maint_msgs_mem.clear()
         monitor_send(f"🔔 <b>أُرسل إشعار عودة البوت</b> لـ {sent} زبون")
 
     threading.Thread(target=_run, daemon=True).start()
-    return len(subs)
+    return len(targets)
 
 @bot.message_handler(commands=["maint", "maintenance"])
 def maint_command(message):
@@ -7466,7 +7562,7 @@ def maint_command(message):
             extra = f"\n🔔 إشعار العودة أُرسل لـ {_maint_broadcast_back()} زبون."
         bot.reply_to(message, f"🛠️ وضع التحديث: {'✅ شغّال' if on else '⛔ مطفأ'}" + extra)
         return
-    bot.reply_to(message, f"🛠️ وضع التحديث: {'✅ شغّال' if _maint_on() else '⛔ مطفأ'}\nالمشتركون في الإشعار: {len(_smembers(MAINT_SUBS))}\n/maint on | off")
+    bot.reply_to(message, f"🛠️ وضع التحديث: {'✅ شغّال' if _maint_on() else '⛔ مطفأ'}\nالمشتركون في الإشعار: {len(_smembers(MAINT_SUBS))} | شاهدوا رسالة التحديث: {len(_smembers(MAINT_SEEN))}\n/maint on | off")
 '''
 patch(r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""",
       NEW_BLOCK + "\n" + r"""# ========== استقبال رقم العملية من الزبون (يجب أن يبقى بعد باقي معالجات النصوص) ==========""", "insert_block")
