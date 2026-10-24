@@ -2481,7 +2481,7 @@ def _style_store(mk):
         for row in mk.keyboard:
             for b in row:
                 cb = getattr(b, "callback_data", None) or ""
-                if cb.startswith("oos_"):
+                if cb.startswith("oos_") or getattr(b, "_oos_grp", False):
                     b.style = "danger"
                 elif cb.startswith(("buy_", "vgrp_", "grp_")):
                     b.style = "success"
@@ -2554,9 +2554,13 @@ def generate_store_keyboard(lang):
                 print(f"prime cell failed: {e}")
             lo, hi, stock = _group_range("netflix")
             if isinstance(stock, int) and stock <= 0:
-                oos.append(InlineKeyboardButton(text=f"{_g['icon']} {_g['name']}", callback_data="oos_netflix"))
+                # المجموعة تبقى في مكانها (أحمر) وبداخلها كل الخيارات حمراء
+                _nb = InlineKeyboardButton(text=f"{_g['icon']} {_g['name']}", callback_data="grp_netflix")
+                _nb._oos_grp = True
                 if _pc:
-                    markup.add(_vt_cell_button(_pc, lang, False))
+                    markup.row(_vt_cell_button(_pc, lang, True), _nb)
+                else:
+                    markup.add(_nb)
             elif _pc:
                 markup.row(_vt_cell_button(_pc, lang, True),
                            InlineKeyboardButton(text=f"{_g['icon']} {_g['name']} | {lo}+", callback_data="grp_netflix"))
@@ -2580,7 +2584,9 @@ def generate_store_keyboard(lang):
                 continue          # Claude/Codex عند المورّد داخل قائمته
             lo, hi, stock = _group_range(gid)
             if isinstance(stock, int) and stock <= 0:
-                oos.append(InlineKeyboardButton(text=f"{g['icon']} {g['name']}", callback_data=f"oos_grp_{gid}"))
+                _gb2 = InlineKeyboardButton(text=f"{g['icon']} {g['name']}", callback_data=f"grp_{gid}")
+                _gb2._oos_grp = True
+                markup.add(_gb2)        # تبقى في مكانها بالأحمر وبداخلها الخيارات حمراء
                 continue
             price = lo if lo == hi else f"{lo} - {hi}"
             stock_txt = stock if stock == "♾️" else f"📦 {stock}"
@@ -3229,8 +3235,8 @@ def _vt_cells():
         for key, title, rx in row:
             its = sorted([p for p in pool if p["vid"] not in used and re.search(rx, p["name"], re.I)], key=lambda x: x["cost"])
             used.update(p["vid"] for p in its)
-            if any(p["stock"] > 0 for p in its):
-                cells.append((key, title, its))
+            if its and (any(p["stock"] > 0 for p in its) or len(its) > 1 or key in VT_ALWAYS_GROUP):
+                cells.append((key, title, its))   # المجموعة تبقى حتى لو نفدت كلها (بالأحمر)
         if cells:
             rows.append(cells)
     left = [p for p in pool if p["vid"] not in used and p["stock"] > 0]
@@ -3257,6 +3263,10 @@ def _vt_cell_button(cell, lang, pair):
             _lbl = title if key in VT_USE_TITLE else _vt_short(p["name"])
             return InlineKeyboardButton(text=f"{p['icon']} {_lbl}", callback_data=f"buy_{p['id']}")
         return _slot_button(p, lang)
+    if not any(p["stock"] > 0 for p in its):
+        _ob = InlineKeyboardButton(text=f"{its[0]['icon']} {title}", callback_data=f"vgrp_{key}")
+        _ob._oos_grp = True
+        return _ob
     ins = [p for p in its if p["stock"] > 0] or its
     stock = sum(p["stock"] for p in its)
     lo = min(Decimal(p["price"].lstrip("$")) for p in ins)
