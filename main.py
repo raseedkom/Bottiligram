@@ -1702,7 +1702,7 @@ GROUP_TEXTS = {
 def _slot_button(item, lang):
     stock_display = item["stock"] if item["stock"] == "♾️" else f"📦 {item['stock']}"
     return InlineKeyboardButton(
-        text=f"{item['icon']} {tr(item, 'name', lang)} | {item['price']} | {stock_display}",
+        text=f"{item['icon']} {tr(item, 'name', lang)}‎ | {item['price']} | {stock_display}",   # علامة اتجاه تمنع تبعثر الكلمة العربية
         callback_data=f"buy_{item['id']}",
     )
 
@@ -1797,7 +1797,7 @@ ICON_WALLET = "5443127283898405358"
 ICON_BINANCE = "5454205576512818013"
 ICON_CARD = "5472250091332993630"      # بريدي موب + RedotPay
 ICON_FLIXY = "5440410042773824003"
-ICON_BYBIT = "5201873447554145566"
+ICON_BYBIT = "5249028722425612882"
 ICON_CHAT = "5215334566549540768"
 ICON_ARROW_R = "5406745015365943482"   # زر «بطاقات الهدايا»
 ICON_SUBS = "5397782960512444700"       # زر «اشتراكات متنوعة»
@@ -1837,6 +1837,8 @@ _DYN_TEXT_FIRST = (
     (r"ساحة المباريات|match arena|arène des matchs|arene des matchs", ICON_MATCH, False),
     (r"تحدي التوقيت|timing challenge|défi chrono|defi chrono", ICON_TIMER, False),
     (r"تواصل مع الدعم|contact support|contacter l'assistance", ICON_CONTACT, False),
+    (r"نسخ الرابط|copy link|copier le lien", "5386379624773066504", False),
+    (r"إلى المحفظة|to wallet|au portefeuille", "5386380500946414098", False),
     (r"baridimob|بريدي\s*موب|بديدي\s*موب", ICON_BARIDI, False),
 )
 
@@ -1912,6 +1914,7 @@ for _setname, _key in (("KB_START_TEXTS", "kb_start"), ("KB_SUPPORT_TEXTS", "kb_
 # ---------- أيقونات الإيموجي المخصص أمام الأزرار (تحتاج Premium عند صاحب البوت) ----------
 # (regex على نص الزر بالترتيب → معرّف الإيموجي). الترتيب مهم: الأخص أولاً.
 BTN_ICON_IDS = [
+    (r"snapchat", "5330248916224983855"),
     (r"free\s*fire", "6012423622730192070"),
     (r"pubg", "6323599384919413622"),
     (r"iptv", "5026268800509543248"),
@@ -1956,7 +1959,7 @@ BTN_ICON_IDS = [
     (r"speechify", "5888548644130399040"),
     (r"arize", "4990421706377004842"),
     (r"readwise", "6282841072993312605"),
-    (r"(^|\s)fin(\s|$|\|)", "5373145666597961572"),
+    (r"(^|\s)fin(\s|$|\||‎)", "5373145666597961572"),
     (r"descript", "5818857774641062590"),
 ]
 
@@ -5444,6 +5447,44 @@ def ref_stats(uid):
 def _ref_link(uid):
     return f"{BOT_LINK}?start=ref{SEP}{uid}"
 
+@bot.message_handler(commands=["refstats"])
+def refstats_command(message):
+    """للأدمن: إحصائيات إحالة أي شخص (صانع محتوى) بلا حد 300."""
+    if str(message.chat.id) != str(ADMIN_CHAT_ID):
+        return
+    a = (message.text or "").split()
+    if len(a) < 2 or not a[1].isdigit():
+        bot.reply_to(message, "الاستعمال: /refstats ID\nمثال: /refstats 8491461365")
+        return
+    rid = a[1]
+    ph = bot.reply_to(message, "⏳ جاري الحساب...")
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+        members = sorted(_smembers(f"rk:ref:list:{rid}"))
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            act = list(ex.map(lambda r: bool(_ref_active(r)), members))
+        spent_each = [_spent_c(r) for r in members]
+        total = len(members)
+        active = sum(1 for x in act if x)
+        buyers = sum(1 for s in spent_each if s > 0)
+        spent_all = sum(spent_each)
+        spent_active = sum(s for s, x in zip(spent_each, act) if x)
+        text = (
+            f"📊 <b>إحصائيات الإحالة</b>\n🆔 <code>{rid}</code>\n\n"
+            f"👥 عدد المُحالين: <b>{total}</b>\n"
+            f"✅ النشطون: <b>{active}</b>\n"
+            f"🛒 اشترى منهم: <b>{buyers}</b>\n"
+            f"💵 مجموع مشترياتهم: <b>{_money(spent_all)}$</b>\n"
+            f"💵 مشتريات النشطين فقط: <b>{_money(spent_active)}$</b>\n\n"
+            f"🔗 <code>{_ref_link(rid)}</code>"
+        )
+    except Exception as e:
+        text = f"❌ خطأ: {html.escape(str(e))[:200]}"
+    try:
+        bot.edit_message_text(text, message.chat.id, ph.message_id, parse_mode="HTML")
+    except Exception:
+        bot.send_message(message.chat.id, text, parse_mode="HTML")
+
 def _ref_show(call, lang, src):
     uid = call.from_user.id
     total, active, spent_c = ref_stats(uid)
@@ -5452,8 +5493,14 @@ def _ref_show(call, lang, src):
         reward=_money(REF_REWARD_C), need_u=REF_NEED_U, need_usd=_money(REF_NEED_C),
         link=_ref_link(uid), total=total, active=active, spent=_money(spent_c),
     )
+    plain_text = text
+    if not _icons_off():
+        for _em, _id in (("🔗", "5271604874419647061"), ("📊", "5386367538735104399"), ("👥", "4909043075529048789"),
+                         ("✅", "5463122435425448565"), ("💵", "5357484575159244309")):
+            text = text.replace("\n" + _em + " ", f'\n<tg-emoji emoji-id="{_id}">{_em}</tg-emoji> ')
     if claimed:
         text += rft(lang, "claimed")
+        plain_text += rft(lang, "claimed")
     mk = InlineKeyboardMarkup(row_width=1)
     link = _ref_link(uid)
     btn = None
@@ -5465,7 +5512,11 @@ def _ref_show(call, lang, src):
     mk.add(btn or InlineKeyboardButton(text=rft(lang, "copy"), callback_data="rf_cp"))
     mk.add(InlineKeyboardButton(text=rft(lang, "claim").format(reward=_money(REF_REWARD_C)), callback_data=f"rf_c_{src}"))
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="back_to_main" if src == "m" else "sm_home"))
-    _pf_show(call, text, mk)
+    try:
+        _pf_show(call, text, mk)
+    except Exception as e:
+        print(f"ref page custom emoji failed: {e}")
+        _pf_show(call, plain_text, mk)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("rf_"))
 def handle_referral(call):
