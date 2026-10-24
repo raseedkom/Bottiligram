@@ -1929,6 +1929,10 @@ ICON_BELL = "5458603043203327669"       # أعلمني بالمباريات ال
 ICON_NOTIF_OFF = "5240241223632954241"  # إيقاف الإشعارات
 ICON_STOP_TIMER = "5359543311897998264" # إيقاف العداد
 VS_EMOJI_ID = "5467412991790043938"     # VS بين الفريقين
+ICON_LANG_GLOBE = "5224450179368767019"  # 🌍 عنوان اختيار اللغة
+ICON_LANG_AR = "5269400778807720624"     # علم الجزائر
+ICON_LANG_FR = "5202132623060640759"     # علم فرنسا
+ICON_LANG_EN = "5458416160586342331"     # علم بريطانيا
 ICON_MENU_GAME = "4972415571384599106"  # لعبة (القائمة الرئيسية)
 ICON_MENU_API = "5271604874419647061"   # API
 ICON_MENU_CHANNEL = "5424818078833715060"  # القناة الرئيسية
@@ -1968,6 +1972,7 @@ def _clean_arrows(s):
         s = s.replace(a, " ")
     return re.sub(r"\s+", " ", s).strip()
 _DYN_CB_PREFIX = (
+    ("lang_en", ICON_LANG_EN), ("lang_ar", ICON_LANG_AR), ("lang_fr", ICON_LANG_FR),
     ("mbuy_", ICON_BUY), ("qb_", ICON_BUY), ("var_gplay_", ICON_GPLAY), ("var_apple_gift_", ICON_APPLE_GIFT), ("var_steam_", ICON_STEAM_GIFT), ("var_pubg_", ICON_BC_CHEST), ("var_freefire_", ICON_FF_CHEST),
     ("pm_bn_", ICON_BINANCE), ("pm_bd_", ICON_CARD), ("pm_fx_", ICON_FLIXY),
     ("pm_rp_", ICON_CARD), ("pm_rd_", ICON_CARD), ("pm_soon_bb", ICON_BYBIT),
@@ -2213,6 +2218,39 @@ def send_main_menu(chat_id, lang):
         print(f"welcome banner message failed: {e}")
     _send_main_menu_plain(chat_id, lang)
 
+# ---------- صفحة اختيار اللغة: إيموجي مخصص في العنوان (والأزرار تأخذ أعلامها من _dyn_icon) ----------
+_send_language_menu_plain = send_language_menu
+
+def send_language_menu(chat_id):
+    if _icons_off():
+        return _send_language_menu_plain(chat_id)
+    try:
+        rest = CHOOSE_LANG_TEXT
+        if rest.startswith("🌐"):
+            rest = rest[1:].lstrip()
+        caption = "⭐ " + rest
+        ents = [telebot.types.MessageEntity("custom_emoji", 0, 1, custom_emoji_id=ICON_LANG_GLOBE)]
+        mk = InlineKeyboardMarkup()
+        mk.row(
+            InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en"),
+            InlineKeyboardButton(text="🇩🇿 العربية", callback_data="lang_ar"),
+            InlineKeyboardButton(text="🇫🇷 Français", callback_data="lang_fr"),
+        )
+    except Exception as e:
+        print(f"lang menu build failed: {e}")
+        return _send_language_menu_plain(chat_id)
+    try:
+        bot.send_photo(chat_id, UNIFIED_IMAGE_URL, caption=caption, caption_entities=ents, reply_markup=mk)
+        return
+    except Exception as e:
+        print(f"lang menu photo failed: {e}")
+    try:
+        bot.send_message(chat_id, caption, entities=ents, reply_markup=mk)
+        return
+    except Exception as e:
+        print(f"lang menu message failed: {e}")
+    _send_language_menu_plain(chat_id)
+
 # ---------- بطاقة المنتج: إيموجي مخصص أمام «السعر» و«المتوفر» ----------
 ICON_PRICE = "5197434882321567830"
 ICON_STOCK = "5429518319243775957"
@@ -2220,6 +2258,28 @@ _send_card_orig = send_card
 
 def _u16(s):
     return len(str(s).encode("utf-16-le")) // 2
+
+# أعلام مخصصة (إيموجي) بدل أعلام النظام: تركيا، الهند، فرنسا، أمريكا، البرازيل، إندونيسيا
+FLAG_IDS = {"🇹🇷": "5229155784192965272", "🇮🇳": "5445209411029050250", "🇫🇷": "5202132623060640759",
+            "🇺🇸": "5202021044105257611", "🇧🇷": "6118655940829907978", "🇮🇩": "6215473823760780367"}
+_FLAG_PUA = {f: chr(0xE000 + i) for i, f in enumerate(FLAG_IDS)}
+_PUA_FLAG_ID = {_FLAG_PUA[f]: FLAG_IDS[f] for f in FLAG_IDS}
+
+def _flags_pua(text):
+    for f, ch in _FLAG_PUA.items():
+        text = text.replace(f, ch)
+    return text
+
+def _flag_ents(text, base=0):
+    """يستبدل كل علم بـ ⭐ ويعيد (نص جديد، entities) بإزاحة base."""
+    out, ents = "", []
+    for ch in _flags_pua(text):
+        if ch in _PUA_FLAG_ID:
+            ents.append(telebot.types.MessageEntity("custom_emoji", base + _u16(out), 1, custom_emoji_id=_PUA_FLAG_ID[ch]))
+            out += "⭐"
+        else:
+            out += ch
+    return out, ents
 
 def _caption_to_entities(caption):
     """يحوّل نص Markdown البسيط (*غامق*) إلى نص + entities، ويضع إيموجي مخصصاً في سطري السعر والمتوفر."""
@@ -2245,6 +2305,7 @@ def _caption_to_entities(caption):
                     line = "⭐" + line[len(head[0]):]
                     eid = e
                 break
+        line = _flags_pua(line)
         res, last, bolds = "", 0, []
         for m in re.finditer(r"\*([^*\n]+)\*", line):
             res += line[last:m.start()]
@@ -2253,6 +2314,16 @@ def _caption_to_entities(caption):
             bolds.append((b0, _u16(m.group(1))))
             last = m.end()
         res += line[last:]
+        fl, chars = [], []
+        for ch in res:
+            if ch in _PUA_FLAG_ID:
+                fl.append((_u16("".join(chars)), _PUA_FLAG_ID[ch]))
+                chars.append("⭐")
+            else:
+                chars.append(ch)
+        res = "".join(chars)
+        for off, fid in fl:
+            ents.append(telebot.types.MessageEntity("custom_emoji", pos + off, 1, custom_emoji_id=fid))
         if eid:
             ents.append(telebot.types.MessageEntity("custom_emoji", pos, 1, custom_emoji_id=eid))
         for b0, bl in bolds:
@@ -2319,8 +2390,10 @@ def _post_build(item, name, lbl_stock, stock_val, lbl_price, price_val):
         ents.append(telebot.types.MessageEntity("custom_emoji", _u16(text), 1, custom_emoji_id=logo))
     text += ("⭐" if logo else str(item.get("icon") or "")) + " "
     b0 = _u16(text)
-    text += name
-    ents.append(telebot.types.MessageEntity("bold", b0, _u16(name)))
+    name2, fents = _flag_ents(str(name), b0)
+    text += name2
+    ents.extend(fents)
+    ents.append(telebot.types.MessageEntity("bold", b0, _u16(name2)))
     text += "\n\n"
     for eid, lbl, val in ((ICON_STOCK, lbl_stock, stock_val), (ICON_PRICE, lbl_price, price_val)):
         pos = _u16(text)
