@@ -2507,7 +2507,24 @@ def _assemble_store(markup, oos):
 @bot.callback_query_handler(func=lambda c: c.data.startswith("oos_"))
 def handle_oos_button(call):
     lang = get_lang(call.from_user.id)
-    txt = {"ar": "❌ نفد المخزون حالياً", "en": "❌ Out of stock right now", "fr": "❌ Rupture de stock"}.get(lang, "❌ Out of stock")
+    # الزر الأحمر يفتح صفحة المنتج/المجموعة (الوصف + زر «أعلمني») بدل رسالة فقط
+    try:
+        _d = call.data
+        if _d == "oos_netflix":
+            call.data = "grp_netflix"
+            return handle_store_group(call)
+        if _d.startswith("oos_grp_"):
+            call.data = "grp_" + _d[8:]
+            return handle_store_group(call)
+        if _d.startswith("oos_vg_"):
+            call.data = "vgrp_" + _d[7:]
+            return handle_vente_group(call)
+        _pid = _d[4:]
+        if find_product(_pid):
+            return _qb_dispatch(call, _pid)
+    except Exception as e:
+        print(f"oos open failed: {e}")
+    txt ={"ar": "❌ نفد المخزون حالياً", "en": "❌ Out of stock right now", "fr": "❌ Rupture de stock"}.get(lang, "❌ Out of stock")
     try:
         bot.answer_callback_query(call.id, txt)
     except Exception:
@@ -3020,8 +3037,16 @@ def _vt_rebuild():
             "delivery_type": p.get("delivery_type"), "api_test": bool(p.get("api_test")),
             "eligible": _vt_eligible(p), "raw_name": name,
         }
+    _old_stock = {k: v.get("stock") for k, v in _VT_PRODS.items()}
     _VT_PRODS.clear()
     _VT_PRODS.update(out)
+    # إشعار «أعلمني» لمنتجات المورّد عند رجوع المخزون
+    for _k, _v in out.items():
+        try:
+            if _old_stock.get(_k) == 0 and _v["stock"] > 0:
+                _restock_hook(_k, 0, _v["stock"])
+        except Exception as e:
+            print(f"vt restock hook failed: {e}")
 
 def vt_refresh(force=False):
     """يحدّث الكتالوج (ar/en/fr) مع ETag. يرجع True إذا نجح جلب واحد على الأقل."""
@@ -3312,6 +3337,9 @@ def _vt_find_cell(key):
         for c in cells:
             if c[0] == key:
                 return c
+    for c in _VT_OOSG:      # مجموعة نفدت كلها (تُفتح لمعرفة العرض والضغط على «أعلمني»)
+        if c[0] == key:
+            return c
     return None
 
 def _own_claude_shown():
@@ -3323,6 +3351,9 @@ def _vt_back_cb(p):
         for key, title, its in cells:
             if (len(its) > 1 or key in VT_ALWAYS_GROUP) and any(x["vid"] == p["vid"] for x in its):
                 return f"vgrp_{key}"
+    for key, title, its in _VT_OOSG:
+        if any(x["vid"] == p["vid"] for x in its):
+            return f"vgrp_{key}"
     return "back_to_main"
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("vgrp_"))
@@ -3381,6 +3412,7 @@ def _vt_view(call, pid):
     else:
         bottom = t(lang, "out_of_stock")
         mk.add(InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK))
+        mk.add(InlineKeyboardButton(text=t(lang, "notify_me"), callback_data=f"notify_{p['id']}"))
     mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=_vt_back_cb(p)))
     caption = (
         f"{t(lang, 'chosen')} *{tr(p, 'name', lang)}*\n"
