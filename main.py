@@ -351,6 +351,7 @@ patch(r"""    if data != "pf_topo":""",
 # 11) لوحة الأدمن
 patch(r"""    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callback_data="adm_view"))""",
       r"""    markup.add(InlineKeyboardButton(text=_maint_label(), callback_data="adm_maint"))
+    _learn_admin_btn(markup)
     markup.add(InlineKeyboardButton(text="💰 ربح الصافي", callback_data="adm_profit"))
     markup.add(InlineKeyboardButton(text="📦 الطلبات المعلقة", callback_data="adm_pend"))
     markup.add(InlineKeyboardButton(text=f"💳 الدفعات المعلقة ({_pp_count()})", callback_data="ap_l"))
@@ -1420,6 +1421,14 @@ def setprofit_cmd(message):
     bot.reply_to(message, "✅ تم الحفظ")
 
 def _admin_panel_extra(call, op):
+    if op == "home":      # زر «رجوع» من شاشات الأدمن (طرق الدفع...) إلى لوحة الأدمن
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+        admin_panel_cmd(_types.SimpleNamespace(from_user=call.from_user, chat=call.message.chat, text="/admin"))
+        bot.answer_callback_query(call.id)
+        return True
     if op == "maint":
         was = _maint_on()
         on = not was
@@ -2219,6 +2228,10 @@ def send_main_menu(chat_id, lang):
     except Exception as e:
         print(f"welcome banner message failed: {e}")
     _send_main_menu_plain(chat_id, lang)
+
+def _learn_admin_btn(markup):
+    """زر تشغيل/إيقاف «تعلّم كيف تشتري» في لوحة الأدمن. يستبدله learn.py إن وُجد، وإلا لا يظهر شيء."""
+    return None
 
 # ---------- صفحة اختيار اللغة: إيموجي مخصص في العنوان (والأزرار تأخذ أعلامها من _dyn_icon) ----------
 _send_language_menu_plain = send_language_menu
@@ -5192,10 +5205,11 @@ def show_pm_settings(chat_id, msg_id=None):
             f"{PM_ICON[m]} <b>{PM_NAME[m]['ar']}</b>: {'✅ مفعّلة' if on else '⛔ موقوفة'} | "
             + ("بالدولار مباشرة" if m == "rd" else f"1$ = {_fmt_rate(pm_rate(m))} DA") + f" | ⏳ {len(pmw_list(m))} ينتظرون"
         )
-        mk.row(
-            InlineKeyboardButton(text=f"✅ تفعيل {PM_NAME[m]['ar']}", callback_data=f"ap_on_{m}"),
-            InlineKeyboardButton(text=f"⛔ إيقاف {PM_NAME[m]['ar']}", callback_data=f"ap_off_{m}"),
-        )
+        _b_on = InlineKeyboardButton(text=f"✅ تفعيل {PM_NAME[m]['ar']}", callback_data=f"ap_on_{m}")
+        _b_on.style = "success"      # التفعيل أخضر
+        _b_off = InlineKeyboardButton(text=f"⛔ إيقاف {PM_NAME[m]['ar']}", callback_data=f"ap_off_{m}")
+        _b_off.style = "danger"      # الإيقاف أحمر
+        mk.row(_b_on, _b_off)
         if m != "rd":
             mk.add(InlineKeyboardButton(text=f"💱 سعر صرف {PM_NAME[m]['ar']}", callback_data=f"ap_rt_{m}"))
     for m in ("rp", "bb"):
@@ -5206,6 +5220,7 @@ def show_pm_settings(chat_id, msg_id=None):
             lines.append(f"🔄 <b>{SOON_NAME[m]}</b>: قريباً | ⏳ {n} ينتظرون")
         if n:
             mk.add(InlineKeyboardButton(text=f"📢 إعلام منتظري {SOON_NAME[m]} (متاح الآن)", callback_data=f"ap_wn_{m}"))
+    mk.add(InlineKeyboardButton(text=t("ar", "back"), callback_data="adm_home"))     # رجوع إلى لوحة الأدمن
     _pr_show(chat_id, msg_id, "\n".join(lines), mk)
 
 def _pm_notify_waiters(m):

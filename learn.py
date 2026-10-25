@@ -33,6 +33,8 @@ LM_T = {
         "step4": "{tag}\n\n<b>الخطوة 4/4 — {method}:</b>\n\n",
         "bn_demo": "🎯 <b>للمثال:</b> بعد الدفع تحصل على رقم عملية (Order ID). هذا هو رقم المثال، انسخه بالزر أدناه ثم أرسله هنا في الشات:\n<code>{oid}</code>",
         "copy_oid": "📋 نسخ رقم العملية (للمثال)",
+        "now_photo": "👉 <b>للتعلّم:</b> أرسل الآن أي صورة عشوائية من عندك (مثال).",
+        "now_fx": "👉 <b>للتعلّم:</b> أرسل الآن رسالة بهذا الشكل بالمبلغ الظاهر أعلاه والوقت (مثال).",
         "after": "هنا يتحقق البوت فوراً لأنه مثال، وفي الشراء الحقيقي يصلك المنتج بعد التحقق 🎓",
         "fx_hint": "✉️ ابعث رسالة بهذا الشكل (المبلغ والوقت):\n<code>فليكسي\nالمبلغ : {da}Da\nالوقت : 12:33</code>",
         "fx_amt": "❌ المبلغ غير مطابق. المطلوب: <b>{da} DA</b>.\nأعد إرسال الرسالة بالمبلغ الصحيح.",
@@ -58,6 +60,8 @@ LM_T = {
         "step4": "{tag}\n\n<b>Step 4/4 — {method}:</b>\n\n",
         "bn_demo": "🎯 <b>For the example:</b> after paying you get a transaction number (Order ID). Here is the example number, copy it with the button below, then send it here in the chat:\n<code>{oid}</code>",
         "copy_oid": "📋 Copy order ID (example)",
+        "now_photo": "👉 <b>For learning:</b> now send any random picture from your phone (example).",
+        "now_fx": "👉 <b>For learning:</b> now send a message in this format with the amount shown above and the time (example).",
         "after": "Here the bot verifies instantly because it is an example; in a real purchase you receive the product after verification 🎓",
         "fx_hint": "✉️ Send a message in this format (amount and time):\n<code>Flexy\nAmount : {da}Da\nTime : 12:33</code>",
         "fx_amt": "❌ The amount does not match. Required: <b>{da} DA</b>.\nPlease resend the message with the correct amount.",
@@ -83,6 +87,8 @@ LM_T = {
         "step4": "{tag}\n\n<b>Étape 4/4 — {method} :</b>\n\n",
         "bn_demo": "🎯 <b>Pour l'exemple :</b> après le paiement vous recevez un numéro de transaction (Order ID). Voici le numéro d'exemple, copiez-le avec le bouton ci-dessous puis envoyez-le ici dans le chat :\n<code>{oid}</code>",
         "copy_oid": "📋 Copier l'ID de commande (exemple)",
+        "now_photo": "👉 <b>Pour apprendre :</b> envoyez maintenant n'importe quelle image au hasard (exemple).",
+        "now_fx": "👉 <b>Pour apprendre :</b> envoyez maintenant un message sous cette forme avec le montant ci-dessus et l'heure (exemple).",
         "after": "Ici le bot vérifie instantanément car c'est un exemple ; pour un vrai achat vous recevez le produit après vérification 🎓",
         "fx_hint": "✉️ Envoyez un message sous cette forme (montant et heure) :\n<code>Flexy\nMontant : {da}Da\nHeure : 12:33</code>",
         "fx_amt": "❌ Le montant ne correspond pas. Montant requis : <b>{da} DA</b>.\nRenvoyez le message avec le bon montant.",
@@ -272,6 +278,18 @@ def _lm_picker(call, lang, k):
     _lm_show(call, text, mk)
 
 
+def _lm_inject(body, hint, after_text):
+    """يضع سطر التلميح قبل الخطوة 3 (أو قبل نص الخاتمة إن لم توجد خطوة 3)."""
+    marker = "3️⃣ " + after_text
+    i = body.find(marker)
+    if i < 0:
+        i = body.rfind(after_text)
+    if i < 0:
+        return body + "\n\n" + hint
+    sep = "\n" if marker in body else "\n\n"
+    return body[:i] + hint + sep + body[i:]
+
+
 def _lm_method(call, lang, m, k):
     uid = call.from_user.id
     tx = _lm_tx(lang)
@@ -298,22 +316,25 @@ def _lm_method(call, lang, m, k):
         body = pmt(lang, "pay_fx").format(
             what=name, usd=price, rate=_fmt_rate(pm_rate("fx")), da=da,
             dest=LM_FAKE["fx"], after=tx["after"])
+        body = _lm_inject(body, tx["now_fx"], tx["after"])
         mk.add(_lm_copy_btn(pmt(lang, "copy_fx"), LM_FAKE["fx"], "dm_cp_dest"))
     elif m == "bd":
         st.update(step="photo")
         body = pmt(lang, "pay_bd").format(
             what=name, usd=price, rate=_fmt_rate(pm_rate("bd")), da=pm_da(price, "bd"),
             dest=LM_FAKE["bd"], after=tx["after"])
+        body = _lm_inject(body, tx["now_photo"], tx["after"])
         mk.add(_lm_copy_btn(pmt(lang, "copy_bd"), LM_FAKE["bd"], "dm_cp_dest"))
     else:  # rd
         st.update(step="photo")
         body = pmt(lang, "pay_rd").format(what=name, usd=price, dest=LM_FAKE["rd"], after=tx["after"])
+        body = _lm_inject(body, tx["now_photo"], tx["after"])
         mk.add(_lm_copy_btn(pmt(lang, "copy_rd"), LM_FAKE["rd"], "dm_cp_dest"))
 
     st["dest"] = LM_FAKE[m]
     _lm_state[uid] = st
-    mk.add(_lm_btn(t(lang, "back"), f"dm_b_{k}"))
-    mk.add(_lm_btn(t(lang, "cancel"), "dm_end"))
+    mk.add(_lm_btn(t(lang, "back"), f"dm_b_{k}"))      # رجوع خطوة واحدة: إلى طرق الدفع
+    mk.add(_lm_btn(tx["end"], "dm_end"))                # الخروج من التعلّم
     _lm_show(call, head + body, mk)
 
 
@@ -453,6 +474,37 @@ def lm_callback(call):
     tx = _lm_tx(lang)
     d = call.data or ""
     try:
+        if d == "dm_adm":      # زر لوحة الأدمن: تشغيل/إيقاف القسم
+            if str(uid) != str(ADMIN_CHAT_ID):
+                bot.answer_callback_query(call.id)
+                return
+            was = _lm_on()
+            waiting = 0
+            try:
+                waiting = len(_smembers(LM_WAIT))
+            except Exception:
+                pass
+            if was:
+                _lm_set(False)
+            else:
+                _lm_set(True)
+                _lm_broadcast_back()
+            try:
+                rm = call.message.reply_markup
+                for row in rm.keyboard:
+                    for b in row:
+                        if getattr(b, "callback_data", None) == "dm_adm":
+                            b.text = _lm_admin_label()
+                bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=rm)
+            except Exception as e:
+                print(f"learn admin label update failed: {e}")
+            bot.answer_callback_query(
+                call.id,
+                ("⛔ تم إيقاف «تعلّم كيف تشتري». من يضغط الزر يجد رسالة التوقف مع «أعلمني عند البدء»." if was
+                 else f"✅ تم تشغيل «تعلّم كيف تشتري». أُرسل إشعار العودة لـ {waiting} زبون."),
+                show_alert=True)
+            return
+
         if d == "dm_end":
             _lm_state.pop(uid, None)
             try:
@@ -641,5 +693,16 @@ def _lm_gsk_with_button(lang):
 
 
 generate_store_keyboard = _lm_gsk_with_button
+
+
+def _lm_admin_label():
+    return "🎓 تعلّم كيف تشتري: " + ("✅ شغّال (اضغط للإيقاف)" if _lm_on() else "⛔ متوقف (اضغط للتشغيل)")
+
+
+def _lm_admin_btn(markup):
+    markup.add(InlineKeyboardButton(text=_lm_admin_label(), callback_data="dm_adm"))
+
+
+_learn_admin_btn = _lm_admin_btn      # يظهر الزر في لوحة الأدمن (يستدعيه main.py)
 
 print("learn.py loaded ✅")
