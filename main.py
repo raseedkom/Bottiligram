@@ -7810,4 +7810,19 @@ monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)""", 
 if _errors:
     sys.exit("❌ فشل تطبيق التعديلات (هل bot_base.py هو الكود القديم نفسه؟):\n" + "\n".join(_errors))
 
+patch(r"""print("Bot is running...")""",
+      r"""# قسم «تعلّم كيف تشتري»: ملف منفصل learn.py (إن غاب أو فشل يشتغل البوت عادي بدونه)
+try:
+    _lp = os.path.join(os.path.dirname(os.path.abspath(BASE_FILE)), "learn.py")
+    if os.path.exists(_lp):
+        exec(compile(open(_lp, encoding="utf-8").read(), _lp, "exec"), globals())
+    else:
+        print("learn.py not found - learning section disabled")
+except Exception as _le:
+    print(f"learn.py failed to load: {_le}")
+print("Bot is running...")""", "load_learn")
+
+if _errors:
+    sys.exit("❌ فشل تطبيق التعديلات (هل bot_base.py هو الكود القديم نفسه؟):\n" + "\n".join(_errors))
+
 exec(compile(src, BASE_FILE, "exec"), globals())
