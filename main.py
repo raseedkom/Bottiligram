@@ -7837,6 +7837,27 @@ except Exception as _le:
     print(f"learn.py failed to load: {_le}")
 print("Bot is running...")""", "load_learn")
 
+# اتصال تليجرام أكثر تحمّلاً: استعلام قصير + تجديد الجلسة (حل Read timed out على Render)
+patch(r"""bot.infinity_polling()""",
+      r"""_poll_kw = {}
+try:
+    import inspect as _insp
+    from telebot import apihelper as _ah
+    for _an, _av in (("CONNECT_TIMEOUT", 10), ("SESSION_TIME_TO_LIVE", 60)):
+        try:
+            setattr(_ah, _an, _av)
+        except Exception:
+            pass
+    _psig = _insp.signature(bot.infinity_polling).parameters
+    if "timeout" in _psig:
+        _poll_kw["timeout"] = 10
+    if "long_polling_timeout" in _psig:
+        _poll_kw["long_polling_timeout"] = 5
+except Exception as _pe:
+    print(f"polling tune skipped: {_pe}")
+print(f"polling options: {_poll_kw}")
+bot.infinity_polling(**_poll_kw)""", "tune_polling")
+
 if _errors:
     sys.exit("❌ فشل تطبيق التعديلات (هل bot_base.py هو الكود القديم نفسه؟):\n" + "\n".join(_errors))
 
