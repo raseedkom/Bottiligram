@@ -7827,14 +7827,15 @@ if _errors:
 
 patch(r"""print("Bot is running...")""",
       r"""# قسم «تعلّم كيف تشتري»: ملف منفصل learn.py (إن غاب أو فشل يشتغل البوت عادي بدونه)
-try:
-    _lp = os.path.join(os.path.dirname(os.path.abspath(BASE_FILE)), "learn.py")
-    if os.path.exists(_lp):
-        exec(compile(open(_lp, encoding="utf-8").read(), _lp, "exec"), globals())
-    else:
-        print("learn.py not found - learning section disabled")
-except Exception as _le:
-    print(f"learn.py failed to load: {_le}")
+for _fn in ("learn.py", "reviews.py", "pimages.py"):
+    try:
+        _lp = os.path.join(os.path.dirname(os.path.abspath(BASE_FILE)), _fn)
+        if os.path.exists(_lp):
+            exec(compile(open(_lp, encoding="utf-8").read(), _lp, "exec"), globals())
+        else:
+            print(f"{_fn} not found - section disabled")
+    except Exception as _le:
+        print(f"{_fn} failed to load: {_le}")
 print("Bot is running...")""", "load_learn")
 
 # اتصال تليجرام أكثر تحمّلاً: استعلام قصير + تجديد الجلسة (حل Read timed out على Render)
