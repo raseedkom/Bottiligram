@@ -132,6 +132,28 @@ def _rp_letter(user):
     return ""
 
 
+def _rp_notify_admin(u, rec, n):
+    """يصل الأدمن إشعار بكل تقييم: النجوم + الاسم الكامل + المعرّف + رابط المحادثة."""
+    try:
+        full = " ".join(x for x in [getattr(u, "first_name", "") or "", getattr(u, "last_name", "") or ""] if x).strip() or "—"
+        un = getattr(u, "username", None)
+        uid = int(u.id)
+        lines = [
+            "🧪 <b>تجربة تقييم</b> (لم يُحفظ)" if rec.get("test") else "⭐ <b>تقييم جديد</b>",
+            "",
+            f"📦 {_rp_html.escape(str(rec.get('pname')))}",
+            f"{_rp_stars(n)}  ({n}/5)",
+            "",
+            f"👤 {_rp_html.escape(full)}",
+            f"🔗 @{_rp_html.escape(un)}" if un else "🔗 (بدون username)",
+            f"🆔 <code>{uid}</code>",
+            f'💬 <a href="tg://user?id={uid}">فتح محادثة الزبون</a>',
+        ]
+        bot.send_message(int(ADMIN_CHAT_ID), "\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
+    except Exception as e:
+        print(f"rate prompt admin notify failed: {e}")
+
+
 def _rp_cb(call):
     d = call.data or ""
     try:
@@ -168,6 +190,7 @@ def _rp_cb(call):
                 _rv_save(items)
             rec["done"] = True
             _rp_put(tok, rec)
+        _rp_notify_admin(call.from_user, rec, n)
         msg = tx["thanks"].format(s=_rp_stars(n), p=_rp_html.escape(str(rec["pname"])))
         if rec.get("test"):
             msg += "\n\n🧪 تجربة فقط — لم يُحفظ شيء."
