@@ -383,11 +383,10 @@ app.wsgi_app = _ws_wsgi
 
 # ---------------- زر «Web Store» بجانب خانة الكتابة ----------------
 def _ws_menu_on():
-    """True = الزر لكل الزبائن (الإطلاق). الافتراضي: مطفأ → الزر للأدمن فقط في الكيبورد السفلي."""
     try:
-        return str(kv_get(WS_MENU_KEY)) == "1"
+        return str(kv_get(WS_MENU_KEY)) != "0"
     except Exception:
-        return False
+        return True
 
 
 def _ws_apply_menu():
@@ -413,33 +412,15 @@ def ws_command(message):
         arg = parts[1].lower() if len(parts) > 1 else ""
         if arg not in ("on", "off"):
             bot.send_message(message.chat.id,
-                             f"🛍️ المتجر المصغّر: {'✅ ظاهر للجميع' if _ws_menu_on() else '🔒 للأدمن فقط'}\n\n"
-                             "/webmenu on — يظهر زر Web Store لكل الزبائن (الإطلاق)\n/webmenu off — للأدمن فقط (زر في الكيبورد السفلي)\n\n"
+                             f"🛍️ المتجر المصغّر: {'✅ زر Web Store مفعّل' if _ws_menu_on() else '⛔ الزر الافتراضي'}\n\n"
+                             "/webmenu on — يظهر زر Web Store بجانب الكتابة\n/webmenu off — يرجع زر القائمة العادي\n\n"
                              f"🔗 {_ws_base_url()}")
             return
         kv_set(WS_MENU_KEY, "1" if arg == "on" else "0")
         _ws_apply_menu()
-        bot.send_message(message.chat.id, "✅ Web Store ظاهر الآن لكل الزبائن" if arg == "on" else "🔒 Web Store للأدمن فقط (اضغط «تحديث» ليظهر الزر في الكيبورد)")
+        bot.send_message(message.chat.id, "✅ تم تفعيل زر Web Store" if arg == "on" else "✅ رجع زر القائمة العادي")
     except Exception as e:
         print(f"webmenu command failed: {e}")
-
-
-# زر Web Store في الكيبورد السفلي للأدمن فقط (مكان مستقل، ولا يمس زر قائمة الأوامر)
-try:
-    _ws_orig_persist = send_persistent_menu
-
-    def send_persistent_menu(chat_id, lang):
-        try:
-            if str(chat_id) == str(ADMIN_CHAT_ID):
-                kb = build_reply_keyboard(lang)
-                kb.row(telebot.types.KeyboardButton("🛍️ Web Store", web_app=telebot.types.WebAppInfo(url=_ws_base_url())))
-                bot.send_message(chat_id, t(lang, "menu_hint"), reply_markup=kb)
-                return
-        except Exception as e:
-            print(f"webstore admin keyboard failed: {e}")
-        return _ws_orig_persist(chat_id, lang)
-except NameError:
-    pass
 
 
 bot.message_handler(commands=["webmenu"])(ws_command)
