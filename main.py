@@ -269,6 +269,10 @@ def patch(old, new, name):
         return
     src = src.replace(old, new, 1)
 
+# رابط الدعم (اليوزر تغيّر)
+patch('MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"',
+      'MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom_Support"', "support_link")
+
 # 0) إعادة تسمية دالتي منشورات المنتجات الأصليتين (نغلّفهما في NEW_BLOCK)
 patch(r"""def send_channel_post(chat_id, item):""",
       r"""def _send_channel_post_orig(chat_id, item):""", "rename_scp")
