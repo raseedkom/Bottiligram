@@ -7827,7 +7827,7 @@ if _errors:
 
 patch(r"""print("Bot is running...")""",
       r"""# قسم «تعلّم كيف تشتري»: ملف منفصل learn.py (إن غاب أو فشل يشتغل البوت عادي بدونه)
-for _fn in ("learn.py", "reviews.py", "pimages.py", "webstore.py"):
+for _fn in ("learn.py", "reviews.py", "pimages.py", "rateprompt.py", "webstore.py"):
     try:
         _lp = os.path.join(os.path.dirname(os.path.abspath(BASE_FILE)), _fn)
         if os.path.exists(_lp):
