@@ -25,11 +25,14 @@ from flask import Flask as _WSFlask, request as _ws_rq, jsonify as _ws_jsonify, 
 WS_CACHE_TTL = 25
 WS_AUTH_MAX_AGE = 24 * 3600
 WS_PRESS_GAP = 2.0
+WS_LOGO_KEY = "rk:ws:logo"          # file_id لشعار المتجر المصغّر
+WS_LOGO_WAIT = "rk:ws:logowait"
 WS_MENU_KEY = "rk:ws:menu"          # "0" = زر القائمة الافتراضي، غير ذلك = Web Store
 
 _ws_cache = {}                       # lang -> (ts, items)
 _ws_lock = _ws_threading.Lock()
 _ws_last_press = {}
+_ws_logo_cache = {}                  # fid -> (bytes, mime)
 _ws_img_cache = {}                   # pk -> (fid, bytes, mime)
 _ws_rv_cache = {"t": 0.0, "agg": {}}
 
@@ -224,11 +227,12 @@ def _ws_item_from_cb(cb, lang, page):
 
 def _ws_collect(lang):
     items, seen = [], set()
-    pages = [("subs", generate_store_keyboard)]
+    pages = []
     try:
         pages.append(("gifts", generate_gift_keyboard))
     except NameError:
         pass
+    pages.append(("subs", generate_store_keyboard))
     for page, gen in pages:
         try:
             mk = gen(lang)
@@ -248,6 +252,9 @@ def _ws_collect(lang):
                 if it:
                     seen.add(cb)
                     items.append(it)
+    # الترتيب: بطاقات الهدايا أولاً ثم الاشتراكات؛ داخل كل قسم المتوفر بترتيب البوت ثم النافد (البوت يضع النافد في الأعلى)
+    items = [i for sec in ("gifts", "subs") for flag in (False, True)
+             for i in items if i.get("sec") == sec and bool(i.get("oos")) == flag]
     out = []
     for it in items:
         pks = it.pop("pks")
@@ -313,8 +320,15 @@ def ws_api_list():
             month = {"avg": round(_t[0] / _t[1], 1), "n": _t[2]}
     except Exception:
         month = None
+    logo = None
+    try:
+        _fid = kv_get(WS_LOGO_KEY)
+        if _fid:
+            logo = "/store/logo?v=" + _ws_hashlib.md5(str(_fid).encode()).hexdigest()[:10]
+    except Exception:
+        logo = None
     return _ws_jsonify({"ok": True, "auth": bool(user), "lang": lang, "maint": maint, "balance": bal, "items": items,
-                        "month": month})
+                        "month": month, "logo": logo})
 
 
 def _ws_make_user(u):
@@ -400,6 +414,36 @@ def ws_img(pk):
     return resp
 
 
+@_ws_app.route("/store/logo")
+def ws_logo():
+    try:
+        fid = kv_get(WS_LOGO_KEY)
+    except Exception:
+        fid = None
+    if not fid:
+        return ("", 404)
+    fid = str(fid)
+    c = _ws_logo_cache.get(fid)
+    if c:
+        data, mime = c
+    else:
+        try:
+            f = bot.get_file(fid)
+            r = _ws_requests.get(f"https://api.telegram.org/file/bot{TOKEN}/{f.file_path}", timeout=20)
+            r.raise_for_status()
+            data = r.content
+            low = str(f.file_path).lower()
+            mime = "image/png" if low.endswith(".png") else ("image/webp" if low.endswith(".webp") else "image/jpeg")
+        except Exception as e:
+            print(f"webstore logo fetch failed: {e}")
+            return ("", 502)
+        _ws_logo_cache.clear()
+        _ws_logo_cache[fid] = (data, mime)
+    resp = _WSResp(data, mimetype=mime)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
 # ---------------- ربط المسارات بالتطبيق الأصلي (دون إضافة routes بعد بدء الخادم) ----------------
 _ws_orig_wsgi = app.wsgi_app
 
@@ -458,6 +502,91 @@ def ws_command(message):
 bot.message_handler(commands=["webmenu"])(ws_command)
 bot.message_handlers.insert(0, bot.message_handlers.pop())
 
+
+# ---------------- شعار المتجر (من الأدمن فقط) ----------------
+def _ws_is_admin(chat_id):
+    return str(chat_id) == str(ADMIN_CHAT_ID)
+
+
+def _ws_logo_prompt(chat_id):
+    try:
+        kv_set(WS_LOGO_WAIT, "1", ex=300)
+    except Exception:
+        pass
+    bot.send_message(chat_id, "🖼️ ابعث الآن صورة الشعار (كصورة عادية) وتظهر قدّام اسم المتجر في المتجر المصغّر.\n"
+                              "لحذفه: /weblogo off")
+
+
+def ws_logo_command(message):
+    try:
+        if not _ws_is_admin(message.chat.id):
+            return
+        parts = (message.text or "").split()
+        if len(parts) > 1 and parts[1].lower() == "off":
+            kv_del(WS_LOGO_KEY)
+            _ws_logo_cache.clear()
+            bot.send_message(message.chat.id, "✅ تم حذف الشعار، رجع الرمز 🛍️")
+            return
+        _ws_logo_prompt(message.chat.id)
+    except Exception as e:
+        print(f"weblogo command failed: {e}")
+
+
+def _ws_logo_photo_filter(m):
+    try:
+        if not _ws_is_admin(m.chat.id) or m.content_type != "photo":
+            return False
+        if str(m.caption or "").strip().lower().startswith("/weblogo"):
+            return True
+        return str(kv_get(WS_LOGO_WAIT)) == "1"
+    except Exception:
+        return False
+
+
+def ws_logo_photo(message):
+    try:
+        fid = message.photo[-1].file_id
+        kv_set(WS_LOGO_KEY, fid)
+        try:
+            kv_del(WS_LOGO_WAIT)
+        except Exception:
+            pass
+        _ws_logo_cache.clear()
+        bot.send_message(message.chat.id, "✅ تم حفظ الشعار. سكّر المتجر المصغّر وافتحو من جديد باش يبان.")
+    except Exception as e:
+        print(f"weblogo photo failed: {e}")
+
+
+def _ws_logo_cb(call):
+    try:
+        bot.answer_callback_query(call.id)
+    except Exception:
+        pass
+    try:
+        _ws_logo_prompt(call.message.chat.id)
+    except Exception as e:
+        print(f"weblogo button failed: {e}")
+
+
+bot.message_handler(commands=["weblogo"])(ws_logo_command)
+bot.message_handlers.insert(0, bot.message_handlers.pop())
+bot.message_handler(func=_ws_logo_photo_filter, content_types=["photo"])(ws_logo_photo)
+bot.message_handlers.insert(0, bot.message_handlers.pop())
+bot.callback_query_handler(func=lambda c: c.data == "ws_logo" and _ws_is_admin(c.from_user.id))(_ws_logo_cb)
+bot.callback_query_handlers.insert(0, bot.callback_query_handlers.pop())
+
+try:
+    _ws_prev_admin_btn = _learn_admin_btn
+
+    def _learn_admin_btn(markup):
+        try:
+            _ws_prev_admin_btn(markup)
+        except Exception as e:
+            print(f"learn admin button failed: {e}")
+        markup.add(InlineKeyboardButton(text="🖼️ شعار المتجر المصغّر", callback_data="ws_logo"))
+except NameError:
+    pass
+
 _ws_threading.Thread(target=_ws_apply_menu, daemon=True).start()
 
 
@@ -477,7 +606,8 @@ body{padding:0 14px 28px;min-height:100vh}
 .top{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 8px}
 .hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
-.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:grid;place-items:center;font-size:22px;flex:none}
+.logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:grid;place-items:center;font-size:22px;flex:none;overflow:hidden}
+.logo img{width:100%;height:100%;object-fit:cover;display:block}
 .brand b{display:block;font-size:17px}
 .brand span{font-size:12px;color:var(--mut)}
 .wallet{display:flex;gap:6px;flex:none}
@@ -642,6 +772,7 @@ async function load(){
     if(j.balance){ $("bal").style.display=""; $("bal").textContent = j.balance; }
     if(j.maint){ $("grid").innerHTML = `<div class="note" style="grid-column:1/-1">${T.maint}</div>`; return; }
     ITEMS = j.items || []; MONTH = j.month || null; renderMonth(); render();
+    if(j.logo){ const lg=document.querySelector(".logo"); const im=new Image(); im.alt=""; im.onload=()=>{ lg.textContent=""; lg.appendChild(im); }; im.src=j.logo; }
     if(!AUTH) toast(T.noauth);
   }catch(e){ applyLang("ar"); $("grid").innerHTML = `<div class="note" style="grid-column:1/-1">${T.err}</div>`; }
 }
