@@ -357,7 +357,7 @@ patch(r"""    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callb
       r"""    markup.add(InlineKeyboardButton(text=_maint_label(), callback_data="adm_maint"))
     _learn_admin_btn(markup)
     markup.add(InlineKeyboardButton(text="💰 ربح الصافي", callback_data="adm_profit"))
-    markup.add(InlineKeyboardButton(text="📦 الطلبات المعلقة", callback_data="adm_pend"))
+    markup.add(InlineKeyboardButton(text=f"📦 الطلبات المعلقة ({_ord_count()})", callback_data="adm_pend"))
     markup.add(InlineKeyboardButton(text=f"💳 الدفعات المعلقة ({_pp_count()})", callback_data="ap_l"))
     markup.add(InlineKeyboardButton(text="💳 شحن محفظة زبون", callback_data="ap_wt"))
     markup.add(InlineKeyboardButton(text="✏️ تعديل وصف منتج", callback_data="ap_dp"))
@@ -1136,6 +1136,17 @@ def handle_input_cb(call):
     bot.answer_callback_query(call.id)
 
 # ---------- لوحة الأدمن: الطلبات المعلقة ----------
+def _ord_count():
+    n = 0
+    try:
+        for _oid in _smembers(ORDSET_KEY):
+            _o = order_get(_oid)
+            if _o and _o.get("status") in OPEN_STATES:
+                n += 1
+    except Exception as e:
+        print(f"ord_count error: {e}")
+    return n
+
 def show_pending_orders(chat_id, msg_id=None):
     rows = []
     for oid in _smembers(ORDSET_KEY):
@@ -1497,6 +1508,7 @@ def handle_order_admin(call):
             mk.add(InlineKeyboardButton(text="📤 إرسال بيانات الطلب للزبون", callback_data=f"ord_d_{oid}"))
         if o.get("status") == "pending" and o.get("cat") == "A":
             mk.add(InlineKeyboardButton(text="✅ تم التنفيذ", callback_data=f"ord_x_{oid}"))
+        mk.add(InlineKeyboardButton(text="🗑️ حذف الطلب من القائمة", callback_data=f"ord_r_{oid}"))
         mk.add(InlineKeyboardButton(text="⬅️ القائمة", callback_data="ord_l_0"))
         _pr_show(chat_id, msg_id, order_admin_text(o), mk)
         bot.answer_callback_query(call.id)
@@ -1514,6 +1526,30 @@ def handle_order_admin(call):
             parse_mode="HTML",
         )
         bot.answer_callback_query(call.id)
+        return
+    if act == "r":
+        mk = InlineKeyboardMarkup(row_width=1)
+        mk.add(InlineKeyboardButton(text="✅ نعم، احذف الطلب", callback_data=f"ord_y_{oid}"))
+        mk.add(InlineKeyboardButton(text="⬅️ لا، رجوع", callback_data=f"ord_v_{oid}"))
+        _pr_show(chat_id, msg_id,
+                 order_admin_text(o) + "\n\n⚠️ <b>حذف نهائي من القائمة ومن سجل الزبون.</b>\nلا يُرجع المال تلقائياً: إذا لزم استعمل «إرجاع رصيد».", mk)
+        bot.answer_callback_query(call.id)
+        return
+    if act == "y":
+        try:
+            kv_del(f"rk:ord:{oid}")
+            _srem(ORDSET_KEY, oid)
+            _srem(WAITSET_KEY, oid)
+            try:
+                db.lrem(f"rk:uord:{o.get('user_id')}", 0, oid)
+            except Exception as e:
+                print(f"uord lrem error: {e}")
+        except Exception as e:
+            bot.answer_callback_query(call.id, "❌ تعذّر الحذف (مشكلة تخزين)", show_alert=True)
+            print(f"order delete error: {e}")
+            return
+        bot.answer_callback_query(call.id, "🗑️ تم حذف الطلب")
+        show_pending_orders(chat_id, msg_id)
         return
     if act == "x":
         ok, msg = mark_executed(oid)
@@ -7831,7 +7867,7 @@ if _errors:
 
 patch(r"""print("Bot is running...")""",
       r"""# قسم «تعلّم كيف تشتري»: ملف منفصل learn.py (إن غاب أو فشل يشتغل البوت عادي بدونه)
-for _fn in ("learn.py", "reviews.py", "pimages.py", "rateprompt.py", "webstore.py"):
+for _fn in ("learn.py", "reviews.py", "pimages.py", "rateprompt.py", "webstore.py", "qtyflow.py"):
     try:
         _lp = os.path.join(os.path.dirname(os.path.abspath(BASE_FILE)), _fn)
         if os.path.exists(_lp):
