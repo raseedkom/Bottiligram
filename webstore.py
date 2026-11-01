@@ -106,36 +106,59 @@ def _ws_img_for(pks):
     return None
 
 
+def _ws_month_key(ts):
+    """مفتاح الشهر بتوقيت الجزائر (UTC+1)."""
+    g = _ws_time.gmtime(float(ts) + 3600)
+    return (g.tm_year, g.tm_mon)
+
+
 def _ws_agg_reviews():
+    """pk -> [مجموع النجوم, العدد الكلي, عدد هذا الشهر]. يحفظ أيضاً الإجمالي في _ws_rv_cache['tot']."""
     now = _ws_time.time()
     if now - _ws_rv_cache["t"] < 30:
         return _ws_rv_cache["agg"]
     agg = {}
+    tot = [0, 0, 0]
+    cur = _ws_month_key(now)
     try:
         for r in _rv_load():
-            a = agg.setdefault(r.get("pk"), [0, 0])
-            a[0] += int(r.get("stars", 0))
-            a[1] += 1
+            a = agg.setdefault(r.get("pk"), [0, 0, 0])
+            _n = max(1, int(r.get("n", 1) or 1))
+            _st = int(r.get("stars", 0)) * _n
+            a[0] += _st
+            a[1] += _n
+            tot[0] += _st
+            tot[1] += _n
+            try:
+                if _ws_month_key(r.get("ts", 0)) == cur:
+                    a[2] += _n
+                    tot[2] += _n
+            except Exception:
+                pass
     except NameError:
         agg = {}
     except Exception:
         agg = _ws_rv_cache["agg"]
+        tot = _ws_rv_cache.get("tot", [0, 0, 0])
     _ws_rv_cache["agg"] = agg
+    _ws_rv_cache["tot"] = tot
     _ws_rv_cache["t"] = now
     return agg
 
 
 def _ws_rating(pks):
+    """(متوسط كل الأوقات، عدد هذا الشهر). النجوم تبقى، والعدد يبدأ من الصفر كل شهر."""
     agg = _ws_agg_reviews()
-    s = n = 0
+    s = n = m = 0
     for pk in pks:
         a = agg.get(pk)
         if a:
             s += a[0]
             n += a[1]
+            m += a[2]
     if not n:
         return None, 0
-    return round(s / n, 1), n
+    return round(s / n, 1), m
 
 
 def _ws_stock_n(v):
@@ -282,7 +305,16 @@ def ws_api_list():
         except Exception:
             bal = None
     items = [] if maint else _ws_items(lang)
-    return _ws_jsonify({"ok": True, "auth": bool(user), "lang": lang, "maint": maint, "balance": bal, "items": items})
+    month = None
+    try:
+        _ws_agg_reviews()
+        _t = _ws_rv_cache.get("tot") or [0, 0, 0]
+        if _t[1]:
+            month = {"avg": round(_t[0] / _t[1], 1), "n": _t[2]}
+    except Exception:
+        month = None
+    return _ws_jsonify({"ok": True, "auth": bool(user), "lang": lang, "maint": maint, "balance": bal, "items": items,
+                        "month": month})
 
 
 def _ws_make_user(u):
@@ -455,6 +487,8 @@ body{padding:0 14px 28px;min-height:100vh}
 .search input{width:100%;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:14px;padding:13px 40px;font-size:15px;outline:none}
 .search input:focus{border-color:var(--acc)}
 .search i{position:absolute;top:50%;transform:translateY(-50%);inset-inline-start:14px;font-style:normal;opacity:.6}
+.mbar{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:var(--mut);display:flex;align-items:center;gap:8px}
+.mbar b{color:var(--star);font-size:15px}.mbar .cnt{margin-inline-start:auto;color:var(--txt);font-weight:700}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:9px 16px;font-size:14px;cursor:pointer}
@@ -495,6 +529,7 @@ body{padding:0 14px 28px;min-height:100vh}
     <div class="brand"><div class="logo">🛍️</div><div><b>RASEEDKOM</b><span id="sub"></span></div></div>
     <div class="wallet"><div class="pill" id="bal" style="display:none"></div><div class="pill btn" id="walletBtn"></div></div>
   </div>
+  <div class="mbar" id="mbar" style="display:none"></div>
   <div class="search"><i>🔎</i><input id="q" type="search" autocomplete="off"></div>
   <div class="chips" id="chips"></div>
   <div class="bar"><select id="sort"></select><label><input type="checkbox" id="stockOnly"><span id="stockLbl"></span></label></div>
@@ -509,19 +544,25 @@ const I18N = {
      s_def:"الترتيب الافتراضي",s_pa:"السعر: الأقل أولاً",s_pd:"السعر: الأعلى أولاً",s_nm:"الاسم",s_rt:"الأعلى تقييماً",
      only:"المتوفر فقط",instock:"متوفر",out:"نفد",inf:"متوفر",new:"جديد",wallet:"المحفظة",empty:"لا توجد نتائج",
      opening:"جارٍ فتح المنتج في البوت...",maint:"المتجر قيد التحديث حالياً، عد بعد قليل 🛠️",noauth:"افتح المتجر من داخل البوت لتتمكن من الشراء.",
-     err:"تعذر التحميل، حاول مجدداً",slow:"لحظة... حاول بعد ثانيتين",fail:"تعذّر فتح المنتج"},
+     mon:"تقييم هذا الشهر",err:"تعذر التحميل، حاول مجدداً",slow:"لحظة... حاول بعد ثانيتين",fail:"تعذّر فتح المنتج"},
  fr:{sub:"Boutique numérique · livraison instantanée",search:"Rechercher un produit...",all:"Tout",subs:"Abonnements",gifts:"Cartes cadeaux",
      s_def:"Ordre par défaut",s_pa:"Prix croissant",s_pd:"Prix décroissant",s_nm:"Nom",s_rt:"Mieux notés",
      only:"En stock",instock:"En stock",out:"Épuisé",inf:"Disponible",new:"Nouveau",wallet:"Portefeuille",empty:"Aucun résultat",
      opening:"Ouverture du produit dans le bot...",maint:"Boutique en maintenance, revenez bientôt 🛠️",noauth:"Ouvrez la boutique depuis le bot pour acheter.",
-     err:"Chargement impossible, réessayez",slow:"Un instant... réessayez dans 2 secondes",fail:"Impossible d'ouvrir le produit"},
+     mon:"Avis ce mois-ci",err:"Chargement impossible, réessayez",slow:"Un instant... réessayez dans 2 secondes",fail:"Impossible d'ouvrir le produit"},
  en:{sub:"Digital store · instant delivery",search:"Search products...",all:"All",subs:"Subscriptions",gifts:"Gift cards",
      s_def:"Default order",s_pa:"Price: low to high",s_pd:"Price: high to low",s_nm:"Name",s_rt:"Top rated",
      only:"In stock only",instock:"In Stock",out:"Sold Out",inf:"Available",new:"New",wallet:"Wallet",empty:"No results",
      opening:"Opening the product in the bot...",maint:"Store under maintenance, please come back soon 🛠️",noauth:"Open the store from inside the bot to buy.",
-     err:"Couldn't load, please retry",slow:"One moment... try again in 2 seconds",fail:"Couldn't open the product"}
+     mon:"Reviews this month",err:"Couldn't load, please retry",slow:"One moment... try again in 2 seconds",fail:"Couldn't open the product"}
 };
-let L = "ar", T = I18N.ar, ITEMS = [], AUTH = false, CAT = "all";
+let L = "ar", T = I18N.ar, ITEMS = [], AUTH = false, CAT = "all", MONTH = null;
+function renderMonth(){
+  const b = $("mbar");
+  if(!MONTH){ b.style.display = "none"; return; }
+  b.style.display = "";
+  b.innerHTML = `<b>★ ${MONTH.avg.toFixed(1)}</b><span>${T.mon}</span>` + (MONTH.n>0 ? `<span class="cnt">${MONTH.n>99?"+99":MONTH.n}</span>` : `<span class="cnt">🆕 ${T.new}</span>`);
+}
 const $ = id => document.getElementById(id);
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2200)}
 function applyLang(l){
@@ -538,7 +579,7 @@ function applyLang(l){
 }
 function stars(it){
   if(it.rating==null) return `<span class="new">🆕 ${T.new}</span>`;
-  return `<b>★</b> ${it.rating.toFixed(1)} <span>(${it.rn})</span>`;
+  return `<b>★</b> ${it.rating.toFixed(1)}` + (it.rn>0 ? ` <span>(${it.rn>99?"+99":it.rn})</span>` : "");
 }
 function render(){
   const q = $("q").value.trim().toLowerCase(), so = $("sort").value, only = $("stockOnly").checked;
@@ -599,7 +640,7 @@ async function load(){
     AUTH = !!j.auth; applyLang(j.lang);
     if(j.balance){ $("bal").style.display=""; $("bal").textContent = j.balance; }
     if(j.maint){ $("grid").innerHTML = `<div class="note" style="grid-column:1/-1">${T.maint}</div>`; return; }
-    ITEMS = j.items || []; render();
+    ITEMS = j.items || []; MONTH = j.month || null; renderMonth(); render();
     if(!AUTH) toast(T.noauth);
   }catch(e){ applyLang("ar"); $("grid").innerHTML = `<div class="note" style="grid-column:1/-1">${T.err}</div>`; }
 }

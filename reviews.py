@@ -6,6 +6,7 @@
 #   kv_get, kv_set, products, _VT_PRODS, _learn_admin_btn
 
 import json as _rv_json
+import random as _rv_random
 import time as _rv_time
 import html as _rv_html
 
@@ -32,12 +33,26 @@ def _rv_save(items):
     kv_set(RV_KEY, _rv_json.dumps(items, ensure_ascii=False))
 
 
+def _rv_n(r):
+    """عدد الزبائن الذين يمثلهم هذا السجل (افتراضي 1)."""
+    try:
+        return max(1, int(r.get("n", 1) or 1))
+    except Exception:
+        return 1
+
+
+def _rv_cnt(n):
+    """عرض العدد: ما فوق 99 يظهر +99."""
+    return "+99" if int(n) > 99 else str(int(n))
+
+
 def rv_stats(pkey):
     """(المتوسط، العدد) لمنتج بمفتاحه. للاستعمال لاحقاً في الـMini App."""
     items = [r for r in _rv_load() if r.get("pk") == pkey]
     if not items:
         return (0.0, 0)
-    return (round(sum(int(r.get("stars", 0)) for r in items) / len(items), 2), len(items))
+    tot = sum(_rv_n(r) for r in items)
+    return (round(sum(int(r.get("stars", 0)) * _rv_n(r) for r in items) / tot, 2), tot)
 
 
 def rv_list(pkey, limit=20):
@@ -164,11 +179,11 @@ def _rv_home(chat_id, msg_id=None):
     if items is None:
         total = "?"
     else:
-        total = len(items)
+        total = sum(_rv_n(r) for r in items)
     text = (
         "⭐ <b>تقييمات الزبائن</b>\n\n"
         f"عدد التقييمات المسجّلة: <b>{total}</b>\n\n"
-        "هنا تضيف <b>تقييمات حقيقية</b> أعطاها زبائنك فعلاً (منتج + نجوم + أول حرف من اسمه للخصوصية).\n"
+        "هنا تضيف <b>تقييمات حقيقية</b> أعطاها زبائنك فعلاً (منتج + نجوم + العدد + أول حرف من اسمه للخصوصية).\n"
         "⚠️ أضف فقط ما قاله الزبون حقاً وبعدد النجوم الذي أعطاه."
     )
     mk = _rv_kb(
@@ -191,8 +206,8 @@ def _rv_list_screen(chat_id, msg_id=None):
     agg = {}
     for r in items:
         a = agg.setdefault(r.get("pk"), {"name": r.get("pname", "؟"), "sum": 0, "n": 0})
-        a["sum"] += int(r.get("stars", 0))
-        a["n"] += 1
+        a["sum"] += int(r.get("stars", 0)) * _rv_n(r)
+        a["n"] += _rv_n(r)
     lines = ["📊 <b>ملخص المنتجات</b>"]
     for pk, a in sorted(agg.items(), key=lambda kv: -kv[1]["n"]):
         lines.append(f"• {_rv_esc(a['name'])}: <b>{a['sum'] / a['n']:.1f}</b>/5 ({a['n']})")
@@ -200,8 +215,9 @@ def _rv_list_screen(chat_id, msg_id=None):
     lines.append("\n🕘 <b>آخر التقييمات</b>")
     rows = []
     for r in last:
-        lines.append(f"{_rv_stars(r.get('stars'))} — {_rv_esc(r.get('pname', ''))} — {_rv_who(r.get('name'))}")
-        rows.append([(f"🗑 حذف: {str(r.get('pname', ''))[:18]} ({r.get('stars')}⭐)", f"rv_del_{r.get('id')}")])
+        _x = f" ×{_rv_n(r)}" if _rv_n(r) > 1 else ""
+        lines.append(f"{_rv_stars(r.get('stars'))} — {_rv_esc(r.get('pname', ''))} — {_rv_who(r.get('name')) if _rv_n(r) == 1 else 'زبائن'}{_x}")
+        rows.append([(f"🗑 حذف: {str(r.get('pname', ''))[:18]} ({r.get('stars')}⭐{_x})", f"rv_del_{r.get('id')}")])
     rows.append([("🔙 رجوع", "rv_home")])
     _rv_show(chat_id, msg_id, "\n".join(lines), _rv_kb(*rows))
 
@@ -223,9 +239,19 @@ def _rv_ask_stars(chat_id, msg_id, pname):
     _rv_show(chat_id, msg_id, text, mk)
 
 
+def _rv_ask_count(chat_id, msg_id, stars, err=False):
+    text = (
+        ("⚠️ اكتب رقماً صحيحاً بين 1 و999.\n\n" if err else "")
+        + f"3️⃣ كم زبون أعطى <b>{stars}⭐</b> لهذا المنتج؟\n"
+        "اكتب العدد بالأرقام (مثال: <code>25</code>)، أو اضغط «زبون واحد».\n"
+        "ℹ️ في المتجر، العدد الأكبر من 99 يظهر <b>+99</b>."
+    )
+    _rv_show(chat_id, msg_id, text, _rv_kb([("1️⃣ زبون واحد", "rv_cn_1")], [("❌ إلغاء", "rv_home")]))
+
+
 def _rv_ask_name(chat_id, msg_id=None):
     text = (
-        "3️⃣ اكتب <b>أول حرف من اسم حساب الزبون</b> (حرف واحد فقط، للخصوصية)،\n"
+        "4️⃣ اكتب <b>أول حرف من اسم حساب الزبون</b> (حرف واحد فقط، للخصوصية)،\n"
         "أو اضغط «مجهول» ليظهر «زبون».\n"
         "🔒 لا تكتب اسمه كاملاً ولا معرّفه ولا رقمه."
     )
@@ -237,7 +263,9 @@ def _rv_confirm(chat_id, msg_id, st):
         "🔎 <b>راجع التقييم قبل الحفظ</b>\n\n"
         f"📦 المنتج: <b>{_rv_esc(st.get('pname'))}</b>\n"
         f"{_rv_stars(st.get('stars'))}\n"
-        f"👤 {_rv_who(st.get('name'))}\n\n"
+        + (f"👥 العدد: <b>{int(st.get('count', 1))}</b> زبون\n\n" if int(st.get("count", 1)) > 1
+           else f"👤 {_rv_who(st.get('name'))}\n\n")
+        +
         "⚠️ تأكد أنه تقييم حقيقي لزبون فعلي."
     )
     mk = _rv_kb([("✅ حفظ", "rv_save"), ("❌ إلغاء", "rv_home")])
@@ -256,7 +284,7 @@ def _rv_msg_filter(m):
             _rv_clear(m.chat.id)      # أي أمر يلغي الإدخال
             return False
         st = _rv_get_state(m.chat.id)
-        return bool(st and st.get("step") in ("q", "n"))
+        return bool(st and st.get("step") in ("q", "n", "c"))
     except Exception:
         return False
 
@@ -282,6 +310,19 @@ def rv_input(m):
         _rv_set_state(uid, step="pick", cands=cands, free=txt[:60])
         head = "اختر المنتج:" if cands else "لم أجد منتجاً بهذا الاسم. يمكنك استعماله كاسم منتج:"
         _rv_show(uid, mid, f"1️⃣ {head}", _rv_kb(*rows))
+        return
+    if step == "c":
+        digits = txt.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+        if not digits.isdigit() or not 1 <= int(digits) <= 999:
+            _rv_ask_count(uid, mid, st.get("stars"), err=True)
+            return
+        cnt = int(digits)
+        if cnt == 1:
+            _rv_set_state(uid, count=1, step="n")
+            _rv_ask_name(uid, mid)
+        else:
+            st = _rv_set_state(uid, count=cnt, name="", step="confirm")
+            _rv_confirm(uid, mid, st)
         return
     if step == "n":
         st = _rv_set_state(uid, name=txt[:1], step="confirm")
@@ -332,7 +373,14 @@ def rv_callback(call):
                 bot.answer_callback_query(call.id, "انتهت الجلسة، ابدأ من جديد.", show_alert=True)
                 return
             n = max(1, min(5, int(d.split("_")[-1])))
-            _rv_set_state(uid, stars=n, step="n", mid=mid)
+            _rv_set_state(uid, stars=n, step="c", mid=mid, count=1)
+            _rv_ask_count(cid, mid, n)
+        elif d == "rv_cn_1":
+            st = _rv_get_state(uid)
+            if not st or st.get("step") != "c":
+                bot.answer_callback_query(call.id, "انتهت الجلسة، ابدأ من جديد.", show_alert=True)
+                return
+            _rv_set_state(uid, count=1, step="n", mid=mid)
             _rv_ask_name(cid, mid)
         elif d == "rv_skip_n":
             st = _rv_get_state(uid)
@@ -349,11 +397,12 @@ def rv_callback(call):
             try:
                 items = _rv_load()
                 items.append({
-                    "id": str(int(_rv_time.time() * 1000)),
+                    "id": str(int(_rv_time.time() * 1000)) + str(_rv_random.randint(100, 999)),
                     "pk": st.get("pk"),
                     "pname": st.get("pname"),
                     "stars": int(st.get("stars")),
                     "name": st.get("name") or "",
+                    "n": max(1, int(st.get("count", 1) or 1)),
                     "ts": int(_rv_time.time()),
                     "src": "admin",
                 })

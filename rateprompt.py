@@ -8,6 +8,7 @@
 #   get_lang, MANUAL_IDS, record_purchase, order_save, _learn_admin_btn, _rv_load, _rv_save (reviews.py)
 
 import json as _rp_json
+import random as _rp_random
 import time as _rp_time
 import html as _rp_html
 import hashlib as _rp_hash
@@ -64,6 +65,7 @@ def _rp_send(uid, pk, pname, key, test=False):
         tok = _rp_tok(key)
         if not test:
             if not kv_set("rk:rq:s:" + tok, "1", ex=RP_TTL, nx=True):
+                print(f"rate prompt skipped (already sent): uid={uid} key={key}")
                 return False                      # أُرسل سابقاً لهذا الطلب
         try:
             lang = get_lang(uid)
@@ -75,6 +77,7 @@ def _rp_send(uid, pk, pname, key, test=False):
         mk.row(*[InlineKeyboardButton(text=f"{n}⭐", callback_data=f"rqs_{tok}_{n}") for n in range(1, 6)])
         mk.add(InlineKeyboardButton(text=tx["later"], callback_data=f"rqx_{tok}"))
         bot.send_message(int(uid), tx["ask"].format(p=_rp_html.escape(str(pname))), parse_mode="HTML", reply_markup=mk)
+        print(f"rate prompt sent: uid={uid} pk={pk}")
         return True
     except Exception as e:
         print(f"rate prompt send failed: {e}")
@@ -85,6 +88,7 @@ def _rp_schedule(uid, pk, pname, key):
     try:
         if not _rp_on() or not pk or not pname:
             return
+        print(f"rate prompt scheduled: uid={uid} pk={pk} key={key}")
         t = _rp_threading.Timer(RP_DELAY, _rp_send, args=(uid, pk, pname, key))
         t.daemon = True
         t.start()
@@ -184,7 +188,7 @@ def _rp_cb(call):
                 return
             if not rec.get("test"):
                 items = _rv_load()
-                items.append({"id": str(int(_rp_time.time() * 1000)), "pk": rec["pk"], "pname": rec["pname"],
+                items.append({"id": str(int(_rp_time.time() * 1000)) + str(_rp_random.randint(100, 999)), "pk": rec["pk"], "pname": rec["pname"],
                               "stars": n, "name": _rp_letter(call.from_user), "ts": int(_rp_time.time()),
                               "src": "customer"})
                 _rv_save(items)
