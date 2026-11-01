@@ -488,6 +488,7 @@ body{padding:0 14px 28px;min-height:100vh}
 .search input:focus{border-color:var(--acc)}
 .search i{position:absolute;top:50%;transform:translateY(-50%);inset-inline-start:14px;font-style:normal;opacity:.6}
 .mbar{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:var(--mut);display:flex;align-items:center;gap:8px}
+.price,.mbar .cnt,.rate span,.badge,.pill{direction:ltr;unicode-bidi:isolate}
 .mbar b{color:var(--star);font-size:15px}.mbar .cnt{margin-inline-start:auto;color:var(--txt);font-weight:700}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
