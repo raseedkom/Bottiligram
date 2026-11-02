@@ -2799,7 +2799,7 @@ def generate_gift_keyboard(lang):
                 else:
                     mk.add(_slot_button(item, lang))
     _nav_rows(mk, lang, "gifts")
-    return _style_store(mk)
+    return _gift_outer_style(_style_store(mk))
 
 @bot.callback_query_handler(func=lambda c: c.data == "gcp")
 def handle_gift_page(call):
@@ -2980,11 +2980,159 @@ def _gift_reprice(cats):
 
 _fazer_load_orig = fazer_load_catalog
 
+# ---- حالة كل قيمة عند FAZER: متوفر (أخضر + العدد) / نافد (أحمر) / غير معروف ----
+def _gift_state(pid, idx):
+    cats = _catalog.get("cats")
+    if not cats:
+        return "unk", None
+    try:
+        label = GIFT_VARIANTS[pid][int(idx)][0]
+        m, reason = fazer_match(pid, label, cats)
+    except Exception:
+        return "unk", None
+    if not m:
+        return ("out", 0) if reason == "no_offer" else ("unk", None)
+    st = m.get("stock")
+    if st is None:
+        return "unk", None
+    try:
+        st = int(st)
+    except Exception:
+        return "unk", None
+    return ("ok", st) if st > 0 else ("out", 0)
+
+def _gift_amount_post(mk, pid):
+    try:
+        for row in mk.keyboard:
+            for b in row:
+                cb = getattr(b, "callback_data", None) or ""
+                if not cb.startswith(f"var_{pid}_"):
+                    continue
+                idx = cb.rsplit("_", 1)[1]
+                stt, n = _gift_state(pid, idx)
+                if stt == "ok":
+                    b.style = "success"
+                elif stt == "out":
+                    b.style = "danger"
+                    b.callback_data = f"gno_{pid}_{idx}"
+    except Exception as e:
+        print(f"gift_amount_post failed: {e}")
+
+def _gift_outer_style(mk):
+    # زر البطاقة يصير أحمر إذا كل قيمها نافدة
+    try:
+        for row in mk.keyboard:
+            for b in row:
+                cb = getattr(b, "callback_data", None) or ""
+                if cb.startswith("buy_") and cb[4:] in GIFT_VARIANTS:
+                    pid = cb[4:]
+                    sts = [_gift_state(pid, i)[0] for i in range(len(GIFT_VARIANTS[pid]))]
+                    if sts and all(x == "out" for x in sts):
+                        b.style = "danger"
+    except Exception as e:
+        print(f"gift_outer_style failed: {e}")
+    return mk
+
+GIFT_NOTIFY_TX = {
+    "ar": "✅ تم! سنرسل لك إشعاراً أول ما تتوفر هذه القيمة.",
+    "en": "✅ Done! We will message you as soon as this amount is available.",
+    "fr": "✅ C'est noté ! Nous vous écrirons dès que ce montant sera disponible.",
+}
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("gno_"))
+def handle_gift_out(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    try:
+        pid, idx = call.data[4:].rsplit("_", 1)
+        product = find_product(pid)
+        label, _price = GIFT_VARIANTS[pid][int(idx)]
+        if not product:
+            raise ValueError("no product")
+    except Exception:
+        bot.answer_callback_query(call.id)
+        return
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=t(lang, "notify_me"), callback_data=f"gnn_{pid}_{idx}"))
+    mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data=f"buy_{pid}"))
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(call.message.chat.id,
+                     f"❌ {tr(product, 'name', lang)} — {label}\n\n{t(lang, 'out_variant')}",
+                     reply_markup=mk)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("gnn_"))
+def handle_gift_notify(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    try:
+        pid, idx = call.data[4:].rsplit("_", 1)
+        product = find_product(pid)
+        label, _price = GIFT_VARIANTS[pid][int(idx)]
+        if not product:
+            raise ValueError("no product")
+        _sadd(f"rk:notify:g:{pid}:{idx}", str(uid))
+    except Exception:
+        bot.answer_callback_query(call.id)
+        return
+    try:
+        notify_admin_interest(call.from_user, {"name": f"{product['name']} — {label}", "price": "", "id": pid}, lang)
+    except Exception:
+        pass
+    bot.answer_callback_query(call.id, GIFT_NOTIFY_TX.get(lang, GIFT_NOTIFY_TX["ar"]), show_alert=True)
+
+def _gift_notify_restock(pid, idx):
+    key = f"rk:notify:g:{pid}:{idx}"
+    subs = _smembers(key)
+    if not subs:
+        return
+    product = find_product(pid)
+    if not product:
+        return
+    label = GIFT_VARIANTS[pid][int(idx)][0]
+
+    def _run():
+        for uid in subs:
+            try:
+                lang = get_lang(uid)
+                mk = InlineKeyboardMarkup()
+                mk.add(InlineKeyboardButton(text=mt(lang, "open_btn"), callback_data=f"buy_{pid}"))
+                _safe_send(int(uid), mt(lang, "restock").format(
+                    product=html.escape(f"{tr(product, 'name', lang)} — {label}")),
+                    parse_mode="HTML", reply_markup=mk)
+                _srem(key, uid)
+                time.sleep(0.05)
+            except Exception as e:
+                print(f"gift restock notify failed: {e}")
+        monitor_send(f"🔔 <b>أُرسل إشعار التوفر</b> لـ {len(subs)} زبون — {html.escape(product['name'])} {html.escape(label)}")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+def _gift_states_snapshot():
+    snap = {}
+    try:
+        for pid, lst in GIFT_VARIANTS.items():
+            for i in range(len(lst)):
+                snap[(pid, i)] = _gift_state(pid, i)[0]
+    except Exception:
+        pass
+    return snap
+
 def fazer_load_catalog(force=False, allow_fetch=True):
     before = _catalog.get("ts")
+    prev = _gift_states_snapshot()
     cats = _fazer_load_orig(force=force, allow_fetch=allow_fetch)
     if cats and _catalog.get("ts") != before:
         _gift_reprice(cats)
+        try:
+            for (pid, i), old in prev.items():
+                if old == "out" and _gift_state(pid, i)[0] == "ok":
+                    _gift_notify_restock(pid, i)
+        except Exception as e:
+            print(f"gift restock check failed: {e}")
     return cats
 
 
@@ -7983,6 +8131,7 @@ patch(r"""    gift_markup.add(_gb)
 """,
       r"""    gift_markup.add(_gb)
     _psn_amount_icons(gift_markup)
+    _gift_amount_post(gift_markup, product_id)
 """, "psn_amount_icons")
 patch(r"""threading.Thread(target=order_autoconfirm_loop, daemon=True).start()
 monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)""",
