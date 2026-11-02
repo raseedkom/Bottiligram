@@ -170,6 +170,12 @@ NEW_GIFT_VARIANTS = {
     "gplay_tr": [("50 TRY", "1.31"), ("100 TRY", "2.30"), ("250 TRY", "5.50"), ("500 TRY", "12.00")],
     "steam_us": [("5 USD", "5.80"), ("20 USD", "23.20"), ("25 USD", "29.00"), ("30 USD", "33.00"), ("50 USD", "54.00"), ("100 USD", "110.00")],
     "steam_id": [("6000 IDR", "1.00"), ("8000 IDR", "1.10"), ("12000 IDR", "1.30"), ("45000 IDR", "3.60"), ("60000 IDR", "5.00")],
+    "psn_us": [("1 USD", "1.26"), ("2 USD", "2.24"), ("4 USD", "4.04"), ("10 USD", "10.03"), ("25 USD", "23.70"), ("50 USD", "47.38"), ("100 USD", "96.48"), ("150 USD", "142.13")],
+    "psn_fr": [("10 EUR", "11.53"), ("20 EUR", "22.92"), ("50 EUR", "57.18"), ("60 EUR", "68.77"), ("80 EUR", "91.56"), ("100 EUR", "114.42"), ("200 EUR", "228.89")],
+    "psn_tr": [("250 TRY", "5.22"), ("500 TRY", "10.45"), ("750 TRY", "15.66"), ("1000 TRY", "20.89"), ("1500 TRY", "31.33"), ("2000 TRY", "41.77"), ("2500 TRY", "52.21"), ("3000 TRY", "63.15"), ("4000 TRY", "83.53"), ("5000 TRY", "104.41")],
+    "psn_br": [("60 BRL", "11.11"), ("100 BRL", "18.52"), ("150 BRL", "27.79"), ("250 BRL", "46.58"), ("300 BRL", "55.57"), ("360 BRL", "66.68"), ("400 BRL", "74.53"), ("530 BRL", "98.17")],
+    "pubg_uc": [("60 UC", "1.14"), ("325 UC", "4.77"), ("660 UC", "9.30"), ("1800 UC", "23.23"), ("3850 UC", "47.12"), ("8100 UC", "93.98")],
+    "fc26_points": [("1050 FC Points", "9.62"), ("2800 FC Points", "22.66"), ("5900 FC Points", "48.14"), ("12000 FC Points", "96.27")],
     "pubg_gcoin": [("100 G-Coin", "1.20"), ("500 + 10 G-Coin", "5.00"), ("1000 + 50 G-Coin", "9.80"), ("2500 + 200 G-Coin", "24.00")],
     "freefire_codes": [("100 + 10 💎", "1.40"), ("210 + 21 💎", "2.40"), ("530 + 53 💎", "5.10"), ("1080 + 108 💎", "10.30"), ("2200 + 220 💎", "20.00")],
 }
@@ -199,10 +205,29 @@ def _steam_desc(flag, c_ar, c_en, c_fr, cur):
         "fr": f"🎮 Steam Wallet {flag} — {c_fr}\n\nCrédit Steam Wallet en {cur} 💰\n🌍 Valable uniquement pour les comptes Steam de la région {c_fr}, vérifiez la région de votre compte avant d'acheter.\n\n🛒 Utile pour les jeux, DLC et objets du magasin Steam.\n\n📩 Comment commander :\n1️⃣ Choisissez la valeur avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : application Steam → nom du compte → Détails du compte → Ajouter des fonds → Utiliser une carte cadeau ou un code Steam",
     }
 
+def _psn_desc(flag, c_ar, c_en, c_fr, cur, reg):
+    return {
+        "ar": f"🎮 PlayStation Gift Card {flag} — {c_ar}\n\nرصيد لمتجر PlayStation Store بعملة {cur} 💰\n\n⚠️ مهم جداً:\n🌍 البطاقة تعمل فقط مع حساب PSN منطقته {reg}. إذا كان حسابك من منطقة أخرى فلن تعمل، تأكد من منطقة حسابك قبل الشراء.\n🔎 كيف تتأكد؟ حسابك على PlayStation لازم يكون مفتوحاً (مسجّلاً) في بلد {reg}. تحقق من بلد الحساب في: الإعدادات ← المستخدمون والحسابات ← الحساب ← الملف الشخصي، فإن كان البلد {reg} فالبطاقة تعمل بإذن الله، وإن كان غير ذلك فلا تشترِ.\n🚫 الكود لا يمكن استرجاعه أو استبداله بعد تسليمه.\n\n🛒 تصلح لشراء الألعاب والإضافات والاشتراكات (مثل PS Plus) من PlayStation Store.\n\n📩 طريقة الطلب:\n1️⃣ اختر القيمة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: PlayStation Store ← … ← استرداد رمز (Redeem Codes) ← أدخل الكود",
+        "en": f"🎮 PlayStation Gift Card {flag} — {c_en}\n\nCredit for the PlayStation Store in {cur} 💰\n\n⚠️ Very important:\n🌍 The card works only with a PSN account of the {reg} region. It will not work on an account from another region, so check your account region before buying.\n🔎 How to check? Your PlayStation account must be registered in the {reg} country/region. Look at it in: Settings → Users and Accounts → Account → Profile. If it shows {reg}, the card will work; if not, please do not buy.\n🚫 The code cannot be refunded or exchanged once delivered.\n\n🛒 Good for games, add-ons and subscriptions (such as PS Plus) on the PlayStation Store.\n\n📩 How to order:\n1️⃣ Choose the value from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: PlayStation Store → … → Redeem Codes → enter the code",
+        "fr": f"🎮 PlayStation Gift Card {flag} — {c_fr}\n\nCrédit pour le PlayStation Store en {cur} 💰\n\n⚠️ Très important :\n🌍 La carte fonctionne uniquement avec un compte PSN de la région {reg}. Elle ne marchera pas sur un compte d'une autre région, vérifiez la région de votre compte avant d'acheter.\n🔎 Comment vérifier ? Votre compte PlayStation doit être créé dans le pays/la région {reg}. Consultez-le dans : Paramètres → Utilisateurs et comptes → Compte → Profil. S'il indique {reg}, la carte fonctionnera ; sinon, n'achetez pas.\n🚫 Le code ne peut être ni remboursé ni échangé après la livraison.\n\n🛒 Utile pour les jeux, extensions et abonnements (comme PS Plus) sur le PlayStation Store.\n\n📩 Comment commander :\n1️⃣ Choisissez la valeur avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : PlayStation Store → … → Utiliser un code → entrez le code",
+    }
+
 _PUBG_DESC = {
     "ar": "🔫 PUBG: BATTLEGROUNDS — G-Coin (Global) 🌍\n\nأكواد G-Coin عالمية (Global) لشحن عملة اللعبة 💰\n⚠️ مهم: هذه لنسخة PUBG: BATTLEGROUNDS (كمبيوتر وأجهزة الكونسول المدعومة) وليست لـ PUBG Mobile (التي عملتها UC).\n\n🛒 تصلح لشراء السكنات والعناصر وباتل باس داخل اللعبة.\n\n📩 طريقة الطلب:\n1️⃣ اختر الباقة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: ادخل لصفحة استرداد الأكواد الرسمية لـ PUBG بحسابك على KRAFTON ID وأدخل الكود، ثم تجد الرصيد في اللعبة",
     "en": "🔫 PUBG: BATTLEGROUNDS — G-Coin (Global) 🌍\n\nGlobal G-Coin codes to top up the in-game currency 💰\n⚠️ Important: this is for PUBG: BATTLEGROUNDS (PC and supported consoles), not PUBG Mobile (whose currency is UC).\n\n🛒 Good for skins, items and the battle pass in the game.\n\n📩 How to order:\n1️⃣ Choose the pack from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: open the official PUBG code redemption page with your KRAFTON ID, enter the code, then find the balance in the game",
     "fr": "🔫 PUBG: BATTLEGROUNDS — G-Coin (Global) 🌍\n\nCodes G-Coin mondiaux pour recharger la monnaie du jeu 💰\n⚠️ Important : pour PUBG: BATTLEGROUNDS (PC et consoles compatibles), pas pour PUBG Mobile (dont la monnaie est l'UC).\n\n🛒 Utile pour les skins, objets et le battle pass du jeu.\n\n📩 Comment commander :\n1️⃣ Choisissez le pack avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : ouvrez la page officielle d'échange de codes PUBG avec votre KRAFTON ID, entrez le code, puis retrouvez le solde dans le jeu",
+}
+
+_PUBGM_DESC = {
+    "ar": "🔫 PUBG Mobile — أكواد UC (Global) 🌍\n\nأكواد UC عالمية (Global) لشحن PUBG Mobile 💎\n⚡ يصلك كود تفعّله بنفسك على موقع Midasbuy.\n\nℹ️ هذا منتج مختلف عن «شحن UC بالـ ID» الموجود في المتجر: هنا تستلم كوداً وتشحنه بنفسك.\n🚫 الكود لا يمكن استرجاعه أو استبداله بعد تسليمه.\n\n📩 طريقة الطلب:\n1️⃣ اختر الباقة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: ادخل لموقع Midasbuy.com، اختر PUBG Mobile، سجّل الدخول بمعرّف اللاعب (Player ID)، ثم اختر الدفع بالكود (Redeem Code) وأدخل الكود لتصلك الـ UC",
+    "en": "🔫 PUBG Mobile — UC codes (Global) 🌍\n\nGlobal UC codes to top up PUBG Mobile 💎\n⚡ You receive a code that you redeem yourself on Midasbuy.\n\nℹ️ This is separate from the «UC top-up by ID» product in the store: here you receive a code and redeem it yourself.\n🚫 The code cannot be refunded or exchanged once delivered.\n\n📩 How to order:\n1️⃣ Choose the pack from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: open Midasbuy.com, pick PUBG Mobile, log in with your Player ID, choose the code payment (Redeem Code) and enter the code to receive the UC",
+    "fr": "🔫 PUBG Mobile — Codes UC (Global) 🌍\n\nCodes UC mondiaux pour recharger PUBG Mobile 💎\n⚡ Vous recevez un code que vous utilisez vous-même sur Midasbuy.\n\nℹ️ Produit distinct de «Recharge UC par ID» déjà disponible dans la boutique : ici vous recevez un code et l’utilisez vous-même.\n🚫 Le code ne peut être ni remboursé ni échangé après la livraison.\n\n📩 Comment commander :\n1️⃣ Choisissez le pack avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : ouvrez Midasbuy.com, choisissez PUBG Mobile, connectez-vous avec votre Player ID, choisissez le paiement par code (Redeem Code) et entrez le code pour recevoir les UC",
+}
+
+_FC26_DESC = {
+    "ar": "⚽ EA SPORTS FC™ 26 — نقاط FC (Global) 🌍\n\nبطاقات EA لنقاط EA SPORTS FC™ 26 (EA Gift Cards) ⚽\n⚡ يصلك كود تفعّله بنفسك على حساب EA.\n🗂️ يمكن حفظ الكود بأمان وتفعيله لاحقاً.\n🚫 الكود لا يمكن استرجاعه أو استبداله بعد تسليمه.\n\n📩 طريقة الطلب:\n1️⃣ اختر الباقة من الأزرار أدناه\n2️⃣ اختر الكمية (حتى 3) ثم ادفع\n3️⃣ يصلك الكود مباشرة بعد الدفع\n4️⃣ التفعيل: استرداد الكود (Redeem) على حساب EA الخاص بك",
+    "en": "⚽ EA SPORTS FC™ 26 — FC Points (Global) 🌍\n\nEA gift cards for EA SPORTS FC™ 26 Points ⚽\n⚡ You receive a code that you redeem yourself on your EA account.\n🗂️ The code can be safely stored and redeemed later.\n🚫 The code cannot be refunded or exchanged once delivered.\n\n📩 How to order:\n1️⃣ Choose the pack from the buttons below\n2️⃣ Choose the quantity (up to 3) and pay\n3️⃣ You receive the code right after payment\n4️⃣ To redeem: redeem the code on your own EA account",
+    "fr": "⚽ EA SPORTS FC™ 26 — Points FC (Global) 🌍\n\nCartes cadeaux EA pour les points EA SPORTS FC™ 26 ⚽\n⚡ Vous recevez un code que vous utilisez vous-même sur votre compte EA.\n🗂️ Le code peut être conservé en toute sécurité et utilisé plus tard.\n🚫 Le code ne peut être ni remboursé ni échangé après la livraison.\n\n📩 Comment commander :\n1️⃣ Choisissez le pack avec les boutons ci-dessous\n2️⃣ Choisissez la quantité (jusqu'à 3) puis payez\n3️⃣ Vous recevez le code juste après le paiement\n4️⃣ Pour l'utiliser : utilisez le code sur votre propre compte EA",
 }
 
 _FF_DESC = {
@@ -221,7 +246,13 @@ _GIFT_DEFS = [
     ("gplay_tr", "🤖", "Google Play 🇹🇷 تركية", "Google Play 🇹🇷 Turkish", "Google Play 🇹🇷 Turque", _gplay_desc("🇹🇷", "تركيا", "Turkey", "Turquie")),
     ("steam_us", "🎮", "Steam Wallet 🇺🇸 أمريكية", "Steam Wallet 🇺🇸 American", "Steam Wallet 🇺🇸 Américaine", _steam_desc("🇺🇸", "أمريكا (US)", "US", "États-Unis (US)", "USD")),
     ("steam_id", "🎮", "Steam Wallet 🇮🇩 إندونيسية", "Steam Wallet 🇮🇩 Indonesian", "Steam Wallet 🇮🇩 Indonésienne", _steam_desc("🇮🇩", "إندونيسيا", "Indonesia", "Indonésie", "IDR")),
-    ("pubg_gcoin", "🔫", "PUBG G-Coin 🌍 Global", "PUBG G-Coin 🌍 Global", "PUBG G-Coin 🌍 Global", _PUBG_DESC),
+    ("psn_us", "🎮", "PlayStation (US)", "PlayStation (US)", "PlayStation (US)", _psn_desc("🇺🇸", "أمريكا (US)", "USA (US)", "États-Unis (US)", "USD", "US")),
+    ("psn_fr", "🎮", "PlayStation (FR)", "PlayStation (FR)", "PlayStation (FR)", _psn_desc("🇫🇷", "فرنسا (FR)", "France (FR)", "France (FR)", "EUR", "FR")),
+    ("psn_tr", "🎮", "PlayStation (TR)", "PlayStation (TR)", "PlayStation (TR)", _psn_desc("🇹🇷", "تركيا (TR)", "Turkey (TR)", "Turquie (TR)", "TRY", "TR")),
+    ("psn_br", "🎮", "PlayStation (BR)", "PlayStation (BR)", "PlayStation (BR)", _psn_desc("🇧🇷", "البرازيل (BR)", "Brazil (BR)", "Brésil (BR)", "BRL", "BR")),
+    ("pubg_gcoin", "🔫", "PUBG G-Coin 🖥️ PC & Console", "PUBG G-Coin 🖥️ PC & Console", "PUBG G-Coin 🖥️ PC & Console", _PUBG_DESC),
+    ("fc26_points", "⚽", "EA SPORTS FC 26 ⚽", "EA SPORTS FC 26 ⚽", "EA SPORTS FC 26 ⚽", _FC26_DESC),
+    ("pubg_uc", "📱", "PUBG Mobile 📱", "PUBG Mobile 📱", "PUBG Mobile 📱", _PUBGM_DESC),
     ("freefire_codes", "🔥", "Free Fire Codes 💎 Global", "Free Fire Codes 💎 Global", "Free Fire Codes 💎 Global", _FF_DESC),
 ]
 
@@ -241,6 +272,7 @@ _GIFT_SEPS = [
     ("sep_apple", "⬇️ Apple gift card ⬇️", "⬇️ Apple gift card ⬇️", "⬇️ Apple gift card ⬇️"),
     ("sep_google", "⬇️ Google gift card ⬇️", "⬇️ Google gift card ⬇️", "⬇️ Google gift card ⬇️"),
     ("sep_steam", "⬇️ Steam gift card ⬇️", "⬇️ Steam gift card ⬇️", "⬇️ Steam gift card ⬇️"),
+    ("sep_psn", "⬇️ PlayStation gift card ⬇️", "⬇️ PlayStation gift card ⬇️", "⬇️ PlayStation gift card ⬇️"),
     ("sep_games", "⬇️ 🎮 بطاقات الألعاب (Global) ⬇️", "⬇️ 🎮 Game Cards (Global) ⬇️", "⬇️ 🎮 Cartes de jeux (Global) ⬇️"),
 ]
 for _sid, _t_ar, _t_en, _t_fr in _GIFT_SEPS:
@@ -545,6 +577,8 @@ patch(r"""    send_persistent_menu(call.message.chat.id, lang)
 patch(r"""        wlog_add(uid, "buy", cents, pname)""",
       r"""        wlog_add(uid, "buy", cents, pname)
         _purchase_coins_hook(uid)""", "purchase_coins")
+patch(r"""GIFT_REWARD_PCT = 2    # مكافأة بطاقات الهداية""",
+      r"""GIFT_REWARD_PCT = 1    # مكافأة بطاقات الهداية (1%)""", "gift_cashback_1")
 patch(r"""                    pct=WALLET_PCT, gift_pct=GIFT_REWARD_PCT,
                 )
                 + "\n\n" + wt(lang, "wallet_note")""",
@@ -1782,8 +1816,9 @@ STORE_SLOTS = [
 GIFT_SLOTS = [
     "sep:sep_apple", "apple_gift_tr", "apple_gift_in", "apple_gift_fr", "apple_gift_us",
     "sep:sep_google", "gplay_us", "gplay_fr", "gplay_br", "gplay_in", "gplay_tr",
+    "sep:sep_psn", "psn_us", "psn_fr", "psn_tr", "psn_br",
     "sep:sep_steam", "steam_us", "steam_id",
-    "sep:sep_games", "pubg_gcoin", "freefire_codes",
+    "sep:sep_games", "freefire_codes", "pubg_gcoin", "pubg_uc", "fc26_points",
 ]
 GIFT_NEXT_TEXT = {"ar": "🎁 بطاقات الهدايا — التالي ◀️", "en": "Next ▶️ 🎁 Gift Cards", "fr": "Suivant ▶️ 🎁 Cartes cadeaux"}
 GIFT_BACK_TEXT = {"ar": "🔙 العودة", "en": "🔙 Back", "fr": "🔙 Retour"}
@@ -2774,7 +2809,7 @@ def handle_gift_page(call):
 # ============================================================
 # ========== FAZER: كتالوج أوسع + مطابقة Google/Steam/PUBG/Free Fire ==========
 # ============================================================
-FAZER_CAT_FILTER = re.compile(r"apple|itunes|google|steam|pubg|battlegrounds|free\s*fire|garena", re.I)
+FAZER_CAT_FILTER = re.compile(r"apple|itunes|google|steam|playstation|psn|ea\s*sports|pubg|battlegrounds|free\s*fire|garena", re.I)
 
 def _fazer_fetch_catalog():
     from concurrent.futures import ThreadPoolExecutor
@@ -2820,6 +2855,7 @@ _US_RE = re.compile(r"\bus\b|\busa\b|united states|america|🇺🇸", re.I)
 _GP_RE = re.compile(r"google", re.I)
 _ST_RE = re.compile(r"steam", re.I)
 _ANY_RE = re.compile(r"")
+_PSN_RE = re.compile(r"playstation|\bpsn\b", re.I)
 # product_id -> (فلتر القسم، فلتر البلد، استثناء اختياري)
 FAZER_SPEC = {
     "apple_gift_us": (re.compile(r"apple|itunes", re.I), _US_RE, None),
@@ -2830,6 +2866,12 @@ FAZER_SPEC = {
     "gplay_tr": (_GP_RE, re.compile(r"turk|türk|🇹🇷|\btr\b|\btry\b", re.I), None),
     "steam_us": (_ST_RE, _US_RE, None),
     "steam_id": (_ST_RE, re.compile(r"indonesia|🇮🇩|\bidr\b", re.I), None),
+    "psn_us": (_PSN_RE, _US_RE, None),
+    "psn_fr": (_PSN_RE, re.compile(r"france|french|🇫🇷|\bfr\b", re.I), None),
+    "psn_tr": (_PSN_RE, re.compile(r"turk|türk|🇹🇷|\btr\b|\btry\b", re.I), None),
+    "psn_br": (_PSN_RE, re.compile(r"brazil|brasil|🇧🇷|\bbr\b|\bbrl\b", re.I), None),
+    "pubg_uc": (re.compile(r"pubg.*mobile|mobile.*pubg", re.I), _ANY_RE, None),
+    "fc26_points": (re.compile(r"fc\W{0,3}26", re.I), _ANY_RE, None),
     "pubg_gcoin": (re.compile(r"pubg|battlegrounds", re.I), _ANY_RE, re.compile(r"mobile|\buc\b", re.I)),
     "freefire_codes": (re.compile(r"free\s*fire", re.I), _ANY_RE, None),
 }
@@ -2891,6 +2933,38 @@ def fazer_match(product_id, label, cats):
             return None, "ambiguous"
     c, o = next(iter(uniq.values()))
     return _mapping(c, o), "auto"
+
+# ---- تسعير تلقائي: تكلفة FAZER × 1.06 بحد أدنى ربح 0.25$ (Steam / PlayStation) ----
+AUTO_PRICE_PIDS = ("steam_us", "steam_id", "psn_us", "psn_fr", "psn_tr", "psn_br", "pubg_uc", "fc26_points")
+AUTO_PROFIT_PCT = 6
+AUTO_MIN_PROFIT = Decimal("0.25")
+
+def _auto_price(cost):
+    cost = Decimal(str(cost))
+    p = max(cost * (Decimal(100 + AUTO_PROFIT_PCT) / 100), cost + AUTO_MIN_PROFIT)
+    return str(p.quantize(Decimal("0.01"), rounding=ROUND_CEILING))
+
+def _gift_reprice(cats):
+    try:
+        for pid in AUTO_PRICE_PIDS:
+            lst = GIFT_VARIANTS.get(pid)
+            if not lst:
+                continue
+            for i, (label, old) in enumerate(list(lst)):
+                m, _r = fazer_match(pid, label, cats)
+                if m and m.get("price_usd") is not None:
+                    lst[i] = (label, _auto_price(m["price_usd"]))
+    except Exception as e:
+        print("gift_reprice failed:", e)
+
+_fazer_load_orig = fazer_load_catalog
+
+def fazer_load_catalog(force=False, allow_fetch=True):
+    before = _catalog.get("ts")
+    cats = _fazer_load_orig(force=force, allow_fetch=allow_fetch)
+    if cats and _catalog.get("ts") != before:
+        _gift_reprice(cats)
+    return cats
 
 
 # ============================================================
