@@ -251,7 +251,7 @@ _GIFT_DEFS = [
     ("psn_tr", "🎮", "PlayStation (TR)", "PlayStation (TR)", "PlayStation (TR)", _psn_desc("🇹🇷", "تركيا (TR)", "Turkey (TR)", "Turquie (TR)", "TRY", "TR")),
     ("psn_br", "🎮", "PlayStation (BR)", "PlayStation (BR)", "PlayStation (BR)", _psn_desc("🇧🇷", "البرازيل (BR)", "Brazil (BR)", "Brésil (BR)", "BRL", "BR")),
     ("pubg_gcoin", "🔫", "PUBG G-Coin 🖥️ PC & Console", "PUBG G-Coin 🖥️ PC & Console", "PUBG G-Coin 🖥️ PC & Console", _PUBG_DESC),
-    ("fc26_points", "⚽", "EA SPORTS FC 26 ⚽", "EA SPORTS FC 26 ⚽", "EA SPORTS FC 26 ⚽", _FC26_DESC),
+    ("fc26_points", "⚽", "EA SPORTS FC 26", "EA SPORTS FC 26", "EA SPORTS FC 26", _FC26_DESC),
     ("pubg_uc", "📱", "PUBG Mobile 📱", "PUBG Mobile 📱", "PUBG Mobile 📱", _PUBGM_DESC),
     ("freefire_codes", "🔥", "Free Fire Codes 💎 Global", "Free Fire Codes 💎 Global", "Free Fire Codes 💎 Global", _FF_DESC),
 ]
@@ -2160,6 +2160,8 @@ BTN_ICON_IDS = [
     (r"lovable", "6104729848675050039"),
     (r"duolingo", "5069087043175318384"),
     (r"claude", "6174520215376763867"),
+    (r"playstation|psn", "5373306783706137993"),
+    (r"ea\s*sports|fc\s*26", "5377605079601785754"),
     (r"codex", "5078234245479007184"),
     (r"muse\s*ai", "5891219692881714411"),
     (r"supabase", "6311992261571780495"),
@@ -2198,6 +2200,25 @@ BTN_ICON_IDS = [
     (r"(^|\s)fin(\s|$|\||‎)", "5373145666597961572"),
     (r"descript", "5818857774641062590"),
 ]
+
+def _psn_amount_icons(mk):
+    # أزرار قيم PlayStation (var_psn_*): نفس الإيموجي المخصص
+    try:
+        if _vt_conf().get("noicons"):
+            return
+        for row in mk.keyboard:
+            for b in row:
+                cb = getattr(b, "callback_data", None) or ""
+                _eid = "5373306783706137993" if cb.startswith("var_psn_") else ("5377605079601785754" if cb.startswith("var_fc26_points_") else None)
+                if _eid:
+                    txt = getattr(b, "text", "") or ""
+                    parts = txt.split(" ", 1)
+                    b._icon_orig_text = txt
+                    if len(parts) == 2 and not re.search(r"\w", parts[0]):
+                        b.text = parts[1]
+                    b.icon_custom_emoji_id = _eid
+    except Exception as e:
+        print(f"psn_amount_icons failed: {e}")
 
 def _apply_icons(mk):
     try:
@@ -7958,6 +7979,11 @@ patch(r"""def handle_product_view(call):
         _vt_view(call, product_id)
         return
 """, "vente_product_view")
+patch(r"""    gift_markup.add(_gb)
+""",
+      r"""    gift_markup.add(_gb)
+    _psn_amount_icons(gift_markup)
+""", "psn_amount_icons")
 patch(r"""threading.Thread(target=order_autoconfirm_loop, daemon=True).start()
 monitor_send("🟢 <b>البوت اشتغل</b>", key="boot", cooldown=120)""",
       r"""threading.Thread(target=order_autoconfirm_loop, daemon=True).start()
