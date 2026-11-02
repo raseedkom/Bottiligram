@@ -409,6 +409,7 @@ patch(r"""    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callb
     markup.add(InlineKeyboardButton(text="✏️ تعديل وصف منتج", callback_data="ap_dp"))
     markup.add(InlineKeyboardButton(text="⚙️ طرق الدفع", callback_data="ap_pm"))
     markup.add(InlineKeyboardButton(text="💲 المخزون / الأسعار", callback_data="adm_prices"))
+    markup.add(InlineKeyboardButton(text="🔔 المهتمون (أعلمني)", callback_data="adm_interest"))
     markup.add(InlineKeyboardButton(text="👤 ملف زبون", callback_data="adm_view"))""", "admin_buttons")
 patch(r"""    if op not in ("use", "add", "buy", "view"):""",
       r"""    if _admin_panel_extra(call, op):
@@ -1483,7 +1484,79 @@ def setprofit_cmd(message):
     _vt_conf_save(conf)
     bot.reply_to(message, "✅ تم الحفظ")
 
+# ---------- قائمة المهتمين («أعلمني عند التوفر») للأدمن ----------
+_PM_INTEREST_NAMES = {"bd": "بريدي موب", "fx": "Flixy", "rd": "RedotPay (يدوي)", "rp": "RedotPay", "bb": "Bybit"}
+
+def _interest_name(key):
+    try:
+        if key == "rk:notify:api":
+            return "🔌 API"
+        rest = key[len("rk:notify:"):]
+        if rest.startswith("g:"):
+            _, pid, idx = rest.split(":")
+            p = find_product(pid)
+            label = GIFT_VARIANTS[pid][int(idx)][0]
+            return f"{(p or {}).get('name', pid)} — {label}"
+        p = find_product(rest) or _VT_PRODS.get(rest)
+        if p:
+            return p.get("name") or rest
+        return rest
+    except Exception:
+        return key
+
+def _interest_rows():
+    keys = {k for k in _mem_sets if k.startswith("rk:notify:")}
+    if db:
+        try:
+            keys |= {str(k) for k in (db.keys("rk:notify:*") or [])}
+        except Exception as e:
+            print(f"interest keys failed: {e}")
+    rows = []
+    for k in keys:
+        n = len(_smembers(k))
+        if n:
+            rows.append((n, _interest_name(k)))
+    for m, nm in _PM_INTEREST_NAMES.items():
+        try:
+            n = len(pmw_list(m))
+        except Exception:
+            n = 0
+        if n:
+            rows.append((n, f"💳 {nm}"))
+    try:
+        n = len(_smembers(MAINT_SUBS))
+        if n:
+            rows.append((n, "🛠️ عودة البوت (وضع التحديث)"))
+    except Exception:
+        pass
+    rows.sort(key=lambda r: (-r[0], r[1]))
+    return rows
+
+def _interest_screen():
+    rows = _interest_rows()
+    if not rows:
+        text = "🔔 <b>المهتمون</b>\n\nلا يوجد أحد ينتظر إشعار توفر حالياً."
+    else:
+        total = sum(n for n, _ in rows)
+        lines = [f"{i}. {html.escape(name)} ({n}🔔)" for i, (n, name) in enumerate(rows, 1)]
+        text = f"🔔 <b>المهتمون ({total})</b>\nالأكثر طلباً أولاً — يُحذف المنتج من القائمة عند توفره.\n\n" + "\n".join(lines)
+        if len(text) > 3900:
+            text = text[:3900].rsplit("\n", 1)[0] + "\n…"
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text="🔄 تحديث", callback_data="adm_interest"))
+    mk.add(InlineKeyboardButton(text=t("ar", "back"), callback_data="adm_home"))
+    return text, mk
+
 def _admin_panel_extra(call, op):
+    if op == "interest":
+        text, mk = _interest_screen()
+        try:
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode="HTML", reply_markup=mk)
+        except Exception as e:
+            if "not modified" not in str(e).lower():
+                bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=mk)
+        bot.answer_callback_query(call.id)
+        return True
     if op == "home":      # زر «رجوع» من شاشات الأدمن (طرق الدفع...) إلى لوحة الأدمن
         try:
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -6072,9 +6145,19 @@ def handle_sm(call):
             print(f"hub error: {e}")
     else:
         mk = InlineKeyboardMarkup(row_width=1)
+        mk.add(InlineKeyboardButton(text=t(lang, "notify_me"), callback_data="api_nt"))
         mk.add(InlineKeyboardButton(text=t(lang, "back"), callback_data="sm_home"))
         _pf_show(call, pmt(lang, "soon"), mk)
     bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda c: c.data == "api_nt")
+def handle_api_notify(call):
+    lang = get_lang(call.from_user.id)
+    try:
+        _sadd("rk:notify:api", str(call.from_user.id))
+    except Exception as e:
+        print(f"api notify failed: {e}")
+    bot.answer_callback_query(call.id, GIFT_NOTIFY_TX.get(lang, GIFT_NOTIFY_TX["ar"]).replace("هذه القيمة", "خدمة API").replace("this amount", "the API service").replace("ce montant", "le service API"), show_alert=True)
 
 # ---------- الإحالة: الإحصائيات والصفحة ----------
 _act_cache = {}
