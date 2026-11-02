@@ -3054,7 +3054,7 @@ def _gift_reprice(cats):
 _fazer_load_orig = fazer_load_catalog
 
 # ---- حالة كل قيمة عند FAZER: متوفر (أخضر + العدد) / نافد (أحمر) / غير معروف ----
-def _gift_state(pid, idx):
+def _gstate(pid, idx):
     cats = _catalog.get("cats")
     if not cats:
         return "unk", None
@@ -3082,7 +3082,7 @@ def _gift_amount_post(mk, pid):
                 if not cb.startswith(f"var_{pid}_"):
                     continue
                 idx = cb.rsplit("_", 1)[1]
-                stt, n = _gift_state(pid, idx)
+                stt, n = _gstate(pid, idx)
                 if stt == "ok":
                     b.style = "success"
                 elif stt == "out":
@@ -3099,7 +3099,7 @@ def _gift_outer_style(mk):
                 cb = getattr(b, "callback_data", None) or ""
                 if cb.startswith("buy_") and cb[4:] in GIFT_VARIANTS:
                     pid = cb[4:]
-                    sts = [_gift_state(pid, i)[0] for i in range(len(GIFT_VARIANTS[pid]))]
+                    sts = [_gstate(pid, i)[0] for i in range(len(GIFT_VARIANTS[pid]))]
                     if sts and all(x == "out" for x in sts):
                         b.style = "danger"
     except Exception as e:
@@ -3189,7 +3189,7 @@ def _gift_states_snapshot():
     try:
         for pid, lst in GIFT_VARIANTS.items():
             for i in range(len(lst)):
-                snap[(pid, i)] = _gift_state(pid, i)[0]
+                snap[(pid, i)] = _gstate(pid, i)[0]
     except Exception:
         pass
     return snap
@@ -3202,7 +3202,7 @@ def fazer_load_catalog(force=False, allow_fetch=True):
         _gift_reprice(cats)
         try:
             for (pid, i), old in prev.items():
-                if old == "out" and _gift_state(pid, i)[0] == "ok":
+                if old == "out" and _gstate(pid, i)[0] == "ok":
                     _gift_notify_restock(pid, i)
         except Exception as e:
             print(f"gift restock check failed: {e}")
