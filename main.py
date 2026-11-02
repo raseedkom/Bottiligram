@@ -2625,6 +2625,11 @@ def generate_store_keyboard(lang):
                 _pc = _vt_find_cell("prime")
             except Exception as e:
                 print(f"prime cell failed: {e}")
+            try:
+                if _pc and any(c[0] == "prime" for c in _VT_OOSG):
+                    _pc = None      # Prime كله نافد: يظهر مرة واحدة بالأحمر في الأعلى (لا زر أخضر مكرر)
+            except Exception:
+                pass
             lo, hi, stock = _group_range("netflix")
             if isinstance(stock, int) and stock <= 0:
                 oos.append(InlineKeyboardButton(text=f"{_g['icon']} {_g['name']}", callback_data="oos_netflix"))
