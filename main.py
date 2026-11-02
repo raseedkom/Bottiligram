@@ -2146,7 +2146,7 @@ def _clean_arrows(s):
     return re.sub(r"\s+", " ", s).strip()
 _DYN_CB_PREFIX = (
     ("lang_en", ICON_LANG_EN), ("lang_ar", ICON_LANG_AR), ("lang_fr", ICON_LANG_FR),
-    ("mbuy_", ICON_BUY), ("qb_", ICON_BUY), ("var_gplay_", ICON_GPLAY), ("var_apple_gift_", ICON_APPLE_GIFT), ("var_steam_", ICON_STEAM_GIFT), ("var_pubg_", ICON_BC_CHEST), ("var_freefire_", ICON_FF_CHEST),
+    ("mbuy_", ICON_BUY), ("qb_", ICON_BUY), ("var_gplay_", ICON_GPLAY), ("var_apple_gift_", ICON_APPLE_GIFT), ("var_steam_", ICON_STEAM_GIFT), ("var_pubg_", ICON_BC_CHEST), ("var_freefire_", ICON_FF_CHEST), ("gno_gplay_", ICON_GPLAY), ("gno_apple_gift_", ICON_APPLE_GIFT), ("gno_steam_", ICON_STEAM_GIFT), ("gno_pubg_", ICON_BC_CHEST), ("gno_freefire_", ICON_FF_CHEST),
     ("pm_bn_", ICON_BINANCE), ("pm_bd_", ICON_CARD), ("pm_fx_", ICON_FLIXY),
     ("pm_rp_", ICON_CARD), ("pm_rd_", ICON_CARD), ("pm_soon_bb", ICON_BYBIT),
     ("wpay_", ICON_WALLET), ("rf_o", ICON_REFERRAL), ("gm_hub", ICON_GAME),
