@@ -1538,7 +1538,7 @@ def _interest_screen():
         text = "🔔 <b>المهتمون</b>\n\nلا يوجد أحد ينتظر إشعار توفر حالياً."
     else:
         total = sum(n for n, _ in rows)
-        lines = [f"{i}. {html.escape(name)} ({n}🔔)" for i, (n, name) in enumerate(rows, 1)]
+        lines = [f"\u200e{i}. \u2068{html.escape(name)}\u2069 \u2066({n}🔔)\u2069" for i, (n, name) in enumerate(rows, 1)]
         text = f"🔔 <b>المهتمون ({total})</b>\nالأكثر طلباً أولاً — يُحذف المنتج من القائمة عند توفره.\n\n" + "\n".join(lines)
         if len(text) > 3900:
             text = text[:3900].rsplit("\n", 1)[0] + "\n…"
