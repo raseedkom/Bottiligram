@@ -410,6 +410,7 @@ patch(r"""    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callb
     markup.add(InlineKeyboardButton(text="⚙️ طرق الدفع", callback_data="ap_pm"))
     markup.add(InlineKeyboardButton(text="💲 المخزون / الأسعار", callback_data="adm_prices"))
     markup.add(InlineKeyboardButton(text="🔔 المهتمون (أعلمني)", callback_data="adm_interest"))
+    markup.add(InlineKeyboardButton(text="💼 أرصدة الزبائن", callback_data="adm_wal"))
     markup.add(InlineKeyboardButton(text="👤 ملف زبون", callback_data="adm_view"))""", "admin_buttons")
 patch(r"""    if op not in ("use", "add", "buy", "view"):""",
       r"""    if _admin_panel_extra(call, op):
@@ -676,7 +677,7 @@ MANUAL_TEXTS = {
         "input_saved_email": "✅ <b>تم التحقق من الدفع — تم تقديم طلبك!</b>\n\n🛍 المنتج: {product}\n💰 المبلغ: USDT {paid}\n📧 {label}: <code>{val}</code>\n\n⏱ <b>وقت التفعيل المتوقع:</b> من دقيقة واحدة إلى 53 دقيقة (حسب إحصائيات هذا الشهر).\n\nسيقوم فريقنا بتفعيل طلبك قريباً وسنُعلمك هنا فور اكتماله. شكراً لثقتك! 🤝",
         "input_saved": "✅ تم تأكيد بياناتك. طلبك قيد التنفيذ وسنُعلمك هنا فور اكتماله.",
         "queued": "ℹ️ سنطلب منك بيانات هذا الطلب بعد إنهاء الطلب الحالي.",
-        "executed": "✅ <b>تم تنفيذ / تفعيل طلبك بنجاح!</b>\n\n📦 {product}\n\nإذا واجهت أي مشكلة تواصل مع الدعم 👇",
+        "executed": "🎉 <b>تم تفعيل طلبك بنجاح!</b>\n\n📦 {product}\n\nشكراً لثقتك بنا 🤝\nقد يستغرق ظهور التفعيل في حسابك لحظات. وإذا واجهت أي مشكلة تواصل مع الدعم وسنساعدك فوراً 👇",
         "delivery": "📦 <b>طلبك جاهز</b>\n\n{product}\n\n{body}\n\n📌 احتفظ بهذه المعلومات في مكان آمن.\nاضغط «✅ استلمت» بعد التأكد (يتأكد الطلب تلقائياً بعد 20 دقيقة).",
         "btn_received": "✅ استلمت",
         "received_ok": "🙏 شكراً! تم تأكيد استلام طلبك.",
@@ -709,7 +710,7 @@ MANUAL_TEXTS = {
         "input_saved_email": "✅ <b>Payment verified — your order was submitted!</b>\n\n🛍 Product: {product}\n💰 Amount: USDT {paid}\n📧 {label}: <code>{val}</code>\n\n⏱ <b>Estimated activation time:</b> from 1 minute up to 53 minutes (based on this month's statistics).\n\nOur team will activate your order shortly and we will notify you here once it is done. Thank you for your trust! 🤝",
         "input_saved": "✅ Details confirmed. Your order is being fulfilled and we will notify you here once done.",
         "queued": "ℹ️ We'll ask for this order's details after you finish the current one.",
-        "executed": "✅ <b>Your order has been fulfilled / activated!</b>\n\n📦 {product}\n\nIf you have any problem, contact support 👇",
+        "executed": "🎉 <b>Your order has been activated successfully!</b>\n\n📦 {product}\n\nThank you for your trust 🤝\nIt may take a few moments for the activation to appear on your account. If you have any problem, contact support and we will help you right away 👇",
         "delivery": "📦 <b>Your order is ready</b>\n\n{product}\n\n{body}\n\n📌 Keep this information in a safe place.\nTap «✅ Received» once checked (auto-confirmed after 20 minutes).",
         "btn_received": "✅ Received",
         "received_ok": "🙏 Thank you! Your order receipt is confirmed.",
@@ -742,7 +743,7 @@ MANUAL_TEXTS = {
         "input_saved_email": "✅ <b>Paiement vérifié — votre commande a été envoyée !</b>\n\n🛍 Produit : {product}\n💰 Montant : USDT {paid}\n📧 {label} : <code>{val}</code>\n\n⏱ <b>Délai d'activation estimé :</b> de 1 minute à 53 minutes (selon les statistiques de ce mois).\n\nNotre équipe activera votre commande très bientôt et nous vous préviendrons ici dès qu'elle sera terminée. Merci de votre confiance ! 🤝",
         "input_saved": "✅ Informations confirmées. Votre commande est en cours et nous vous préviendrons ici dès qu'elle sera terminée.",
         "queued": "ℹ️ Nous vous demanderons les informations de cette commande après la commande en cours.",
-        "executed": "✅ <b>Votre commande a été exécutée / activée !</b>\n\n📦 {product}\n\nEn cas de problème, contactez l'assistance 👇",
+        "executed": "🎉 <b>Votre commande a été activée avec succès !</b>\n\n📦 {product}\n\nMerci de votre confiance 🤝\nL'activation peut mettre quelques instants à apparaître sur votre compte. En cas de problème, contactez l'assistance, nous vous aiderons tout de suite 👇",
         "delivery": "📦 <b>Votre commande est prête</b>\n\n{product}\n\n{body}\n\n📌 Conservez ces informations en lieu sûr.\nAppuyez sur « ✅ Reçu » après vérification (confirmation automatique après 20 minutes).",
         "btn_received": "✅ Reçu",
         "received_ok": "🙏 Merci ! La réception de votre commande est confirmée.",
@@ -866,6 +867,50 @@ def _edit_cb(call, text, markup=None):
     except Exception as e:
         if "not modified" not in str(e).lower():
             print(f"_edit_cb failed: {e}")
+
+# ---------- أزرار «تم» / «لم أفهم» تحت رسالة تقديم الطلب (منتجات التفعيل اليدوي) ----------
+HOWTO_TX = {
+    "ar": {
+        "ok": "✅ تم", "no": "❓ لم أفهم",
+        "ack": "👍 بالتوفيق! سنُعلمك هنا فور تفعيل طلبك.",
+        "explain": "ℹ️ <b>كيف يتم تنفيذ طلبك؟</b>\n\nهذا المنتج (Canva، Snapchat، شحن Free Fire) <b>ليس تسليماً فورياً</b> مثل باقي منتجاتنا، بل يُفعَّل <b>يدوياً من فريق العمل</b>.\n\n👨‍💻 في هذه اللحظة قد يكون فريقنا قد اطّلع على طلبك وبدأ العمل عليه.\n\n⏳ ما عليك سوى الانتظار، وستصلك رسالة هنا فور <b>تفعيل طلبك</b>.\n\nشكراً لصبرك 🤝",
+    },
+    "en": {
+        "ok": "✅ Got it", "no": "❓ I did not understand",
+        "ack": "👍 All good! We will notify you here as soon as your order is activated.",
+        "explain": "ℹ️ <b>How is your order processed?</b>\n\nThis product (Canva, Snapchat, Free Fire top-up) is <b>not instant delivery</b> like our other products. It is <b>activated manually by our team</b>.\n\n👨‍💻 Right now our team may already have seen your order and started working on it.\n\n⏳ Just wait, and you will receive a message here as soon as <b>your order is activated</b>.\n\nThank you for your patience 🤝",
+    },
+    "fr": {
+        "ok": "✅ Compris", "no": "❓ Je n'ai pas compris",
+        "ack": "👍 Parfait ! Nous vous préviendrons ici dès que votre commande sera activée.",
+        "explain": "ℹ️ <b>Comment votre commande est-elle traitée ?</b>\n\nCe produit (Canva, Snapchat, recharge Free Fire) n'est <b>pas livré instantanément</b> comme nos autres produits. Il est <b>activé manuellement par notre équipe</b>.\n\n👨‍💻 En ce moment, notre équipe a peut-être déjà vu votre commande et travaille dessus.\n\n⏳ Il suffit d'attendre : vous recevrez un message ici dès que <b>votre commande sera activée</b>.\n\nMerci pour votre patience 🤝",
+    },
+}
+def _hw(lang, key):
+    return HOWTO_TX.get(lang, HOWTO_TX["ar"])[key]
+
+def _howto_markup(lang):
+    mk = InlineKeyboardMarkup(row_width=1)
+    b_ok = InlineKeyboardButton(text=_hw(lang, "ok"), callback_data="hw_ok")
+    b_no = InlineKeyboardButton(text=_hw(lang, "no"), callback_data="hw_no")
+    b_ok.style = "success"
+    b_no.style = "danger"
+    mk.add(b_ok)
+    mk.add(b_no)
+    return mk
+
+@bot.callback_query_handler(func=lambda c: c.data in ("hw_ok", "hw_no"))
+def handle_howto(call):
+    lang = get_lang(call.from_user.id)
+    try:
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    if call.data == "hw_ok":
+        bot.answer_callback_query(call.id, _hw(lang, "ack"), show_alert=True)
+        return
+    bot.answer_callback_query(call.id)
+    _safe_send(call.message.chat.id, _hw(lang, "explain"), parse_mode="HTML")
 
 # ---------- مخزون المنتجات اليدوية ----------
 def _manual_in_stock(pid):
@@ -1176,9 +1221,9 @@ def handle_input_cb(call):
         except StorageError:
             pass
         if MANUAL_A[o["product_id"]] == "email":
-            _edit_cb(call, mt(lang, "input_saved_email").format(product=html.escape(o.get("product_name", "")), label=mt(lang, "lbl_email"), val=html.escape(o.get("input", "")), paid=html.escape(str(o.get("paid", "")))))
+            _edit_cb(call, mt(lang, "input_saved_email").format(product=html.escape(o.get("product_name", "")), label=mt(lang, "lbl_email"), val=html.escape(o.get("input", "")), paid=html.escape(str(o.get("paid", "")))), _howto_markup(lang))
         else:
-            _edit_cb(call, mt(lang, "input_saved"))
+            _edit_cb(call, mt(lang, "input_saved"), _howto_markup(lang))
         bot.answer_callback_query(call.id)
         kind = MANUAL_A[o["product_id"]]
         txt = (f"📦 <b>طلب جديد (Pending)</b>\n\n📦 {html.escape(o['product_name'])}\n👤 {_user_link(uid)}\n"
@@ -1553,7 +1598,90 @@ def _interest_screen():
     mk.add(InlineKeyboardButton(text=t("ar", "back"), callback_data="adm_home"))
     return text, mk
 
+WAL_PAGE = 25
+
+def _avail_from_hash(h):
+    def _i(k):
+        try:
+            return int(float(h.get(k, 0) or 0))
+        except (ValueError, TypeError):
+            return 0
+    reward = _i("reward_c") if "reward_c" in h else _i("spent_c") * WALLET_PCT // 100
+    return max(0, reward + _i("topup_c") - _i("redeemed_c") - _i("wspent_c"))
+
+def _wallet_rows():
+    """[(avail_cents, uid, name)] لمن رصيده > 0، من الأكبر للأصغر."""
+    uids = sorted(known_users)
+    hashes = None
+    try:
+        pipe = db.pipeline()
+        for u in uids:
+            pipe.hgetall(_prof_key(u))
+        hashes = pipe.exec()
+    except Exception as e:
+        print(f"wallet_rows pipeline failed: {e}")
+        hashes = None
+    rows = []
+    for i, u in enumerate(uids):
+        try:
+            if hashes is not None:
+                raw = hashes[i]
+                if isinstance(raw, (list, tuple)):
+                    raw = dict(zip(raw[0::2], raw[1::2]))
+                h = {str(a): str(b) for a, b in (raw or {}).items()}
+            else:
+                h = {str(a): str(b) for a, b in (db.hgetall(_prof_key(u)) or {}).items()}
+            av = _avail_from_hash(h)
+            if av > 0:
+                rows.append((av, u, h.get("name", "")))
+        except Exception:
+            continue
+    rows.sort(key=lambda r: -r[0])
+    return rows
+
+def _wallets_screen(offset=0):
+    rows = _wallet_rows()
+    if not rows:
+        text = "💼 <b>أرصدة الزبائن</b>\n\nلا يوجد زبون عنده رصيد حالياً."
+        total_pages = 1
+    else:
+        total = sum(r[0] for r in rows)
+        offset = max(0, min(offset, max(0, len(rows) - 1)))
+        chunk = rows[offset:offset + WAL_PAGE]
+        lines = []
+        for i, (av, u, nm) in enumerate(chunk, offset + 1):
+            nm = html.escape(nm.strip()) if nm and nm.strip() else "—"
+            lines.append(f"\u200e{i}. <b>${_money(av)}</b> — \u2068{nm}\u2069 — <code>{u}</code>")
+        text = (f"💼 <b>أرصدة الزبائن</b>\n👥 {len(rows)} زبون · 💵 المجموع ${_money(total)}\n"
+                f"الأكبر رصيداً أولاً (من رصيده 0 غير ظاهر)\n\n" + "\n".join(lines))
+    mk = InlineKeyboardMarkup(row_width=2)
+    nav = []
+    if rows and offset > 0:
+        nav.append(InlineKeyboardButton(text="⬅️ السابق", callback_data=f"adm_wal{max(0, offset - WAL_PAGE)}"))
+    if rows and offset + WAL_PAGE < len(rows):
+        nav.append(InlineKeyboardButton(text="التالي ➡️", callback_data=f"adm_wal{offset + WAL_PAGE}"))
+    if nav:
+        mk.row(*nav)
+    mk.add(InlineKeyboardButton(text="🔄 تحديث", callback_data=f"adm_wal{offset}"))
+    mk.add(InlineKeyboardButton(text=t("ar", "back"), callback_data="adm_home"))
+    return text, mk
+
 def _admin_panel_extra(call, op):
+    if op == "wal" or (op.startswith("wal") and op[3:].isdigit()):
+        try:
+            off = int(op[3:] or 0)
+            text, mk = _wallets_screen(off)
+        except Exception as e:
+            print(f"wallets_screen failed: {e}")
+            bot.answer_callback_query(call.id, "❌ تعذّر جلب الأرصدة", show_alert=True)
+            return True
+        try:
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode="HTML", reply_markup=mk)
+        except Exception as e:
+            if "not modified" not in str(e).lower():
+                bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=mk)
+        bot.answer_callback_query(call.id)
+        return True
     if op == "interest":
         text, mk = _interest_screen()
         try:
