@@ -1776,13 +1776,28 @@ def handle_order_admin(call):
         return
     if act == "v":
         mk = InlineKeyboardMarkup(row_width=1)
+        if o.get("status") == "pending" and o.get("product_id") in NETFLIX_TV and o.get("device") == "tv" and o.get("tv_code"):
+            mk.add(InlineKeyboardButton(text="✅ تم تفعيل", callback_data=f"tva_{oid}"))
+            mk.add(InlineKeyboardButton(text="📩 تواصل مع فريق التفعيل", callback_data=f"tvs_{oid}"))
         if o.get("status") == "pending" and o.get("cat") == "B":
             mk.add(InlineKeyboardButton(text="📤 إرسال بيانات الطلب للزبون", callback_data=f"ord_d_{oid}"))
         if o.get("status") == "pending" and o.get("cat") == "A":
             mk.add(InlineKeyboardButton(text="✅ تم التنفيذ", callback_data=f"ord_x_{oid}"))
         mk.add(InlineKeyboardButton(text="🗑️ حذف الطلب من القائمة", callback_data=f"ord_r_{oid}"))
         mk.add(InlineKeyboardButton(text="⬅️ القائمة", callback_data="ord_l_0"))
-        _pr_show(chat_id, msg_id, order_admin_text(o), mk)
+        if o.get("product_id") in NETFLIX_TV:
+            # زر «مراسلة الزبون» يفتح دردشته مباشرة؛ إن منعته خصوصية الزبون نعرض الشاشة بدونه
+            mk_chat = InlineKeyboardMarkup(row_width=1)
+            mk_chat.add(InlineKeyboardButton(text="💬 مراسلة الزبون", url=f"tg://user?id={o['user_id']}"))
+            for _row in mk.keyboard:
+                mk_chat.keyboard.append(_row)
+            try:
+                _pr_show(chat_id, msg_id, order_admin_text(o), mk_chat)
+            except Exception as e:
+                print(f"order view with chat btn failed: {e}")
+                _pr_show(chat_id, msg_id, order_admin_text(o), mk)
+        else:
+            _pr_show(chat_id, msg_id, order_admin_text(o), mk)
         bot.answer_callback_query(call.id)
         return
     if act == "d":
@@ -1983,18 +1998,21 @@ def handle_tv_confirm(call):
     bot.answer_callback_query(call.id)
     amk = InlineKeyboardMarkup(row_width=1)
     amk.add(InlineKeyboardButton(text="✅ تم تفعيل", callback_data=f"tva_{oid}"))
-    amk.add(InlineKeyboardButton(text="📩 إرسال للزبون", callback_data=f"tvs_{oid}"))
+    amk.add(InlineKeyboardButton(text="📩 تواصل مع فريق التفعيل", callback_data=f"tvs_{oid}"))
+    _atxt = (f"📺 <b>كود تلفاز Netflix</b>\n\n📦 {html.escape(o.get('product_name', ''))}\n"
+             f"🙋 {_user_link(uid)}\n🧾 طلب <code>{oid}</code>\n🔢 الكود: <code>{code}</code>")
+    amk_chat = InlineKeyboardMarkup(row_width=1)
+    amk_chat.add(InlineKeyboardButton(text="💬 مراسلة الزبون", url=f"tg://user?id={uid}"))
+    for _row in amk.keyboard:
+        amk_chat.keyboard.append(_row)
     try:
-        prof = o.get("profile")
-        bot.send_message(
-            ADMIN_CHAT_ID,
-            f"📺 <b>كود تلفاز Netflix</b>\n\n📦 {html.escape(o.get('product_name', ''))}\n"
-            + (f"👤 البروفيل: <code>{html.escape(str(prof))}</code> (حساب {html.escape(str(o.get('acct', '')))})\n" if prof else "")
-            + f"🙋 {_user_link(uid)}\n🧾 طلب <code>{oid}</code>\n🔢 الكود: <code>{code}</code>",
-            parse_mode="HTML", reply_markup=amk,
-        )
+        bot.send_message(ADMIN_CHAT_ID, _atxt, parse_mode="HTML", reply_markup=amk_chat)
     except Exception as e:
-        print(f"tv admin notify failed: {e}")
+        print(f"tv admin notify with chat btn failed: {e}")
+        try:
+            bot.send_message(ADMIN_CHAT_ID, _atxt, parse_mode="HTML", reply_markup=amk)
+        except Exception as e2:
+            print(f"tv admin notify failed: {e2}")
 
 @bot.callback_query_handler(func=lambda c: c.data == "tvok")
 def handle_tv_ok(call):
