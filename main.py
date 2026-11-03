@@ -1378,6 +1378,8 @@ def deliver_manual_order(oid, text):
         InlineKeyboardButton(text=mt(lang, "btn_received"), callback_data=f"rcv_{oid}"),
         InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK),
     )
+    if o["product_id"] in NETFLIX_TV:
+        mk.add(InlineKeyboardButton(text=_tv(lang, "btn"), callback_data=f"tv_{oid}"))
     try:
         sent = bot.send_message(
             uid, mt(lang, "delivery").format(product=html.escape(o["product_name"]), body=body),
@@ -1814,6 +1816,139 @@ def handle_order_admin(call):
         return
     bot.answer_callback_query(call.id)
 
+# ---------- تفعيل Netflix على التلفاز (الزبون يرسل كود 8 أرقام ← الأدمن يدخله) ----------
+NETFLIX_TV = {"netflix_profile"}
+TV_TX = {
+    "ar": {
+        "btn": "📺 تفعيل على التلفاز",
+        "ask": "📺 <b>تفعيل Netflix على التلفاز</b>\n\n1️⃣ افتح تطبيق Netflix في التلفاز، وسيظهر لك <b>كود من 8 أرقام</b>.\n2️⃣ أرسل الكود هنا الآن (أرقام فقط).\n\n⚠️ لا تغلق شاشة الكود في التلفاز حتى يتم التفعيل.",
+        "bad": "❌ الكود يجب أن يتكون من 8 أرقام فقط. أعد الإرسال.",
+        "got": "✅ <b>تم!</b> استلمنا الكود: <code>{code}</code>\n\nسيقوم فريقنا بتفعيله على التلفاز خلال لحظات.\n\n⚠️ إذا تغيّر الكود في التلفاز قبل التفعيل، تواصل مع الدعم 👇",
+        "done": "✅ <b>تم تجهيز حسابك بنجاح!</b>\n\n📺 تم تسجيل الدخول إلى حسابك على التلفاز. استمتع بالمشاهدة 🎉",
+        "support": "📞 <b>فريق الدعم يطلب منك التواصل معهم الآن</b>\n\nهم في انتظارك. اضغط الزر بالأسفل للتواصل معهم 👇",
+    },
+    "en": {
+        "btn": "📺 Activate on TV",
+        "ask": "📺 <b>Activate Netflix on your TV</b>\n\n1️⃣ Open the Netflix app on your TV, and an <b>8-digit code</b> will appear.\n2️⃣ Send the code here now (numbers only).\n\n⚠️ Do not close the code screen on the TV until the activation is done.",
+        "bad": "❌ The code must be exactly 8 digits. Please send it again.",
+        "got": "✅ <b>Done!</b> We received the code: <code>{code}</code>\n\nOur team will activate it on your TV in a few moments.\n\n⚠️ If the code changes on the TV before the activation, contact support 👇",
+        "done": "✅ <b>Your account is ready!</b>\n\n📺 Your account is now signed in on your TV. Enjoy watching 🎉",
+        "support": "📞 <b>Our support team asks you to contact them now</b>\n\nThey are waiting for you. Tap the button below to reach them 👇",
+    },
+    "fr": {
+        "btn": "📺 Activer sur la TV",
+        "ask": "📺 <b>Activer Netflix sur votre TV</b>\n\n1️⃣ Ouvrez l'application Netflix sur votre TV, un <b>code à 8 chiffres</b> s'affichera.\n2️⃣ Envoyez le code ici maintenant (chiffres uniquement).\n\n⚠️ Ne fermez pas l'écran du code sur la TV avant la fin de l'activation.",
+        "bad": "❌ Le code doit contenir exactement 8 chiffres. Renvoyez-le.",
+        "got": "✅ <b>C'est fait !</b> Nous avons reçu le code : <code>{code}</code>\n\nNotre équipe l'activera sur votre TV dans quelques instants.\n\n⚠️ Si le code change sur la TV avant l'activation, contactez l'assistance 👇",
+        "done": "✅ <b>Votre compte est prêt !</b>\n\n📺 Votre compte est maintenant connecté sur votre TV. Bon visionnage 🎉",
+        "support": "📞 <b>L'assistance vous demande de les contacter maintenant</b>\n\nIls vous attendent. Appuyez sur le bouton ci-dessous pour les joindre 👇",
+    },
+}
+def _tv(lang, key):
+    return TV_TX.get(lang, TV_TX["ar"])[key]
+
+def _support_tv(lang, o):
+    mk = support_markup(lang)
+    try:
+        if o and o.get("product_id") in NETFLIX_TV:
+            mk.add(InlineKeyboardButton(text=_tv(lang, "btn"), callback_data=f"tv_{o['oid']}"))
+    except Exception:
+        pass
+    return mk
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("tv_"))
+def handle_tv_btn(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    oid = call.data[3:]
+    o = order_get(oid)
+    if not o or str(o.get("user_id")) != str(uid) or o.get("product_id") not in NETFLIX_TV:
+        bot.answer_callback_query(call.id)
+        return
+    try:
+        kv_set(f"rk:tv:{uid}", oid, ex=1800)
+    except Exception:
+        bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
+        return
+    bot.answer_callback_query(call.id)
+    _safe_send(call.message.chat.id, _tv(lang, "ask"), parse_mode="HTML")
+
+def _awaiting_tv(m):
+    try:
+        if not m.text or m.text.startswith("/") or m.chat.type != "private":
+            return False
+        if re.fullmatch(r"\d{10,}", re.sub(r"[\s-]", "", m.text)):   # رقم عملية Binance: لا نلتقطه
+            return False
+        return bool(kv_get(f"rk:tv:{m.from_user.id}"))
+    except Exception:
+        return False
+
+@bot.message_handler(func=_awaiting_tv, content_types=["text"])
+def handle_tv_code(message):
+    uid = message.from_user.id
+    lang = get_lang(uid)
+    code = re.sub(r"[\s-]", "", message.text or "")
+    if not re.fullmatch(r"\d{8}", code):
+        bot.send_message(message.chat.id, _tv(lang, "bad"))
+        return
+    try:
+        oid = str(kv_get(f"rk:tv:{uid}"))
+        o = order_get(oid)
+    except Exception:
+        return
+    if not o or str(o.get("user_id")) != str(uid):
+        return
+    o["tv_code"] = code
+    o["tv_ts"] = int(time.time())
+    try:
+        order_save(o)
+        kv_del(f"rk:tv:{uid}")
+    except Exception:
+        pass
+    _safe_send(message.chat.id, _tv(lang, "got").format(code=code), parse_mode="HTML", reply_markup=support_markup(lang))
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text="✅ تم تفعيل", callback_data=f"tva_{oid}"))
+    mk.add(InlineKeyboardButton(text="📩 إرسال للزبون", callback_data=f"tvs_{oid}"))
+    try:
+        bot.send_message(
+            ADMIN_CHAT_ID,
+            f"📺 <b>كود تلفاز Netflix</b>\n\n📦 {html.escape(o.get('product_name', ''))}\n👤 {_user_link(uid)}\n"
+            f"🧾 طلب <code>{oid}</code>\n🔢 الكود: <code>{code}</code>",
+            parse_mode="HTML", reply_markup=mk,
+        )
+    except Exception as e:
+        print(f"tv admin notify failed: {e}")
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith(("tva_", "tvs_")))
+def handle_tv_admin(call):
+    if not _is_admin_user(call.from_user.id):
+        bot.answer_callback_query(call.id)
+        return
+    act, oid = call.data[:3], call.data[4:]
+    o = order_get(oid)
+    if not o:
+        bot.answer_callback_query(call.id, "❌ الطلب غير موجود", show_alert=True)
+        return
+    uid = o["user_id"]
+    lang = get_lang(uid)
+    base = call.message.html_text or ""
+    if act == "tva":
+        ok = _safe_send(uid, _tv(lang, "done"), parse_mode="HTML")
+        try:
+            bot.edit_message_text(base + "\n\n✅ <b>تم التفعيل وأُبلغ الزبون</b>", call.message.chat.id, call.message.message_id, parse_mode="HTML")
+        except Exception:
+            pass
+        bot.answer_callback_query(call.id, "✅ أُبلغ الزبون" if ok else "⚠️ تعذر إبلاغ الزبون", show_alert=not ok)
+        return
+    ok = _safe_send(uid, _tv(lang, "support"), parse_mode="HTML", reply_markup=support_markup(lang))
+    if "أُرسل للزبون" not in base:
+        try:
+            bot.edit_message_text(base + "\n\n📩 <i>أُرسل للزبون: تواصل مع الدعم</i>", call.message.chat.id, call.message.message_id,
+                                  parse_mode="HTML", reply_markup=call.message.reply_markup)
+        except Exception:
+            pass
+    bot.answer_callback_query(call.id, "📩 أُرسل للزبون" if ok else "⚠️ تعذر الإرسال", show_alert=not ok)
+
 # ---------- استلام الزبون + التأكيد التلقائي بعد 20 دقيقة ----------
 @bot.callback_query_handler(func=lambda c: c.data.startswith("rcv_"))
 def handle_received(call):
@@ -1832,7 +1967,7 @@ def handle_received(call):
         _srem(WAITSET_KEY, oid)
         monitor_send(f"✅ <b>الزبون أكد الاستلام</b>\n\n📦 {html.escape(o['product_name'])}\n👤 {_user_link(uid)}")
     try:
-        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=support_markup(lang))
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=_support_tv(lang, o))
     except Exception:
         pass
     bot.answer_callback_query(call.id, mt(lang, "received_ok"), show_alert=True)
@@ -1851,7 +1986,7 @@ def autoconfirm_orders():
         order_save(o)
         _srem(WAITSET_KEY, oid)
         try:
-            bot.edit_message_reply_markup(o["chat_id"], o["message_id"], reply_markup=support_markup(get_lang(o["user_id"])))
+            bot.edit_message_reply_markup(o["chat_id"], o["message_id"], reply_markup=_support_tv(get_lang(o["user_id"]), o))
         except Exception:
             pass
         monitor_send(f"⏱️ <b>تأكيد تلقائي للطلب (20 دقيقة)</b>\n\n📦 {html.escape(o['product_name'])}\n👤 {_user_link(o['user_id'])}")
