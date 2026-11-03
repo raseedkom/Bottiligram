@@ -673,6 +673,7 @@ MANUAL_TEXTS = {
         "lbl_username": "اسم المستخدم", "lbl_playerid": "Player ID", "lbl_email": "البريد الإلكتروني",
         "confirm_q": "🔎 تأكد من بياناتك:\n\n{label}: <code>{val}</code>\n\nهل هي صحيحة؟",
         "btn_confirm": "✅ تأكيد", "btn_edit": "✏️ تعديل",
+        "input_saved_email": "✅ <b>تم التحقق من الدفع — تم تقديم طلبك!</b>\n\n🛍 المنتج: {product}\n💰 المبلغ: USDT {paid}\n📧 {label}: <code>{val}</code>\n\n⏱ <b>وقت التفعيل المتوقع:</b> من دقيقة واحدة إلى 53 دقيقة (حسب إحصائيات هذا الشهر).\n\nسيقوم فريقنا بتفعيل طلبك قريباً وسنُعلمك هنا فور اكتماله. شكراً لثقتك! 🤝",
         "input_saved": "✅ تم تأكيد بياناتك. طلبك قيد التنفيذ وسنُعلمك هنا فور اكتماله.",
         "queued": "ℹ️ سنطلب منك بيانات هذا الطلب بعد إنهاء الطلب الحالي.",
         "executed": "✅ <b>تم تنفيذ / تفعيل طلبك بنجاح!</b>\n\n📦 {product}\n\nإذا واجهت أي مشكلة تواصل مع الدعم 👇",
@@ -705,6 +706,7 @@ MANUAL_TEXTS = {
         "lbl_username": "Username", "lbl_playerid": "Player ID", "lbl_email": "Email",
         "confirm_q": "🔎 Check your details:\n\n{label}: <code>{val}</code>\n\nIs it correct?",
         "btn_confirm": "✅ Confirm", "btn_edit": "✏️ Edit",
+        "input_saved_email": "✅ <b>Payment verified — your order was submitted!</b>\n\n🛍 Product: {product}\n💰 Amount: USDT {paid}\n📧 {label}: <code>{val}</code>\n\n⏱ <b>Estimated activation time:</b> from 1 minute up to 53 minutes (based on this month's statistics).\n\nOur team will activate your order shortly and we will notify you here once it is done. Thank you for your trust! 🤝",
         "input_saved": "✅ Details confirmed. Your order is being fulfilled and we will notify you here once done.",
         "queued": "ℹ️ We'll ask for this order's details after you finish the current one.",
         "executed": "✅ <b>Your order has been fulfilled / activated!</b>\n\n📦 {product}\n\nIf you have any problem, contact support 👇",
@@ -737,6 +739,7 @@ MANUAL_TEXTS = {
         "lbl_username": "Nom d'utilisateur", "lbl_playerid": "Player ID", "lbl_email": "E-mail",
         "confirm_q": "🔎 Vérifiez vos informations :\n\n{label} : <code>{val}</code>\n\nSont-elles correctes ?",
         "btn_confirm": "✅ Confirmer", "btn_edit": "✏️ Modifier",
+        "input_saved_email": "✅ <b>Paiement vérifié — votre commande a été envoyée !</b>\n\n🛍 Produit : {product}\n💰 Montant : USDT {paid}\n📧 {label} : <code>{val}</code>\n\n⏱ <b>Délai d'activation estimé :</b> de 1 minute à 53 minutes (selon les statistiques de ce mois).\n\nNotre équipe activera votre commande très bientôt et nous vous préviendrons ici dès qu'elle sera terminée. Merci de votre confiance ! 🤝",
         "input_saved": "✅ Informations confirmées. Votre commande est en cours et nous vous préviendrons ici dès qu'elle sera terminée.",
         "queued": "ℹ️ Nous vous demanderons les informations de cette commande après la commande en cours.",
         "executed": "✅ <b>Votre commande a été exécutée / activée !</b>\n\n📦 {product}\n\nEn cas de problème, contactez l'assistance 👇",
@@ -1172,7 +1175,10 @@ def handle_input_cb(call):
             kv_del(f"rk:inp:{uid}")
         except StorageError:
             pass
-        _edit_cb(call, mt(lang, "input_saved"))
+        if MANUAL_A[o["product_id"]] == "email":
+            _edit_cb(call, mt(lang, "input_saved_email").format(product=html.escape(o.get("product_name", "")), label=mt(lang, "lbl_email"), val=html.escape(o.get("input", "")), paid=html.escape(str(o.get("paid", "")))))
+        else:
+            _edit_cb(call, mt(lang, "input_saved"))
         bot.answer_callback_query(call.id)
         kind = MANUAL_A[o["product_id"]]
         txt = (f"📦 <b>طلب جديد (Pending)</b>\n\n📦 {html.escape(o['product_name'])}\n👤 {_user_link(uid)}\n"
