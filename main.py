@@ -307,11 +307,11 @@ patch('MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"',
 
 # وصف Netflix (بروفيل + حساب كامل): VPN مجاني + رابط الصورة (ar/en/fr) + ملاحظة كود الإيميل للبروفيل
 patch(r""""description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n❌ ممنوع تغيير الاسم و كلمة السر هاذا يتم طردك من الحساب مع عدم وجود ضمان\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n🔵 أرخص سعر — 2.70$\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام بروفيل في حساب واحد\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح عند الحاجة\n📊 المباعة: 216 حسابات",""",
-      r""""description": "📦 حسابات نتفليكس بريميوم - شهرين (بروفيل خاص)\n\n✅ بروفيل خاص بك وحدك مع كلمة سر خاصة به\n✅ مدة كاملة: شهرين كاملين\n🌐 يعمل عبر VPN مجاني (أمريكا 🇺🇸 أو كندا 🇨🇦) مثل Proton VPN\n🛡️ ضمان لمدة شهر\n🎬 يدعم كل الأفلام والمسلسلات بجودة عالية\n📱 يعمل على جميع الأجهزة: الهاتف، الكمبيوتر، التابلت والتلفزيون الذكي\n💬 الدعم متاح عند الحاجة\n📩 ملاحظة: إذا طلب نتفليكس رمز تحقق (كود) على الإيميل، تواصل مع الدعم وسنزوّدك بالكود في أقرب وقت.\n❌ ممنوع تغيير الاسم وكلمة السر، وإلا يتم طردك من الحساب مع عدم وجود ضمان\n📊 المباعة: 216 حسابات\n\n🖼️ شرح التشغيل مع Proton VPN: https://drive.google.com/file/d/1IEg2wISdZ42ojqLLTTJkK6M4HesZQbFK/view?usp=sharing",""", "netflix_profile_desc_ar")
+      r""""description": "📦 حسابات نتفليكس بريميوم - شهرين (بروفيل خاص)\n\n✅ بروفيل خاص بك وحدك داخل حساب Netflix Premium\n✅ المدة: شهران كاملان + هدية تقارب شهراً إضافياً 🎁\n⚡ التفعيل برابط مباشر على الهاتف والحاسوب، بدون كلمة سر\n📺 التلفاز: يُفعَّل بكود من 8 أرقام يظهر لك في التطبيق، ترسله لنا في البوت ويفعّله فريقنا\n🌐 يعمل عبر VPN مجاني (أمريكا 🇺🇸 أو كندا 🇨🇦) مثل Proton VPN\n🛡️ ضمان لمدة شهر\n🎬 يدعم كل الأفلام والمسلسلات بجودة عالية\n💬 الدعم متاح عند الحاجة\n\n⚠️ مهم: ادخل فقط إلى البروفيل الخاص بك (اسمه يظهر في رسالة التسليم). الدخول إلى أي بروفيل آخر يؤدي إلى إخراجك من الحساب وفقدان الضمان.\n📊 المباعة: 216 حسابات\n\n🖼️ شرح التشغيل مع Proton VPN: https://drive.google.com/file/d/1IEg2wISdZ42ojqLLTTJkK6M4HesZQbFK/view?usp=sharing",""", "netflix_profile_desc_ar")
 patch(r""""description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n❌ Do not change the name or the password, otherwise you will be removed from the account with no warranty\n✅ Login with email and password\n🔵 Cheapest price — 2.30$\n✅ High-quality streaming\n✅ One profile on one account\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available when needed\n📊 Sold: 216 accounts"}""",
-      r""""description": "📦 Netflix Premium accounts - 2 months (private profile)\n\n✅ Your own private profile with its own password\n✅ Full duration: 2 full months\n🌐 Works with a free VPN (USA 🇺🇸 or Canada 🇨🇦) such as Proton VPN\n🛡️ 1-month warranty\n🎬 Supports all movies and series in high quality\n📱 Works on all devices: mobile, laptop, tablet and smart TV\n💬 Support available when needed\n📩 Note: if Netflix asks for a verification code sent to the email, contact support and we will provide the code as soon as possible.\n❌ Do not change the name or the password, otherwise you will be removed from the account with no warranty\n📊 Sold: 216 accounts\n\n🖼️ Proton VPN setup guide: https://drive.google.com/file/d/1IEg2wISdZ42ojqLLTTJkK6M4HesZQbFK/view?usp=sharing"}""", "netflix_profile_desc_en")
+      r""""description": "📦 Netflix Premium accounts - 2 months (private profile)\n\n✅ Your own private profile inside a Netflix Premium account\n✅ Duration: 2 full months + about 1 extra month as a gift 🎁\n⚡ Activation with a direct link on phone and computer, no password\n📺 TV: activated with an 8-digit code shown in the app, you send it to us in the bot and our team activates it\n🌐 Works with a free VPN (USA 🇺🇸 or Canada 🇨🇦) such as Proton VPN\n🛡️ 1-month warranty\n🎬 Supports all movies and series in high quality\n💬 Support available when needed\n\n⚠️ Important: enter ONLY your own profile (its name is shown in the delivery message). Entering any other profile gets you removed from the account and voids the warranty.\n📊 Sold: 216 accounts\n\n🖼️ Proton VPN setup guide: https://drive.google.com/file/d/1IEg2wISdZ42ojqLLTTJkK6M4HesZQbFK/view?usp=sharing"}""", "netflix_profile_desc_en")
 patch(r""""description": "📦 Comptes Netflix Premium - 2 mois\n\n✅ Comptes Netflix Premium\n❌ Interdiction de changer le nom ou le mot de passe, sinon vous serez exclu du compte sans garantie\n✅ Connexion par e-mail et mot de passe\n🔵 Prix le plus bas — 2,30$\n✅ Streaming haute qualité\n✅ Un profil sur un compte\n✅ Fonctionne sur mobile, ordinateur portable, tablette et Smart TV\n✅ Support disponible en cas de besoin\n📊 Vendus : 216 comptes"}""",
-      r""""description": "📦 Comptes Netflix Premium - 2 mois (profil privé)\n\n✅ Votre propre profil privé avec son propre mot de passe\n✅ Durée complète : 2 mois entiers\n🌐 Fonctionne avec un VPN gratuit (USA 🇺🇸 ou Canada 🇨🇦) comme Proton VPN\n🛡️ Garantie d'un mois\n🎬 Compatible avec tous les films et séries en haute qualité\n📱 Fonctionne sur tous les appareils : mobile, ordinateur, tablette et Smart TV\n💬 Support disponible en cas de besoin\n📩 Remarque : si Netflix demande un code de vérification envoyé à l'e-mail, contactez le support et nous vous fournirons le code dans les plus brefs délais.\n❌ Interdiction de changer le nom ou le mot de passe, sinon vous serez exclu du compte sans garantie\n📊 Vendus : 216 comptes\n\n🖼️ Guide Proton VPN : https://drive.google.com/file/d/1IEg2wISdZ42ojqLLTTJkK6M4HesZQbFK/view?usp=sharing"}""", "netflix_profile_desc_fr")
+      r""""description": "📦 Comptes Netflix Premium - 2 mois (profil privé)\n\n✅ Votre propre profil privé dans un compte Netflix Premium\n✅ Durée : 2 mois entiers + environ 1 mois offert 🎁\n⚡ Activation par lien direct sur téléphone et ordinateur, sans mot de passe\n📺 TV : activée avec un code à 8 chiffres affiché dans l'application, vous nous l'envoyez dans le bot et notre équipe l'active\n🌐 Fonctionne avec un VPN gratuit (USA 🇺🇸 ou Canada 🇨🇦) comme Proton VPN\n🛡️ Garantie d'un mois\n🎬 Compatible avec tous les films et séries en haute qualité\n💬 Support disponible en cas de besoin\n\n⚠️ Important : entrez UNIQUEMENT dans votre propre profil (son nom est indiqué dans le message de livraison). Entrer dans un autre profil vous fait exclure du compte et annule la garantie.\n📊 Vendus : 216 comptes\n\n🖼️ Guide Proton VPN : https://drive.google.com/file/d/1IEg2wISdZ42ojqLLTTJkK6M4HesZQbFK/view?usp=sharing"}""", "netflix_profile_desc_fr")
 patch(r""""description": "📦 حسابات نتفليكس بريميوم - شهرين\n\n✅ حسابات نتفليكس بريميوم\n✅ تسجيل الدخول بالبريد الإلكتروني وكلمة المرور\n✅ ضمان لمدة شهر الأول\n🔵 أرخص سعر — 10$ يعني 5$ حساب كامل 😍\n✅ يدعم البث بجودة عالية\n✅ يمكن استخدام ما يصل إلى 5 ملفات شخصية و4 أجهزة\n✅ يعمل على الهاتف المحمول، الكمبيوتر المحمول، التابلت والتلفزيون الذكي\n✅ الدعم متاح 12/24 ساعة\n📊 المباعة: 432 حسابات",""",
       r""""description": "📦 حسابات نتفليكس بريميوم - شهرين (حساب كامل)\n\n✅ حساب كامل: نعطيك الإيميل وكلمة السر لتسجّل الدخول بهما\n✅ يمكنك تغيير كلمة السر بعد الدخول\n✅ مدة كاملة: شهرين كاملين\n🌐 يعمل عبر VPN مجاني (أمريكا 🇺🇸 أو كندا 🇨🇦) مثل Proton VPN\n🛡️ ضمان لمدة شهر\n🎬 يدعم كل الأفلام والمسلسلات بجودة عالية\n👥 يمكن استخدام ما يصل إلى 5 ملفات شخصية و4 أجهزة\n📱 يعمل على جميع الأجهزة: الهاتف، الكمبيوتر، التابلت والتلفزيون الذكي\n💬 الدعم متاح 12/24 ساعة\n📊 المباعة: 432 حسابات\n\n🖼️ شرح التشغيل مع Proton VPN: https://drive.google.com/file/d/1IEg2wISdZ42ojqLLTTJkK6M4HesZQbFK/view?usp=sharing",""", "netflix_full_desc_ar")
 patch(r""""description": "📦 Netflix Premium accounts - 2 months\n\n✅ Netflix Premium accounts\n✅ Login with email and password\n✅ 1-month warranty\n🔵 Cheapest price — 10$ means 5$ for a full account 😍\n✅ High-quality streaming\n✅ Up to 5 profiles and 4 devices\n✅ Works on mobile, laptop, tablet and smart TV\n✅ Support available 12/24 hours\n📊 Sold: 432 accounts"}""",
@@ -1093,6 +1093,11 @@ def _fulfill_manual(chat_id, uid, lang, claim, canon, retry, mark, failed):
                 return
             _iptv_push_back(acct)      # فشل الإرسال: يرجع الحساب للقائمة ويبقى الطلب يدوياً
             alert_admin(f"⚠️ <b>تعذّر التسليم التلقائي لـ IPTV</b> — الطلب بقي معلقاً للتسليم اليدوي\n👤 <code>{uid}</code>\n{msg}")
+    if cat == "B" and pid in NETFLIX_TV:
+        _safe_send(chat_id, _nfd(lang, "choose").format(product=spname), parse_mode="HTML", reply_markup=_nf_device_markup(lang, oid))
+        monitor_send(f"💰 <b>دفع مقبول — بانتظار اختيار الجهاز</b>\n\n📦 {spname}\n👤 {_user_link(uid)}\n"
+                     f"💵 {html.escape(str(claim.get('paid')))} USDT")
+        return
     if cat == "B":
         _safe_send(chat_id, mt(lang, "paid_b"), reply_markup=support_markup(lang))
         txt = (f"📦 <b>طلب جديد (Pending)</b>\n\n📦 {spname}\n👤 {_user_link(uid)}\n"
@@ -1276,6 +1281,11 @@ def order_admin_text(o):
     ]
     if o.get("input"):
         lines.append(f"🔤 {INPUT_LBL_AR.get(MANUAL_A.get(o['product_id']), '')}: <code>{html.escape(o['input'])}</code>")
+    if o.get("product_id") in NETFLIX_TV:
+        _dv = {"phone": "📱 الهاتف", "pc": "💻 الحاسوب", "tv": "📺 التلفاز"}.get(o.get("device"), "⏳ لم يختر بعد")
+        lines.append(f"🎯 الجهاز: {_dv}")
+        if o.get("tv_code"):
+            lines.append(f"🔢 كود التلفاز: <code>{html.escape(str(o['tv_code']))}</code>")
     return "\n".join(lines)
 
 def mark_executed(oid):
@@ -1379,12 +1389,17 @@ def deliver_manual_order(oid, text):
         InlineKeyboardButton(text=t(lang, "support_btn"), url=MY_PRIVATE_CHAT_LINK),
     )
     if o["product_id"] in NETFLIX_TV:
-        mk.add(InlineKeyboardButton(text=_tv(lang, "btn"), callback_data=f"tv_{oid}"))
+        # بروفيل Netflix: نرسل نصك كما كتبته (بدون قالب)، وتحته زر «تم استلام الطلب» وزر فريق التفعيل
+        mk = InlineKeyboardMarkup(row_width=1)
+        b_rcv = InlineKeyboardButton(text=_nfd(lang, "recv"), callback_data=f"rcv_{oid}")
+        b_rcv.style = "success"
+        mk.add(b_rcv)
+        mk.add(InlineKeyboardButton(text=_tv(lang, "team"), url=MY_PRIVATE_CHAT_LINK))
+        out_text, out_pm = text, None
+    else:
+        out_text, out_pm = mt(lang, "delivery").format(product=html.escape(o["product_name"]), body=body), "HTML"
     try:
-        sent = bot.send_message(
-            uid, mt(lang, "delivery").format(product=html.escape(o["product_name"]), body=body),
-            parse_mode="HTML", reply_markup=mk, disable_web_page_preview=True,
-        )
+        sent = bot.send_message(uid, out_text, parse_mode=out_pm, reply_markup=mk, disable_web_page_preview=True)
     except ApiTelegramException as e:
         if e.error_code == 403:
             return False, "🚫 الزبون حظر البوت — لم يُسلَّم الطلب وبقي في القائمة."
@@ -1816,45 +1831,64 @@ def handle_order_admin(call):
         return
     bot.answer_callback_query(call.id)
 
-# ---------- تفعيل Netflix على التلفاز (الزبون يرسل كود 8 أرقام ← الأدمن يدخله) ----------
+# ---------- تفعيل Netflix على التلفاز (الزبون يرسل كود 8 أرقام ← تأكيد ← الأدمن يدخله) ----------
 NETFLIX_TV = {"netflix_profile"}
 TV_TX = {
     "ar": {
         "btn": "📺 تفعيل على التلفاز",
-        "ask": "📺 <b>تفعيل Netflix على التلفاز</b>\n\n1️⃣ افتح تطبيق Netflix في التلفاز، وسيظهر لك <b>كود من 8 أرقام</b>.\n2️⃣ أرسل الكود هنا الآن (أرقام فقط).\n\n⚠️ لا تغلق شاشة الكود في التلفاز حتى يتم التفعيل.",
+        "team": "👨‍💻 فريق التفعيل",
+        "team2": "👨‍💻 تواصل مع فريق التفعيل",
+        "ok": "✅ تم",
+        "ask": "📺 <b>تفعيل Netflix على التلفاز</b>\n\n1️⃣ افتح تطبيق Netflix في التلفاز، وسيظهر لك <b>كود من 8 أرقام</b>.\n2️⃣ أرسل الكود هنا الآن (أرقام فقط).\n\n⚠️ لا تغلق التلفاز ولا تخرج من تطبيق Netflix قبل التفعيل. إذا طالت المدة أو تغيّر الكود أو خرجت من التطبيق، تواصل مع فريق التفعيل.",
         "bad": "❌ الكود يجب أن يتكون من 8 أرقام فقط. أعد الإرسال.",
-        "got": "✅ <b>تم!</b> استلمنا الكود: <code>{code}</code>\n\nسيقوم فريقنا بتفعيله على التلفاز خلال لحظات.\n\n⚠️ إذا تغيّر الكود في التلفاز قبل التفعيل، تواصل مع الدعم 👇",
+        "confirm_q": "🔎 تأكد من الكود:\n\n📺 الكود: <code>{code}</code>\n\nهل هو صحيح؟",
+        "got": "✅ <b>تم استلام كود التلفاز!</b>\n\n🛍 المنتج: {product}\n💰 المبلغ: USDT {paid}\n📺 الكود: <code>{code}</code>\n\nسيقوم فريقنا بتفعيله على التلفاز خلال لحظات.\n\n⚠️ إذا تغيّر الكود في التلفاز قبل التفعيل، تواصل مع فريق التفعيل 👇",
         "done": "✅ <b>تم تجهيز حسابك بنجاح!</b>\n\n📺 تم تسجيل الدخول إلى حسابك على التلفاز. استمتع بالمشاهدة 🎉",
-        "support": "📞 <b>فريق الدعم يطلب منك التواصل معهم الآن</b>\n\nهم في انتظارك. اضغط الزر بالأسفل للتواصل معهم 👇",
+        "support": "📞 <b>فريق التفعيل يطلب منك التواصل معهم الآن</b>\n\nهم في انتظارك. اضغط الزر بالأسفل للتواصل معهم 👇",
+        "ack": "👍 بالتوفيق! سنُعلمك هنا فور تفعيل التلفاز.",
     },
     "en": {
         "btn": "📺 Activate on TV",
-        "ask": "📺 <b>Activate Netflix on your TV</b>\n\n1️⃣ Open the Netflix app on your TV, and an <b>8-digit code</b> will appear.\n2️⃣ Send the code here now (numbers only).\n\n⚠️ Do not close the code screen on the TV until the activation is done.",
+        "team": "👨‍💻 Activation team",
+        "team2": "👨‍💻 Contact the activation team",
+        "ok": "✅ Got it",
+        "ask": "📺 <b>Activate Netflix on your TV</b>\n\n1️⃣ Open the Netflix app on your TV, and an <b>8-digit code</b> will appear.\n2️⃣ Send the code here now (numbers only).\n\n⚠️ Do not turn off the TV or leave the Netflix app before the activation. If it takes long, the code changes, or you left the app, contact the activation team.",
         "bad": "❌ The code must be exactly 8 digits. Please send it again.",
-        "got": "✅ <b>Done!</b> We received the code: <code>{code}</code>\n\nOur team will activate it on your TV in a few moments.\n\n⚠️ If the code changes on the TV before the activation, contact support 👇",
+        "confirm_q": "🔎 Please check the code:\n\n📺 Code: <code>{code}</code>\n\nIs it correct?",
+        "got": "✅ <b>TV code received!</b>\n\n🛍 Product: {product}\n💰 Amount: USDT {paid}\n📺 Code: <code>{code}</code>\n\nOur team will activate it on your TV in a few moments.\n\n⚠️ If the code changes on the TV before the activation, contact the activation team 👇",
         "done": "✅ <b>Your account is ready!</b>\n\n📺 Your account is now signed in on your TV. Enjoy watching 🎉",
-        "support": "📞 <b>Our support team asks you to contact them now</b>\n\nThey are waiting for you. Tap the button below to reach them 👇",
+        "support": "📞 <b>The activation team asks you to contact them now</b>\n\nThey are waiting for you. Tap the button below to reach them 👇",
+        "ack": "👍 All good! We will notify you here as soon as your TV is activated.",
     },
     "fr": {
         "btn": "📺 Activer sur la TV",
-        "ask": "📺 <b>Activer Netflix sur votre TV</b>\n\n1️⃣ Ouvrez l'application Netflix sur votre TV, un <b>code à 8 chiffres</b> s'affichera.\n2️⃣ Envoyez le code ici maintenant (chiffres uniquement).\n\n⚠️ Ne fermez pas l'écran du code sur la TV avant la fin de l'activation.",
+        "team": "👨‍💻 Équipe d'activation",
+        "team2": "👨‍💻 Contacter l'équipe d'activation",
+        "ok": "✅ Compris",
+        "ask": "📺 <b>Activer Netflix sur votre TV</b>\n\n1️⃣ Ouvrez l'application Netflix sur votre TV, un <b>code à 8 chiffres</b> s'affichera.\n2️⃣ Envoyez le code ici maintenant (chiffres uniquement).\n\n⚠️ N'éteignez pas la TV et ne quittez pas l'application Netflix avant l'activation. Si cela tarde, si le code change ou si vous avez quitté l'application, contactez l'équipe d'activation.",
         "bad": "❌ Le code doit contenir exactement 8 chiffres. Renvoyez-le.",
-        "got": "✅ <b>C'est fait !</b> Nous avons reçu le code : <code>{code}</code>\n\nNotre équipe l'activera sur votre TV dans quelques instants.\n\n⚠️ Si le code change sur la TV avant l'activation, contactez l'assistance 👇",
+        "confirm_q": "🔎 Vérifiez le code :\n\n📺 Code : <code>{code}</code>\n\nEst-il correct ?",
+        "got": "✅ <b>Code TV reçu !</b>\n\n🛍 Produit : {product}\n💰 Montant : USDT {paid}\n📺 Code : <code>{code}</code>\n\nNotre équipe l'activera sur votre TV dans quelques instants.\n\n⚠️ Si le code change sur la TV avant l'activation, contactez l'équipe d'activation 👇",
         "done": "✅ <b>Votre compte est prêt !</b>\n\n📺 Votre compte est maintenant connecté sur votre TV. Bon visionnage 🎉",
-        "support": "📞 <b>L'assistance vous demande de les contacter maintenant</b>\n\nIls vous attendent. Appuyez sur le bouton ci-dessous pour les joindre 👇",
+        "support": "📞 <b>L'équipe d'activation vous demande de la contacter maintenant</b>\n\nElle vous attend. Appuyez sur le bouton ci-dessous pour la joindre 👇",
+        "ack": "👍 Parfait ! Nous vous préviendrons ici dès que votre TV sera activée.",
     },
 }
 def _tv(lang, key):
     return TV_TX.get(lang, TV_TX["ar"])[key]
 
-def _support_tv(lang, o):
-    mk = support_markup(lang)
-    try:
-        if o and o.get("product_id") in NETFLIX_TV:
-            mk.add(InlineKeyboardButton(text=_tv(lang, "btn"), callback_data=f"tv_{o['oid']}"))
-    except Exception:
-        pass
+def _team_markup(lang, key="team"):
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=_tv(lang, key), url=MY_PRIVATE_CHAT_LINK))
     return mk
+
+def _support_tv(lang, o):
+    if o and o.get("product_id") in NETFLIX_TV:
+        return _team_markup(lang)
+    return support_markup(lang)
+
+def _tv_ask(uid, oid):
+    kv_set(f"rk:tv:{uid}", oid, ex=1800)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("tv_"))
 def handle_tv_btn(call):
@@ -1866,7 +1900,7 @@ def handle_tv_btn(call):
         bot.answer_callback_query(call.id)
         return
     try:
-        kv_set(f"rk:tv:{uid}", oid, ex=1800)
+        _tv_ask(uid, oid)
     except Exception:
         bot.answer_callback_query(call.id, t(lang, "temp_error"), show_alert=True)
         return
@@ -1898,26 +1932,78 @@ def handle_tv_code(message):
         return
     if not o or str(o.get("user_id")) != str(uid):
         return
-    o["tv_code"] = code
-    o["tv_ts"] = int(time.time())
+    o["tv_tmp"] = code
     try:
         order_save(o)
         kv_del(f"rk:tv:{uid}")
     except Exception:
         pass
-    _safe_send(message.chat.id, _tv(lang, "got").format(code=code), parse_mode="HTML", reply_markup=support_markup(lang))
-    mk = InlineKeyboardMarkup(row_width=1)
-    mk.add(InlineKeyboardButton(text="✅ تم تفعيل", callback_data=f"tva_{oid}"))
-    mk.add(InlineKeyboardButton(text="📩 إرسال للزبون", callback_data=f"tvs_{oid}"))
+    mk = InlineKeyboardMarkup()
+    mk.row(
+        InlineKeyboardButton(text=mt(lang, "btn_confirm"), callback_data=f"tvc_{oid}"),
+        InlineKeyboardButton(text=mt(lang, "btn_edit"), callback_data=f"tve_{oid}"),
+    )
+    _safe_send(message.chat.id, _tv(lang, "confirm_q").format(code=code), parse_mode="HTML", reply_markup=mk)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith(("tvc_", "tve_")))
+def handle_tv_confirm(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    act, oid = call.data[:3], call.data[4:]
+    o = order_get(oid)
+    if not o or str(o.get("user_id")) != str(uid) or o.get("product_id") not in NETFLIX_TV:
+        bot.answer_callback_query(call.id)
+        return
+    if act == "tve":
+        try:
+            _tv_ask(uid, oid)
+        except Exception:
+            pass
+        _edit_cb(call, _tv(lang, "ask"), _team_markup(lang))
+        bot.answer_callback_query(call.id)
+        return
+    code = o.get("tv_tmp")
+    if not code:
+        bot.answer_callback_query(call.id)
+        return
+    o["tv_code"] = code
+    o["tv_ts"] = int(time.time())
+    o.pop("tv_tmp", None)
     try:
+        order_save(o)
+    except Exception:
+        pass
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text=_tv(lang, "team"), url=MY_PRIVATE_CHAT_LINK))
+    b_ok = InlineKeyboardButton(text=_tv(lang, "ok"), callback_data="tvok")
+    b_ok.style = "success"
+    mk.add(b_ok)
+    _edit_cb(call, _tv(lang, "got").format(product=html.escape(o.get("product_name", "")),
+                                          paid=html.escape(str(o.get("paid", ""))), code=code), mk)
+    bot.answer_callback_query(call.id)
+    amk = InlineKeyboardMarkup(row_width=1)
+    amk.add(InlineKeyboardButton(text="✅ تم تفعيل", callback_data=f"tva_{oid}"))
+    amk.add(InlineKeyboardButton(text="📩 إرسال للزبون", callback_data=f"tvs_{oid}"))
+    try:
+        prof = o.get("profile")
         bot.send_message(
             ADMIN_CHAT_ID,
-            f"📺 <b>كود تلفاز Netflix</b>\n\n📦 {html.escape(o.get('product_name', ''))}\n👤 {_user_link(uid)}\n"
-            f"🧾 طلب <code>{oid}</code>\n🔢 الكود: <code>{code}</code>",
-            parse_mode="HTML", reply_markup=mk,
+            f"📺 <b>كود تلفاز Netflix</b>\n\n📦 {html.escape(o.get('product_name', ''))}\n"
+            + (f"👤 البروفيل: <code>{html.escape(str(prof))}</code> (حساب {html.escape(str(o.get('acct', '')))})\n" if prof else "")
+            + f"🙋 {_user_link(uid)}\n🧾 طلب <code>{oid}</code>\n🔢 الكود: <code>{code}</code>",
+            parse_mode="HTML", reply_markup=amk,
         )
     except Exception as e:
         print(f"tv admin notify failed: {e}")
+
+@bot.callback_query_handler(func=lambda c: c.data == "tvok")
+def handle_tv_ok(call):
+    lang = get_lang(call.from_user.id)
+    try:
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=_team_markup(lang))
+    except Exception:
+        pass
+    bot.answer_callback_query(call.id, _tv(lang, "ack"), show_alert=True)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith(("tva_", "tvs_")))
 def handle_tv_admin(call):
@@ -1933,21 +2019,117 @@ def handle_tv_admin(call):
     lang = get_lang(uid)
     base = call.message.html_text or ""
     if act == "tva":
-        ok = _safe_send(uid, _tv(lang, "done"), parse_mode="HTML")
+        try:
+            if o.get("status") in ("pending", "delivered_wait"):
+                o["status"] = "done"
+                o["confirmed_by"] = "admin"
+                o["done_ts"] = int(time.time())
+                order_save(o)
+                _srem(ORDSET_KEY, oid)
+                _srem(WAITSET_KEY, oid)
+        except Exception as e:
+            print(f"tv done mark failed: {e}")
+        ok = _safe_send(uid, _tv(lang, "done"), parse_mode="HTML", reply_markup=_team_markup(lang, "team2"))
         try:
             bot.edit_message_text(base + "\n\n✅ <b>تم التفعيل وأُبلغ الزبون</b>", call.message.chat.id, call.message.message_id, parse_mode="HTML")
         except Exception:
             pass
         bot.answer_callback_query(call.id, "✅ أُبلغ الزبون" if ok else "⚠️ تعذر إبلاغ الزبون", show_alert=not ok)
         return
-    ok = _safe_send(uid, _tv(lang, "support"), parse_mode="HTML", reply_markup=support_markup(lang))
+    ok = _safe_send(uid, _tv(lang, "support"), parse_mode="HTML", reply_markup=_team_markup(lang, "team2"))
     if "أُرسل للزبون" not in base:
         try:
-            bot.edit_message_text(base + "\n\n📩 <i>أُرسل للزبون: تواصل مع الدعم</i>", call.message.chat.id, call.message.message_id,
+            bot.edit_message_text(base + "\n\n📩 <i>أُرسل للزبون: تواصل مع فريق التفعيل</i>", call.message.chat.id, call.message.message_id,
                                   parse_mode="HTML", reply_markup=call.message.reply_markup)
         except Exception:
             pass
     bot.answer_callback_query(call.id, "📩 أُرسل للزبون" if ok else "⚠️ تعذر الإرسال", show_alert=not ok)
+
+# ---------- Netflix بروفيل: اختيار الجهاز بعد الدفع ----------
+NFD_TX = {
+    "ar": {
+        "choose": "✅ <b>تم استلام دفعك!</b>\n\n📦 {product}\n\n📍 <b>وين تحب تفعّل Netflix؟</b>\nاختر الجهاز من الأزرار بالأسفل 👇",
+        "phone": "📱 تفعيل على الهاتف", "pc": "💻 تفعيل على الحاسوب", "tv": "📺 تفعيل على التلفاز",
+        "dev_phone": "📱 الهاتف", "dev_pc": "💻 الحاسوب", "dev_tv": "📺 التلفاز",
+        "got": "✅ <b>تم استلام طلبك!</b>\n\n📦 {product}\n🎯 الجهاز: {device}\n\nسيقوم فريقنا بتسليمك رابط التفعيل قريباً.\n\n⚠️ إذا واجهت أي مشكلة تواصل مع فريق التفعيل 👇",
+        "recv": "✅ تم استلام الطلب",
+        "ack": "👍 بالتوفيق! سنُرسل لك رابط التفعيل هنا قريباً.",
+    },
+    "en": {
+        "choose": "✅ <b>Payment received!</b>\n\n📦 {product}\n\n📍 <b>Where do you want to activate Netflix?</b>\nChoose your device from the buttons below 👇",
+        "phone": "📱 Activate on phone", "pc": "💻 Activate on computer", "tv": "📺 Activate on TV",
+        "dev_phone": "📱 Phone", "dev_pc": "💻 Computer", "dev_tv": "📺 TV",
+        "got": "✅ <b>Your order was received!</b>\n\n📦 {product}\n🎯 Device: {device}\n\nOur team will send you the activation link shortly.\n\n⚠️ If you have any problem, contact the activation team 👇",
+        "recv": "✅ Order received",
+        "ack": "👍 All good! We will send you the activation link here shortly.",
+    },
+    "fr": {
+        "choose": "✅ <b>Paiement reçu !</b>\n\n📦 {product}\n\n📍 <b>Où voulez-vous activer Netflix ?</b>\nChoisissez votre appareil avec les boutons ci-dessous 👇",
+        "phone": "📱 Activer sur téléphone", "pc": "💻 Activer sur ordinateur", "tv": "📺 Activer sur TV",
+        "dev_phone": "📱 Téléphone", "dev_pc": "💻 Ordinateur", "dev_tv": "📺 TV",
+        "got": "✅ <b>Votre commande a été reçue !</b>\n\n📦 {product}\n🎯 Appareil : {device}\n\nNotre équipe vous enverra le lien d'activation très bientôt.\n\n⚠️ En cas de problème, contactez l'équipe d'activation 👇",
+        "recv": "✅ Commande reçue",
+        "ack": "👍 Parfait ! Nous vous enverrons le lien d'activation ici très bientôt.",
+    },
+}
+def _nfd(lang, key):
+    return NFD_TX.get(lang, NFD_TX["ar"])[key]
+
+def _nf_device_markup(lang, oid):
+    mk = InlineKeyboardMarkup(row_width=1)
+    for key, code in (("phone", "p"), ("pc", "c"), ("tv", "t")):
+        b = InlineKeyboardButton(text=_nfd(lang, key), callback_data=f"nfd_{oid}_{code}")
+        b.style = "success"
+        mk.add(b)
+    return mk
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("nfd_"))
+def handle_nf_device(call):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    try:
+        oid, d = call.data[4:].rsplit("_", 1)
+    except ValueError:
+        bot.answer_callback_query(call.id)
+        return
+    o = order_get(oid)
+    dev = {"p": "phone", "c": "pc", "t": "tv"}.get(d)
+    if (not o or str(o.get("user_id")) != str(uid) or o.get("product_id") not in NETFLIX_TV
+            or o.get("status") != "pending" or o.get("device") or not dev):
+        bot.answer_callback_query(call.id)
+        return
+    o["device"] = dev
+    order_save(o)
+    spname = html.escape(o.get("product_name", ""))
+    if dev == "tv":
+        try:
+            _tv_ask(uid, oid)
+        except Exception:
+            pass
+        _edit_cb(call, _tv(lang, "ask"), _team_markup(lang))
+        bot.answer_callback_query(call.id)
+        monitor_send(f"🎯 <b>اختار التلفاز</b> — بانتظار كوده\n\n📦 {spname}\n👤 {_user_link(uid)}")
+        return
+    mk = InlineKeyboardMarkup(row_width=1)
+    b_ok = InlineKeyboardButton(text=_nfd(lang, "recv"), callback_data="nfok")
+    b_ok.style = "success"
+    mk.add(b_ok)
+    mk.add(InlineKeyboardButton(text=_tv(lang, "team"), url=MY_PRIVATE_CHAT_LINK))
+    _edit_cb(call, _nfd(lang, "got").format(product=spname, device=_nfd(lang, "dev_" + dev)), mk)
+    bot.answer_callback_query(call.id)
+    txt = (f"📦 <b>طلب جديد (Pending)</b>\n\n📦 {spname}\n👤 {_user_link(uid)}\n"
+           f"🎯 الجهاز: {_nfd('ar', 'dev_' + dev)}\n💵 {html.escape(str(o.get('paid')))} USDT\n📌 /admin ← 📦 الطلبات المعلقة")
+    alert_admin(txt)
+    monitor_send(txt)
+
+@bot.callback_query_handler(func=lambda c: c.data == "nfok")
+def handle_nf_ok(call):
+    lang = get_lang(call.from_user.id)
+    try:
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=_team_markup(lang))
+    except Exception:
+        pass
+    bot.answer_callback_query(call.id, _nfd(lang, "ack"), show_alert=True)
 
 # ---------- استلام الزبون + التأكيد التلقائي بعد 20 دقيقة ----------
 @bot.callback_query_handler(func=lambda c: c.data.startswith("rcv_"))
