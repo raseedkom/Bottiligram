@@ -1395,7 +1395,7 @@ def deliver_manual_order(oid, text):
         b_rcv.style = "success"
         mk.add(b_rcv)
         mk.add(InlineKeyboardButton(text=_tv(lang, "team"), url=MY_PRIVATE_CHAT_LINK))
-        out_text, out_pm = text, None
+        out_text, out_pm = _nf_html(text, lang), "HTML"
     else:
         out_text, out_pm = mt(lang, "delivery").format(product=html.escape(o["product_name"]), body=body), "HTML"
     try:
@@ -2053,6 +2053,7 @@ NFD_TX = {
         "dev_phone": "📱 الهاتف", "dev_pc": "💻 الحاسوب", "dev_tv": "📺 التلفاز",
         "got": "✅ <b>تم استلام طلبك!</b>\n\n📦 {product}\n🎯 الجهاز: {device}\n\nسيقوم فريقنا بتسليمك رابط التفعيل قريباً.\n\n⚠️ إذا واجهت أي مشكلة تواصل مع فريق التفعيل 👇",
         "recv": "✅ تم استلام الطلب",
+        "copyhint": "💡 اضغط على الرابط لنسخه، ثم الصقه في المتصفح.",
         "ack": "👍 بالتوفيق! سنُرسل لك رابط التفعيل هنا قريباً.",
     },
     "en": {
@@ -2061,6 +2062,7 @@ NFD_TX = {
         "dev_phone": "📱 Phone", "dev_pc": "💻 Computer", "dev_tv": "📺 TV",
         "got": "✅ <b>Your order was received!</b>\n\n📦 {product}\n🎯 Device: {device}\n\nOur team will send you the activation link shortly.\n\n⚠️ If you have any problem, contact the activation team 👇",
         "recv": "✅ Order received",
+        "copyhint": "💡 Tap the link to copy it, then paste it in your browser.",
         "ack": "👍 All good! We will send you the activation link here shortly.",
     },
     "fr": {
@@ -2069,11 +2071,29 @@ NFD_TX = {
         "dev_phone": "📱 Téléphone", "dev_pc": "💻 Ordinateur", "dev_tv": "📺 TV",
         "got": "✅ <b>Votre commande a été reçue !</b>\n\n📦 {product}\n🎯 Appareil : {device}\n\nNotre équipe vous enverra le lien d'activation très bientôt.\n\n⚠️ En cas de problème, contactez l'équipe d'activation 👇",
         "recv": "✅ Commande reçue",
+        "copyhint": "💡 Appuyez sur le lien pour le copier, puis collez-le dans votre navigateur.",
         "ack": "👍 Parfait ! Nous vous enverrons le lien d'activation ici très bientôt.",
     },
 }
 def _nfd(lang, key):
     return NFD_TX.get(lang, NFD_TX["ar"])[key]
+
+def _nf_html(text, lang):
+    """نصّك كما كتبتَه، وكل رابط يصير قابلاً للنسخ بنقرة (داخل <code>) + سطر تلميح."""
+    esc = html.escape(text, quote=False)
+    found = []
+    def _wrap(m):
+        u = m.group(0)
+        tail = ""
+        while u and u[-1] in ".,;:!?)":
+            tail = u[-1] + tail
+            u = u[:-1]
+        found.append(u)
+        return "<code>" + u + "</code>" + tail
+    out = re.sub(r"https?://[^\s<>]+", _wrap, esc)
+    if found:
+        out += "\n\n" + _nfd(lang, "copyhint")
+    return out
 
 def _nf_device_markup(lang, oid):
     mk = InlineKeyboardMarkup(row_width=1)
