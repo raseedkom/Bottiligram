@@ -661,7 +661,7 @@ INPUT_LBL_AR = {"username": "اسم المستخدم", "playerid": "Player ID", 
 MANUAL_TEXTS = {
     "ar": {
         "buy_btn": "🛒 اشتري الآن",
-        "buy_hint": "💳 اضغط «اشتري الآن» لإنشاء فاتورة الدفع عبر Binance Pay.",
+        "buy_hint": "💳 اضغط «اشتري الآن» ثم اختر طريقة الدفع المناسبة لك.",
         "pick_pack": "🛒 اختر الباقة لإنشاء فاتورة الدفع",
         "out": "❌ هذا المنتج غير متوفر حالياً.",
         "paid_b": "✅ تم استلام دفعك. طلبك قيد المعالجة وسيصلك هنا قريباً.\n\n📂 تجد كل طلباتك في: الملف الشخصي ← سجل المشتريات ← طلباتي",
@@ -694,7 +694,7 @@ MANUAL_TEXTS = {
     },
     "en": {
         "buy_btn": "🛒 Buy now",
-        "buy_hint": "💳 Tap «Buy now» to create a Binance Pay invoice.",
+        "buy_hint": "💳 Tap «Buy now», then choose the payment method that suits you.",
         "pick_pack": "🛒 Choose a package to create the invoice",
         "out": "❌ This product is currently unavailable.",
         "paid_b": "✅ Payment received. Your order is being processed and will be sent here soon.\n\n📂 Find all your orders in: Profile → Purchase history → My orders",
@@ -727,7 +727,7 @@ MANUAL_TEXTS = {
     },
     "fr": {
         "buy_btn": "🛒 Acheter maintenant",
-        "buy_hint": "💳 Appuyez sur « Acheter maintenant » pour créer une facture Binance Pay.",
+        "buy_hint": "💳 Appuyez sur « Acheter maintenant », puis choisissez le mode de paiement qui vous convient.",
         "pick_pack": "🛒 Choisissez un pack pour créer la facture",
         "out": "❌ Ce produit est actuellement indisponible.",
         "paid_b": "✅ Paiement reçu. Votre commande est en cours de traitement et vous sera envoyée ici bientôt.\n\n📂 Retrouvez vos commandes dans : Profil → Historique d'achats → Mes commandes",
