@@ -301,6 +301,14 @@ def patch(old, new, name):
         return
     src = src.replace(old, new, 1)
 
+# وصف Canva Edu Pro 500: السعر 4.99$ + مدة اللوحة 3 سنوات + ضمان شهر (ar/en/fr)
+patch(r"""📦 السعة: 500 مقعد\n💰 السعر: 10$ فقط\n⚠️ مهم: المنتج بدون ضمان.""",
+      r"""📦 السعة: 500 مقعد\n⏳ مدة اللوحة: 3 سنوات\n💰 السعر: 4.99$ فقط\n🛡️ الضمان: شهر واحد""", "canva500_desc_ar")
+patch(r"""📦 Capacity: 500 seats\n💰 Price: only 10$\n⚠️ Important: no warranty on this product.""",
+      r"""📦 Capacity: 500 seats\n⏳ Panel duration: 3 years\n💰 Price: only 4.99$\n🛡️ Warranty: 1 month""", "canva500_desc_en")
+patch(r"""📦 Capacité : 500 places\n💰 Prix : seulement 10$\n⚠️ Important : produit sans garantie.""",
+      r"""📦 Capacité : 500 places\n⏳ Durée du panel : 3 ans\n💰 Prix : seulement 4,99$\n🛡️ Garantie : 1 mois""", "canva500_desc_fr")
+
 # رابط الدعم (اليوزر تغيّر)
 patch('MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"',
       'MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom_Support"', "support_link")
