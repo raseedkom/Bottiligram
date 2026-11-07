@@ -323,6 +323,10 @@ patch(r"""    if len(uniq) > 1:
     return _mapping(c, o), "auto"
 """, "fazer_pick_instant_base")
 
+# Apple India: رفع سعر 1000 و1500 INR لهامش ربح ~15% (كان ~11%)
+patch("""("500 INR", "6.90"), ("1000 INR", "12.00"), ("1500 INR", "18.00"),""",
+      """("500 INR", "6.90"), ("1000 INR", "12.60"), ("1500 INR", "18.90"),""", "apple_in_prices")
+
 # رابط الدعم (اليوزر تغيّر)
 patch('MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"',
       'MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom_Support"', "support_link")
