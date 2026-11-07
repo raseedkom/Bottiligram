@@ -309,6 +309,20 @@ patch(r"""📦 Capacity: 500 seats\n💰 Price: only 10$\n⚠️ Important: no w
 patch(r"""📦 Capacité : 500 places\n💰 Prix : seulement 10$\n⚠️ Important : produit sans garantie.""",
       r"""📦 Capacité : 500 places\n⏳ Durée du panel : 3 ans\n💰 Prix : seulement 4,99$\n🛡️ Garantie : 1 mois""", "canva500_desc_fr")
 
+# FAZER: عند تطابق عرضين (قسم عادي + قسم instant_use) اختر الأرخص المتوفر بدل التوقف بـ ambiguous
+patch(r"""    if len(uniq) > 1:
+        return None, "ambiguous"
+    c, o = next(iter(uniq.values()))
+    return _mapping(c, o), "auto"
+""", r"""    if len(uniq) > 1:
+        _pk = _pick_instant(uniq)
+        if _pk is None:
+            return None, "ambiguous"
+        uniq = {_pk: uniq[_pk]}
+    c, o = next(iter(uniq.values()))
+    return _mapping(c, o), "auto"
+""", "fazer_pick_instant_base")
+
 # رابط الدعم (اليوزر تغيّر)
 patch('MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"',
       'MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom_Support"', "support_link")
@@ -3484,6 +3498,30 @@ FAZER_OFFER_RE = {
     ("freefire_codes", "2200 + 220 💎"): _ff_re(20, r"2200\s*\+\s*220"),
 }
 
+def _pick_instant(uniq):
+    """uniq: {(category_id, card_id): (cat, offer)}. إذا كانت كل الأقسام نفس القسم مع/بدون _instant_use
+    يرجع مفتاح الأرخص المتوفر في المخزون (وإلا الأرخص). غير ذلك: None (يبقى ambiguous)."""
+    try:
+        bases = {re.sub(r"_instant_use$", "", str(k[0])) for k in uniq}
+        if len(bases) != 1:
+            return None
+        def _cost(v):
+            try:
+                return Decimal(str(v[1].get("price_usd")))
+            except Exception:
+                return Decimal("999999")
+        def _has(v):
+            st = v[1].get("stock")
+            try:
+                return st is None or int(st) > 0
+            except Exception:
+                return True
+        items = list(uniq.items())
+        ok = [kv for kv in items if _has(kv[1])] or items
+        return min(ok, key=lambda kv: _cost(kv[1]))[0]
+    except Exception:
+        return None
+
 _fazer_match_orig = fazer_match
 
 def fazer_match(product_id, label, cats):
@@ -3521,7 +3559,10 @@ def fazer_match(product_id, label, cats):
         if len(glob) == 1:
             uniq = glob
         else:
-            return None, "ambiguous"
+            _pk = _pick_instant(uniq)
+            if _pk is None:
+                return None, "ambiguous"
+            uniq = {_pk: uniq[_pk]}
     c, o = next(iter(uniq.values()))
     return _mapping(c, o), "auto"
 
