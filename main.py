@@ -3580,7 +3580,82 @@ def _auto_price(cost):
     p = max(cost * (Decimal(100 + AUTO_PROFIT_PCT) / 100), cost + AUTO_MIN_PROFIT)
     return str(p.quantize(Decimal("0.01"), rounding=ROUND_CEILING))
 
+# ---- تسعير تلقائي بنفس الهامش الحالي (Apple / Google Play) ----
+# (التكلفة عند FAZER وقت الضبط، سعر البيع وقتها). النسبة بينهما = الهامش المحفوظ.
+_RATIO_BASE = {
+    "apple_gift_tr": {"10 TRY": ("0.1803", "1.00"), "50 TRY": ("0.8944", "1.35"), "100 TRY": ("1.8877", "2.50"),
+                      "150 TRY": ("2.8314", "3.60"), "200 TRY": ("3.7752", "5.00"), "250 TRY": ("5.0047", "5.70")},
+    "apple_gift_in": {"100 INR": ("1.0178", "1.40"), "200 INR": ("2.0351", "2.45"), "250 INR": ("2.5197", "3.05"),
+                      "500 INR": ("5.3443", "6.90"), "1000 INR": ("10.6886", "12.60"), "1500 INR": ("16.0843", "18.90")},
+    "apple_gift_fr": {"10 EUR": ("11.1625", "12.00"), "20 EUR": ("22.3250", "23.65"),
+                      "50 EUR": ("55.8125", "59.00"), "100 EUR": ("111.6250", "116.22")},
+    "apple_gift_us": {"2 USD": ("1.8810", "2.15"), "5 USD": ("4.7025", "5.15"), "10 USD": ("10.0750", "10.20"),
+                      "20 USD": ("20.1500", "20.50"), "30 USD": ("29.8485", "31.00")},
+    "gplay_us": {"5 USD": ("4.9474", "5.20"), "10 USD": ("9.8939", "10.70"), "15 USD": ("14.8424", "15.70"),
+                 "20 USD": ("19.7888", "20.81"), "50 USD": ("49.4715", "53.00"), "100 USD": ("98.9428", "103.00")},
+    "gplay_fr": {"10 EUR": ("11.1625", "12.00"), "15 EUR": ("16.7436", "18.00"), "25 EUR": ("27.9061", "30.10"),
+                 "50 EUR": ("55.8125", "60.00"), "100 EUR": ("111.6250", "119.00")},
+    "gplay_br": {"10 BRL": ("1.6109", "2.20"), "30 BRL": ("4.5644", "5.90"), "50 BRL": ("6.7123", "11.00"),
+                 "100 BRL": ("18.0337", "22.10"), "150 BRL": ("27.0507", "34.00")},
+    "gplay_in": {"10 INR": ("0.0947", "0.71"), "50 INR": ("0.3947", "0.98"), "100 INR": ("0.8947", "1.37"),
+                 "1000 INR": ("10.6048", "11.11"), "1500 INR": ("15.9072", "18.00")},
+    "gplay_tr": {"50 TRY": ("0.9399", "1.31"), "100 TRY": ("1.8799", "2.30"),
+                 "250 TRY": ("4.4524", "5.50"), "500 TRY": ("9.9684", "12.00")},
+}
+_ratio_alerted = set()
+
+def _ratio_price(pid, label, cost):
+    """سعر البيع الجديد بنفس الهامش. None = لا تغيّر السعر."""
+    b = _RATIO_BASE.get(pid, {}).get(label)
+    if not b:
+        return None
+    bc, bs = Decimal(b[0]), Decimal(b[1])
+    cost = Decimal(str(cost))
+    if cost <= 0:
+        return None
+    # تغيّر مفاجئ كبير في التكلفة = غالباً خلل في الكتالوج: لا نطبّق وننبّه الأدمن مرة واحدة
+    if abs(cost - bc) / bc > Decimal("0.25") and abs(cost - bc) > Decimal("0.10"):
+        if (pid, label) not in _ratio_alerted:
+            _ratio_alerted.add((pid, label))
+            try:
+                alert_admin(f"⚠️ <b>تغيّر كبير في تكلفة FAZER</b>\n📦 {pid} — {html.escape(label)}\n"
+                            f"كانت {bc}$ وأصبحت {cost}$.\nلم أغيّر سعر البيع تلقائياً، راجعها.")
+            except Exception:
+                pass
+        return None
+    if bs / bc > Decimal("1.5"):
+        p = cost + (bs - bc)          # بطاقات صغيرة: نفس الربح بالدولار
+    else:
+        p = cost * bs / bc            # نفس نسبة الهامش
+    p = max(p, cost + Decimal("0.03"))
+    return str(p.quantize(Decimal("0.01"), rounding=ROUND_CEILING))
+
+def _ratio_reprice(cats):
+    try:
+        for pid in _RATIO_BASE:
+            lst = GIFT_VARIANTS.get(pid)
+            if not lst:
+                continue
+            for i, (label, old) in enumerate(list(lst)):
+                if label not in _RATIO_BASE[pid]:
+                    continue
+                m, _r = fazer_match(pid, label, cats)
+                if m and m.get("price_usd") is not None:
+                    np_ = _ratio_price(pid, label, m["price_usd"])
+                    if np_:
+                        lst[i] = (label, np_)
+            try:
+                vals = [float(x[1]) for x in lst]
+                for it in products:
+                    if it.get("id") == pid:
+                        it["price"] = f"${min(vals):.2f} - ${max(vals):.2f}"
+            except Exception:
+                pass
+    except Exception as e:
+        print("ratio_reprice failed:", e)
+
 def _gift_reprice(cats):
+    _ratio_reprice(cats)
     try:
         for pid in AUTO_PRICE_PIDS:
             lst = GIFT_VARIANTS.get(pid)
