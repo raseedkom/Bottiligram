@@ -23,7 +23,8 @@ PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
 REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
 REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
 # منتجاتك الخاصة المخفية دائماً (Prime Video: يُباع من المورّد فقط). لإرجاع منتج احذفه من هنا.
-OWN_ALWAYS_HIDDEN = {"amazon_prime_6m", "prime_video_ultra_6m", "chatgpt_plus_1m", "chatgpt_k12_edu",
+REMOVED_OWN = {"capcut_1m"}   # منتجات محذوفة نهائياً من القوائم ولوحة الأدمن (تبقى في الكود لأجل الطلبات القديمة)
+OWN_ALWAYS_HIDDEN = {"capcut_1m", "amazon_prime_6m", "prime_video_ultra_6m", "chatgpt_plus_1m", "chatgpt_k12_edu",
                      "claude_100_30d", "claude_10m_1d"}   # Claude القديم (قبل الربط بالمورّد) محذوف نهائياً من القائمة
 VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
 VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
@@ -326,6 +327,16 @@ patch(r"""    if len(uniq) > 1:
 # Apple India: رفع سعر 1000 و1500 INR لهامش ربح ~15% (كان ~11%)
 patch("""("500 INR", "6.90"), ("1000 INR", "12.00"), ("1500 INR", "18.00"),""",
       """("500 INR", "6.90"), ("1000 INR", "12.60"), ("1500 INR", "18.90"),""", "apple_in_prices")
+
+# إخفاء المنتجات المحذوفة من لوحة الأدمن (الأسعار/المخزون، الأوصاف، البث)
+patch("""        if p.get("type") == "separator" or p["id"] not in (price_ids | stock_ids):
+            continue""", """        if p.get("type") == "separator" or p["id"] not in (price_ids | stock_ids) or p["id"] in REMOVED_OWN:
+            continue""", "removed_price_list")
+patch("""    return [p for p in products if p.get("type") != "separator"]
+
+def _retry_after""", """    return [p for p in products if p.get("type") != "separator" and p.get("id") not in REMOVED_OWN]
+
+def _retry_after""", "removed_broadcast")
 
 # رابط الدعم (اليوزر تغيّر)
 patch('MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"',
@@ -6182,7 +6193,7 @@ def tr(item, field, lang):
 def show_desc_products(chat_id, msg_id=None):
     mk = InlineKeyboardMarkup(row_width=1)
     for p in products:
-        if p.get("type") == "separator":
+        if p.get("type") == "separator" or p.get("id") in REMOVED_OWN:
             continue
         mk.add(InlineKeyboardButton(text=f"{p['icon']} {p['name'][:40]}", callback_data=f"ap_ds_{p['id']}"))
     _pr_show(chat_id, msg_id, "✏️ <b>تعديل وصف منتج</b>\nاختر المنتج:", mk)
@@ -8823,6 +8834,13 @@ patch(r"""def handle_product_view(call):
     product_id = call.data.replace("buy_", "")
 """, r"""def handle_product_view(call):
     product_id = call.data.replace("buy_", "")
+    if product_id in OWN_ALWAYS_HIDDEN:
+        # منتجك الخاص المحذوف: يمنع الوصول إليه من أزرار/روابط قديمة
+        try:
+            bot.answer_callback_query(call.id, "❌ هذا المنتج لم يعد متوفراً • No longer available • Produit indisponible", show_alert=True)
+        except Exception:
+            pass
+        return
     if _vt_is_pid(product_id):
         _vt_view(call, product_id)
         return
