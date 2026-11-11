@@ -4789,6 +4789,10 @@ def _has_custom_emoji(message):
     try:
         if not is_admin_msg(message):
             return False
+        # أثناء كتابة بيانات تسليم طلب: لا تبتلع الرسالة (قد تحمل إيموجي مميز منسوخ من بوت المورّد)
+        _w = _adm_wait.get(message.from_user.id)
+        if _w and _w.get("op") == "deliver":
+            return False
         ents = (message.entities or []) + (message.caption_entities or [])
         return any(getattr(e, "type", "") == "custom_emoji" for e in ents)
     except Exception:
