@@ -374,6 +374,7 @@ def _qf_txt_on():
 
 
 def _qf_delivery_markup(lang, oid, old):
+    """أزرار تحت رسالة التسليم: TXT + نفس قائمة /start (بدون زر الإحالة) + فتح المتجر المصغّر."""
     bt = _qf_bt(lang)
     mk = InlineKeyboardMarkup()
     try:
@@ -391,9 +392,22 @@ def _qf_delivery_markup(lang, oid, old):
         mk.add(InlineKeyboardButton(text=bt["store"], web_app=telebot.types.WebAppInfo(url=url)))
     except Exception:
         pass
+    mk.add(InlineKeyboardButton(text=bt["wal"], callback_data="qgo|pf_wallet"))
+    try:
+        game = InlineKeyboardButton(text=smt(lang, "game"), callback_data="qgo|sm_game")
+        game.style = "danger"
+        mk.add(game)
+    except Exception as e:
+        print(f"qtyflow game btn failed: {e}")
     mk.row(InlineKeyboardButton(text=bt["prof"], callback_data="qgo|pf_profile"),
            InlineKeyboardButton(text=bt["hist"], callback_data="qgo|pf_hist"))
-    mk.add(InlineKeyboardButton(text=bt["wal"], callback_data="qgo|pf_wallet"))
+    try:
+        mk.add(InlineKeyboardButton(text=t(lang, "kb_support"), url=MY_PRIVATE_CHAT_LINK))
+        mk.add(InlineKeyboardButton(text=smt(lang, "api"), callback_data="qgo|sm_api"))
+        mk.add(InlineKeyboardButton(text=smt(lang, "channel"), url=CHANNEL_LINK))
+        mk.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="qgo|change_lang"))
+    except Exception as e:
+        print(f"qtyflow extra btns failed: {e}")
     return mk
 
 
@@ -474,7 +488,10 @@ def _qf_cb_go(call):
         if target == "shop":
             send_main_menu(call.message.chat.id, lang)
             return
-        if target not in ("pf_wallet", "pf_profile", "pf_hist"):
+        if target == "change_lang":
+            send_language_menu(call.message.chat.id)
+            return
+        if target not in ("pf_wallet", "pf_profile", "pf_hist", "sm_game", "sm_api"):
             return
         ph = bot.send_message(call.message.chat.id, "⏳")
         fake = _qf_types.SimpleNamespace(id="qb", data=target, from_user=call.from_user, message=ph,
