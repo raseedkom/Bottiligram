@@ -30,7 +30,7 @@ VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
 # استثناءات نسبة الربح بالاسم (regex ← %): Higgsfield بربح 25% بدل 30%
 VENTE_MARGIN_OVERRIDE = [(r"higgsfield", 25)]
 # منتجات supplier_api المسموح بيعها (جُرّب Gemini Plus 6: يرجع COMPLETED فوراً مع رابط في account_data بدون بيانات من الزبون)
-VENTE_API_OK = [r"gemini plus 6", r"apple music", r"picsart", r"higgsfield"]
+VENTE_API_OK = [r"gemini plus 6", r"apple music", r"picsart", r"higgsfield", r"lovable pro lite"]
 VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
 VENTE_REFRESH_SECONDS = 300 # تحديث الكتالوج كل كم ثانية
 VENTE_LOW_BALANCE = 10      # تنبيه إذا نزل رصيدك عند المورّد عن هذا ($)
