@@ -476,6 +476,25 @@ def _qf_cb_txt(call):
             pass
 
 
+def _qf_cb_txt_demo(call):
+    """زر TXT في رسالة «تعلّم كيف تشتري»: يرسل ملفاً تجريبياً بالكود المعروض (لا علاقة له بأي طلب حقيقي)."""
+    try:
+        code = call.data[4:]
+        if not _qf_re.fullmatch(r"DEMO(-[A-Z0-9]{4}){3}", code):
+            bot.answer_callback_query(call.id)
+            return
+        f = _qf_io.BytesIO((code + "\n").encode("utf-8"))
+        f.name = "demo_order.txt"
+        bot.send_document(call.message.chat.id, f, caption="📁 DEMO (مثال)")
+        bot.answer_callback_query(call.id)
+    except Exception as e:
+        print(f"qtyflow demo txt failed: {e}")
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception:
+            pass
+
+
 def _qf_cb_go(call):
     """أزرار جنب التسليم: تفتح قوائم البوت في رسالة جديدة دون المساس برسالة التسليم."""
     uid = call.from_user.id
@@ -515,7 +534,8 @@ bot.callback_query_handler(func=lambda c: (c.data or "").startswith("qfc|"))(_qf
 bot.callback_query_handler(func=lambda c: c.data == "qfb")(_qf_cb_back)
 bot.callback_query_handler(func=lambda c: (c.data or "").startswith("qtx_"))(_qf_cb_txt)
 bot.callback_query_handler(func=lambda c: (c.data or "").startswith("qgo|"))(_qf_cb_go)
-for _i in range(5):
+bot.callback_query_handler(func=lambda c: (c.data or "").startswith("qtd_"))(_qf_cb_txt_demo)
+for _i in range(6):
     bot.callback_query_handlers.insert(0, bot.callback_query_handlers.pop())
 bot.callback_query_handler(func=_qf_clear_filter)(lambda c: None)
 bot.callback_query_handlers.insert(0, bot.callback_query_handlers.pop())

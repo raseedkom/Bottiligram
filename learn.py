@@ -341,10 +341,23 @@ def _lm_method(call, lang, m, k):
 def _lm_success(chat_id, uid, lang):
     _lm_state.pop(uid, None)
     tx = _lm_tx(lang)
-    mk = InlineKeyboardMarkup(row_width=1)
+    code = _lm_new_code()
+    mk = None
+    try:
+        # نفس أزرار رسالة التسليم الحقيقية (TXT + شراء + المتجر + المحفظة + ...) ليرى الزبون الشكل الحقيقي
+        mk = _qf_delivery_markup(lang, "demo", None)
+        for _row in mk.keyboard:
+            for _b in _row:
+                if getattr(_b, "callback_data", None) == "qtx_demo":
+                    _b.callback_data = "qtd_" + code
+    except Exception as e:
+        print(f"learn delivery markup failed: {e}")
+        mk = None
+    if mk is None:
+        mk = InlineKeyboardMarkup(row_width=1)
     mk.add(_lm_btn(tx["again"], "dm_home", style="primary", icon=LM_ICON))
     mk.add(_lm_btn(tx["real"], "dm_end"))
-    bot.send_message(chat_id, tx["ok"].format(code=_lm_new_code()), parse_mode="HTML", reply_markup=mk)
+    bot.send_message(chat_id, tx["ok"].format(code=code), parse_mode="HTML", reply_markup=mk)
 
 
 def _lm_stopped(call, lang):
