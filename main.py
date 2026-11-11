@@ -2512,6 +2512,7 @@ def handle_gift_qty(call):
 # ============================================================
 # كل عنصر: معرّف منتج (زر طويل) | tuple من منتجين (جنب بعض) | "grp:..." مجموعة | "sep:..." فاصل
 STORE_SLOTS = [
+    "vente:gem6",
     "gemini_18m", "capcut_1m",
     ("duolingo_12m", "duolingo_link_12m"),
     "row:prime_netflix",
@@ -3437,6 +3438,13 @@ def generate_store_keyboard(lang):
                 price = lo if lo == hi else f"{lo} - {hi}"
                 stock_txt = stock if stock == "♾️" else f"📦 {stock}"
                 markup.add(InlineKeyboardButton(text=f"{_g['icon']} {_g['name']} | {price} | {stock_txt}", callback_data="grp_netflix"))
+        elif slot == "vente:gem6":
+            try:
+                _gc = _vt_find_cell("gem6")
+                if _gc:
+                    markup.add(_vt_cell_button(_gc, lang, False))
+            except Exception as e:
+                print(f"gem6 cell failed: {e}")
         elif slot == "vente:all":
             try:
                 _vt_add_buttons(markup, lang, oos)
@@ -4354,6 +4362,7 @@ def _vt_qty(label):
 # إذا طابقت الخلية عدة منتجات صار زر مجموعة يفتح خياراتها. الخلية الفارغة (غير موجود/نافد/مستبعد) تُتخطّى،
 # والزوج الذي بقي منه منتج واحد يظهر زراً طويلاً. أي منتج جديد غير مذكور هنا يظهر في آخر القائمة.
 VT_LAYOUT = [
+    [("gem6", "Gemini Plus 6", r"gemini plus 6 months")],     # زر مستقل في أول القائمة (مطلوب كثيراً)
     [("gem", "Gemini", r"google ai|gemini")],
     [("chatgpt", "ChatGPT", r"chatgpt")],
     [("cap12", "CapCut", r"capcut\s*pro\s*12m")],
@@ -4399,7 +4408,7 @@ VT_LAYOUT = [
     [("muse", "Muse AI", r"^muse")],
 ]
 
-VT_SKIP_RENDER = {"prime"}              # يُعرض بجانب Netflix في صف خاص
+VT_SKIP_RENDER = {"prime", "gem6"}              # يُعرض بجانب Netflix في صف خاص
 VT_USE_TITLE = {"prime"}                # زر قصير بالعنوان
 VT_ALWAYS_GROUP = {"claude", "codex"}   # دائماً زر مجموعة حتى لو بقي خيار واحد
 
