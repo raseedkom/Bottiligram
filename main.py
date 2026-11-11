@@ -29,13 +29,15 @@ OWN_ALWAYS_HIDDEN = {"capcut_1m", "n8n_starter_12m", "office365_1y", "elevenlabs
 VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
 # استثناءات نسبة الربح بالاسم (regex ← %): Higgsfield بربح 25% بدل 30%
 VENTE_MARGIN_OVERRIDE = [(r"higgsfield", 25)]
+# منتجات supplier_api المسموح بيعها (جُرّب Gemini Plus 6: يرجع COMPLETED فوراً مع رابط في account_data بدون بيانات من الزبون)
+VENTE_API_OK = [r"gemini plus 6", r"apple music", r"picsart", r"higgsfield"]
 VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
 VENTE_REFRESH_SECONDS = 300 # تحديث الكتالوج كل كم ثانية
 VENTE_LOW_BALANCE = 10      # تنبيه إذا نزل رصيدك عند المورّد عن هذا ($)
 # منتجات المورّد المخفية افتراضياً (regex على الاسم). يمكن إظهارها بـ /vente_show ID
 # منتجات تتطلب من الزبون تفعيل كود على حسابه (مخفية بطلبك)
 VENTE_HIDE_ACTIVATE = [r"^jam\b", r"^gamma\b", r"posthog", r"^supercut", r"^airtable", r"^runway", r"quizlet"]
-VENTE_DEFAULT_HIDE = VENTE_HIDE_ACTIVATE + [r"higgsfield.*pro.*year", r"mobbin\s*pro\s*1\s*year", r"railway.*hobby", r"crunchyroll.*link"]
+VENTE_DEFAULT_HIDE = VENTE_HIDE_ACTIVATE + [r"mobbin\s*pro\s*1\s*year", r"railway.*hobby", r"crunchyroll.*link"]
 # ربط Gemini الافتراضي: منتجك الخاص ← رقم منتج Gemini عند المورّد (يغيّره /vente_link)
 VENTE_DEFAULT_LINK = {"gemini_18m": 28}
 # منتجاتك التي يحلّ محلها منتج المورّد (إذا وُجد عنده منتج مطابق للاسم) — تتغيّر بـ /vente_replace
@@ -4137,7 +4139,13 @@ def _vt_eligible(p):
             return False
         if p.get("api_test"):
             return True          # منتج الاختبار: يظهر للأدمن فقط عبر /vente_test
-        return p.get("delivery_type") == "stock" and p.get("stock") is not None
+        if p.get("stock") is None:
+            return False
+        if p.get("delivery_type") == "stock":
+            return True
+        if p.get("delivery_type") == "supplier_api":
+            return any(re.search(pat, str(p.get("name", "")), re.I) for pat in VENTE_API_OK)
+        return False
     except Exception:
         return False
 
