@@ -338,6 +338,10 @@ def _retry_after""", """    return [p for p in products if p.get("type") != "sep
 
 def _retry_after""", "removed_broadcast")
 
+# Apple India 100 INR: ربح ثابت 0.30$ (التكلفة الحالية 1.2775$ ← 1.58$)
+patch("""("100 INR", "1.40"), ("200 INR", "2.45"), ("250 INR", "3.05"),""",
+      """("100 INR", "1.58"), ("200 INR", "2.45"), ("250 INR", "3.05"),""", "apple_in_100_price")
+
 # رابط الدعم (اليوزر تغيّر)
 patch('MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom"',
       'MY_PRIVATE_CHAT_LINK = "https://t.me/Raseedkom_Support"', "support_link")
@@ -3704,7 +3708,7 @@ def _auto_price(cost):
 _RATIO_BASE = {
     "apple_gift_tr": {"10 TRY": ("0.1803", "1.00"), "50 TRY": ("0.8944", "1.35"), "100 TRY": ("1.8877", "2.50"),
                       "150 TRY": ("2.8314", "3.60"), "200 TRY": ("3.7752", "5.00"), "250 TRY": ("5.0047", "5.70")},
-    "apple_gift_in": {"100 INR": ("1.0178", "1.40"), "200 INR": ("2.0351", "2.45"), "250 INR": ("2.5197", "3.05"),
+    "apple_gift_in": {"100 INR": ("1.2775", "1.58"), "200 INR": ("2.0351", "2.45"), "250 INR": ("2.5197", "3.05"),
                       "500 INR": ("5.3443", "6.90"), "1000 INR": ("10.6886", "12.60"), "1500 INR": ("16.0843", "18.90")},
     "apple_gift_fr": {"10 EUR": ("11.1625", "12.00"), "20 EUR": ("22.3250", "23.65"),
                       "50 EUR": ("55.8125", "59.00"), "100 EUR": ("111.6250", "116.22")},
@@ -3722,6 +3726,8 @@ _RATIO_BASE = {
                  "250 TRY": ("4.4524", "5.50"), "500 TRY": ("9.9684", "12.00")},
 }
 _ratio_alerted = set()
+# بطاقات بربح ثابت بالدولار (السعر = التكلفة + هذا الربح، يتبع FAZER صعوداً ونزولاً)
+_FIXED_PROFIT = {("apple_gift_in", "100 INR"): Decimal("0.30")}
 
 def _ratio_price(pid, label, cost):
     """سعر البيع الجديد بنفس الهامش. None = لا تغيّر السعر."""
@@ -3742,7 +3748,10 @@ def _ratio_price(pid, label, cost):
             except Exception:
                 pass
         return None
-    if bs / bc > Decimal("1.5"):
+    _fx = _FIXED_PROFIT.get((pid, label))
+    if _fx is not None:
+        p = cost + _fx                # ربح ثابت محدد يدوياً
+    elif bs / bc > Decimal("1.5"):
         p = cost + (bs - bc)          # بطاقات صغيرة: نفس الربح بالدولار
     else:
         p = cost * bs / bc            # نفس نسبة الهامش
