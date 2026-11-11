@@ -2920,6 +2920,7 @@ BTN_ICON_IDS = [
     (r"picsart", "5440533024867394333"),
     (r"apple\s*(tv|12m)", "5069267169808745341"),     # Apple TV (الزر المختصر: APPLE 12M)
     (r"coursera", "5267255150585621432"),
+    (r"higgsfield", "6201889194390855235"),
 ]
 
 def _psn_amount_icons(mk):
@@ -4124,6 +4125,10 @@ _VT_UNIT_WORDS = {"month", "months", "mon", "year", "years", "day", "days", "m",
 
 def _vt_short(name):
     tok = str(name).split()
+    # أسماء تبدأ بإيموجي (مثل 🔥 Higgsfield ...): نتجاهل الرموز في البداية كي لا يضيع اسم المنتج من الزر المختصر
+    _orig_tok = tok
+    while len(tok) > 1 and not re.search(r"\w", tok[0]):
+        tok = tok[1:]
     if not tok:
         return str(name)[:22]
     keep = [tok[0]]
