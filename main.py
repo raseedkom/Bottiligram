@@ -448,6 +448,7 @@ patch(r"""    markup.add(InlineKeyboardButton(text="👤 ملف زبون", callb
     markup.add(InlineKeyboardButton(text="💲 المخزون / الأسعار", callback_data="adm_prices"))
     markup.add(InlineKeyboardButton(text="🔔 المهتمون (أعلمني)", callback_data="adm_interest"))
     markup.add(InlineKeyboardButton(text="💼 أرصدة الزبائن", callback_data="adm_wal"))
+    markup.add(InlineKeyboardButton(text="🔧 المنتجات اليدوية / التلقائية", callback_data="adm_modes"))
     markup.add(InlineKeyboardButton(text="👤 ملف زبون", callback_data="adm_view"))""", "admin_buttons")
 patch(r"""    if op not in ("use", "add", "buy", "view"):""",
       r"""    if _admin_panel_extra(call, op):
@@ -1720,7 +1721,114 @@ def _wallets_screen(offset=0):
     mk.add(InlineKeyboardButton(text=t("ar", "back"), callback_data="adm_home"))
     return text, mk
 
+def _mode_of(pid):
+    """للمنتج اليدوي المستبدَل بمنتج مورّد: 'auto' إذا غطّاه المورّد، 'manual' إذا رجع يدوياً."""
+    return "auto" if _own_hidden(pid) else "manual"
+
+def _mode_watch_pids():
+    conf = _vt_conf()
+    pids = set(VENTE_REPLACE_DEFAULT) | set(conf.get("replace", []))
+    out = []
+    for pid in sorted(pids):
+        if pid in OWN_ALWAYS_HIDDEN or pid in REMOVED_OWN or str(pid).startswith("vt"):
+            continue
+        if _find_product_orig(pid) is None:
+            continue
+        out.append(pid)
+    return out
+
+def _mode_watch():
+    """يُنبّه الأدمن عندما يتحوّل منتج بين تلقائي (مورّد) ويدوي (أنت). أول مرة: يسجّل الحالة بدون إشعار."""
+    if not VENTE_KEY or not _VT_PRODS:
+        return          # تعذّر جلب المورّد: لا نُنبّه خطأً
+    for pid in _mode_watch_pids():
+        try:
+            mode = _mode_of(pid)
+            key = f"rk:mode:{pid}"
+            old = kv_get(key)
+            if isinstance(old, bytes):
+                old = old.decode()
+            if old == mode:
+                continue
+            kv_set(key, mode)
+            if old is None:
+                continue
+            nm = html.escape(str(_find_product_orig(pid).get("name", pid)))
+            if mode == "manual":
+                alert_admin(f"⚠️ <b>منتج صار يدوي</b>\n📦 {nm}\nالمورّد لم يعد يوفره الآن، فالطلبات عليه ستصلك كطلب يدوي تسلّمه أنت من «الطلبات المعلقة».")
+            else:
+                alert_admin(f"✅ <b>منتج عاد تلقائياً</b>\n📦 {nm}\nالمورّد وفّره من جديد، والتسليم صار تلقائياً.")
+        except Exception as e:
+            print(f"mode_watch failed for {pid}: {e}")
+
+def _modes_screen():
+    watch = set(_mode_watch_pids())
+    manual_b, manual_a, auto_own, hidden = [], [], [], []
+    for p in products:
+        pid = p.get("id")
+        if p.get("type") == "separator" or not pid:
+            continue
+        nm = html.escape(str(p.get("name", pid))[:44])
+        if pid in REMOVED_OWN:
+            continue
+        if pid in OWN_ALWAYS_HIDDEN:
+            hidden.append(nm)
+            continue
+        if pid in MANUAL_A:
+            manual_a.append(f"• {nm}")
+        elif pid in MANUAL_B:
+            if _own_hidden(pid):
+                hidden.append(nm + " (المورّد يغطيه)")
+            else:
+                tag = " ⚠️ <i>مؤقتاً: المورّد غير متوفر</i>" if pid in watch else ""
+                manual_b.append(f"• {nm}{tag}")
+        elif pid == GEMINI_ID:
+            auto_own.append(f"• {nm} (روابط من مخزونك)")
+    gift_n = len([k for k in GIFT_VARIANTS])
+    vt_ok = sorted([p for p in _VT_PRODS.values() if _vt_listed(p) and p["stock"] > 0], key=lambda x: x["name"].lower())
+    vt_out = len([p for p in _VT_PRODS.values() if _vt_listed(p) and p["stock"] <= 0])
+    lines = ["🔧 <b>المنتجات اليدوية / التلقائية</b>", ""]
+    lines.append(f"🖐 <b>يدوي: تسلّمه أنت ({len(manual_b)})</b>")
+    lines += manual_b or ["—"]
+    lines.append("")
+    lines.append(f"📝 <b>يدوي: الزبون يرسل بياناته ثم يُفعَّل ({len(manual_a)})</b>")
+    lines += manual_a or ["—"]
+    lines.append("")
+    lines.append("⚡ <b>تلقائي</b>")
+    lines += auto_own
+    lines.append(f"• بطاقات الهدايا: {gift_n} نوع (FAZER)")
+    lines.append(f"• منتجات المورّد المتوفرة: {len(vt_ok)}" + (f" (+{vt_out} نافد)" if vt_out else ""))
+    for p in vt_ok[:22]:
+        lines.append(f"   · {html.escape(p['name'][:38])} — {p['stock']}")
+    if len(vt_ok) > 22:
+        lines.append(f"   … و{len(vt_ok) - 22} أخرى")
+    if hidden:
+        lines.append("")
+        lines.append(f"🙈 <b>مخفي عن الزبائن ({len(hidden)})</b>")
+        lines += [f"• {h}" for h in hidden]
+    text = "\n".join(lines)
+    if len(text) > 3900:
+        text = text[:3890] + "…"
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(InlineKeyboardButton(text="🔄 تحديث", callback_data="adm_modes"))
+    mk.add(InlineKeyboardButton(text=t("ar", "back"), callback_data="adm_home"))
+    return text, mk
+
 def _admin_panel_extra(call, op):
+    if op == "modes":
+        try:
+            text, mk = _modes_screen()
+        except Exception as e:
+            print(f"modes_screen failed: {e}")
+            bot.answer_callback_query(call.id, "❌ تعذّر جلب القائمة", show_alert=True)
+            return True
+        try:
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode="HTML", reply_markup=mk, disable_web_page_preview=True)
+        except Exception as e:
+            if "not modified" not in str(e).lower():
+                bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=mk)
+        bot.answer_callback_query(call.id)
+        return True
     if op == "wal" or (op.startswith("wal") and op[3:].isdigit()):
         try:
             off = int(op[3:] or 0)
@@ -4073,6 +4181,10 @@ def _vt_rebuild():
                 _restock_hook(_k, 0, _v["stock"])
         except Exception as e:
             print(f"vt restock hook failed: {e}")
+    try:
+        _mode_watch()
+    except Exception as e:
+        print(f"mode_watch hook failed: {e}")
 
 def vt_refresh(force=False):
     """يحدّث الكتالوج (ar/en/fr) مع ETag. يرجع True إذا نجح جلب واحد على الأقل."""
