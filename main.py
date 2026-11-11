@@ -2916,6 +2916,7 @@ BTN_ICON_IDS = [
     (r"readwise", "6282841072993312605"),
     (r"(^|\s)fin(\s|$|\||‎)", "5373145666597961572"),
     (r"descript", "5818857774641062590"),
+    (r"gmail\s*2fa", "5008025248314950702"),     # Gmail 2FA
 ]
 
 def _psn_amount_icons(mk):
