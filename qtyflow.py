@@ -402,9 +402,9 @@ def _qf_delivery_markup(lang, oid, old):
     mk.row(InlineKeyboardButton(text=bt["prof"], callback_data="qgo|pf_profile"),
            InlineKeyboardButton(text=bt["hist"], callback_data="qgo|pf_hist"))
     try:
-        mk.add(InlineKeyboardButton(text=t(lang, "kb_support"), url=MY_PRIVATE_CHAT_LINK))
         mk.add(InlineKeyboardButton(text=smt(lang, "api"), callback_data="qgo|sm_api"))
-        mk.add(InlineKeyboardButton(text=smt(lang, "channel"), url=CHANNEL_LINK))
+        mk.row(InlineKeyboardButton(text=t(lang, "kb_support"), url=MY_PRIVATE_CHAT_LINK),
+               InlineKeyboardButton(text=smt(lang, "channel"), url=CHANNEL_LINK))
         mk.add(InlineKeyboardButton(text=t(lang, "change_lang"), callback_data="qgo|change_lang"))
     except Exception as e:
         print(f"qtyflow extra btns failed: {e}")
