@@ -23,10 +23,12 @@ PURCHASE_COINS = 10    # كوينز عند كل عملية شراء
 REF_COINS = 10         # كوينز لصاحب الرابط عن كل صديق ينضم
 REF_COINS_DAILY_CAP = 20   # أقصى عدد إحالات تمنح كوينز يومياً لكل زبون (حماية من الحسابات الوهمية)
 # منتجاتك الخاصة المخفية دائماً (Prime Video: يُباع من المورّد فقط). لإرجاع منتج احذفه من هنا.
-REMOVED_OWN = {"capcut_1m"}   # منتجات محذوفة نهائياً من القوائم ولوحة الأدمن (تبقى في الكود لأجل الطلبات القديمة)
-OWN_ALWAYS_HIDDEN = {"capcut_1m", "amazon_prime_6m", "prime_video_ultra_6m", "chatgpt_plus_1m", "chatgpt_k12_edu",
+REMOVED_OWN = {"capcut_1m", "n8n_starter_12m", "office365_1y", "elevenlabs_3m", "duolingo_12m", "duolingo_link_12m"}   # منتجات محذوفة نهائياً من القوائم ولوحة الأدمن (تبقى في الكود لأجل الطلبات القديمة)
+OWN_ALWAYS_HIDDEN = {"capcut_1m", "n8n_starter_12m", "office365_1y", "elevenlabs_3m", "duolingo_12m", "duolingo_link_12m", "amazon_prime_6m", "prime_video_ultra_6m", "chatgpt_plus_1m", "chatgpt_k12_edu",
                      "claude_100_30d", "claude_10m_1d"}   # Claude القديم (قبل الربط بالمورّد) محذوف نهائياً من القائمة
 VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
+# استثناءات نسبة الربح بالاسم (regex ← %): Higgsfield بربح 25% بدل 30%
+VENTE_MARGIN_OVERRIDE = [(r"higgsfield", 25)]
 VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
 VENTE_REFRESH_SECONDS = 300 # تحديث الكتالوج كل كم ثانية
 VENTE_LOW_BALANCE = 10      # تنبيه إذا نزل رصيدك عند المورّد عن هذا ($)
@@ -1509,7 +1511,8 @@ def profit_log(canon, pid, pname, price, cost=None):
         elif pid_s in PROFIT_PCT and pc is not None:
             pr = pc * Decimal(PROFIT_PCT[pid_s]) / Decimal(100)      # نسبة من سعر البيع
         elif pid_s.startswith("vt") and pc is not None:
-            pr = pc * Decimal(VENTE_MARGIN_PCT) / Decimal(100 + VENTE_MARGIN_PCT)
+            _m = Decimal(_vt_margin_for((_VT_PRODS.get(pid_s) or {}).get("name")))
+            pr = pc * _m / (Decimal(100) + _m)
         rec = {"t": ts, "p": pid_s, "n": str(pname or "")[:60], "s": str(pc if pc is not None else price),
                "g": None if pr is None else float(round(pr, 4))}
         db.lpush(f"rk:pl:{_pl_mkey(ts)}", json.dumps(rec, ensure_ascii=False))
@@ -4147,9 +4150,16 @@ def _vt_hidden(p):
         return True
     return any(re.search(pat, str(p.get("name", "")), re.I) for pat in VENTE_DEFAULT_HIDE)
 
-def _vt_sell_price(cost):
+def _vt_margin_for(name):
+    """نسبة الربح لمنتج المورّد: استثناء بالاسم إن وُجد، وإلا الافتراضية."""
+    for pat, pct in VENTE_MARGIN_OVERRIDE:
+        if re.search(pat, str(name or ""), re.I):
+            return pct
+    return VENTE_MARGIN_PCT
+
+def _vt_sell_price(cost, name=None):
     c = Decimal(str(cost))
-    s = (c * (Decimal(100) + Decimal(VENTE_MARGIN_PCT)) / Decimal(100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    s = (c * (Decimal(100) + Decimal(_vt_margin_for(name))) / Decimal(100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return s if s >= Decimal("0.01") else Decimal("0.01")
 
 def _vt_rebuild():
@@ -4172,7 +4182,7 @@ def _vt_rebuild():
         except Exception:
             stock = 0
         out["vt" + str(vid)] = {
-            "id": "vt" + str(vid), "vid": vid, "name": name, "price": "$" + str(_vt_sell_price(cost)),
+            "id": "vt" + str(vid), "vid": vid, "name": name, "price": "$" + str(_vt_sell_price(cost, name)),
             "cost": float(cost), "stock": max(0, stock), "icon": _vt_icon(name),
             "image": p.get("image_url") or None, "description": d_ar,
             "loc": {"en": {"name": name, "description": d_en or d_ar}, "fr": {"name": name, "description": d_fr or d_en or d_ar}},
