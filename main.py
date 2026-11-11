@@ -4807,6 +4807,48 @@ def _own_similar(name):
             hits.append(p["id"])
     return hits[:3]
 
+@bot.message_handler(commands=["vente_buytest"])
+def vente_buytest_command(message):
+    """للأدمن فقط: شراء تجريبي واحد (كمية 1) من المورّد لرؤية الرد الحقيقي، خاصة لمنتجات supplier_api.
+    يخصم من رصيدك عند المورّد ويُرسل لك الرد كما هو. حد أقصى للتكلفة 1.00$ لتفادي الأخطاء."""
+    if not is_admin_msg(message) or not _vt_need_key(message):
+        return
+    parts = (message.text or "").split()
+    if len(parts) != 2 or not parts[1].isdigit():
+        bot.reply_to(message, "الاستخدام: /vente_buytest رقم_المنتج_عند_المورد\nمثال: /vente_buytest 121\n(شراء حقيقي بكمية 1، حد أقصى للتكلفة 1.00$)")
+        return
+    vid = int(parts[1])
+    if not _VT_PRODS:
+        vt_refresh(force=True)
+    p = _VT_PRODS.get("vt" + str(vid))
+    if not p:
+        bot.reply_to(message, "❌ هذا الرقم غير موجود في الكتالوج.")
+        return
+    if Decimal(str(p["cost"])) > Decimal("1.00"):
+        bot.reply_to(message, f"❌ تكلفته {p['cost']}$ أكبر من حد الاختبار 1.00$. لم أشترِ شيئاً.")
+        return
+    if p["stock"] <= 0:
+        bot.reply_to(message, "❌ مخزونه صفر عند المورّد. لم أشترِ شيئاً.")
+        return
+    idem = f"test-{vid}-{int(time.time())}"
+    bot.reply_to(message, f"⏳ شراء تجريبي: {html.escape(p['name'])} (تكلفة {p['cost']}$)...")
+    try:
+        code, data, _r = vt_order(vid, 1, idem, f"admin_test_{message.from_user.id}")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ فشل الاتصال: {html.escape(str(e))[:300]}")
+        return
+    out = json.dumps(data, ensure_ascii=False, indent=1)[:3300]
+    bot.send_message(message.chat.id, f"HTTP {code}\n<pre>{html.escape(out)}</pre>", parse_mode="HTML")
+    try:
+        oid = (data.get("order") or data).get("id") if isinstance(data, dict) else None
+        if oid:
+            time.sleep(6)
+            r2 = vt_get(f"/api/reseller/orders/{oid}", timeout=20)
+            out2 = json.dumps(r2.json(), ensure_ascii=False, indent=1)[:3300]
+            bot.send_message(message.chat.id, f"📋 حالة الطلب بعد 6 ثوانٍ (HTTP {r2.status_code})\n<pre>{html.escape(out2)}</pre>", parse_mode="HTML")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"⚠️ تعذر قراءة حالة الطلب: {html.escape(str(e))[:200]}")
+
 @bot.message_handler(commands=["vente_catalog"])
 def vente_catalog_command(message):
     if not is_admin_msg(message) or not _vt_need_key(message):
