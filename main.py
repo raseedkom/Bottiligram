@@ -2916,7 +2916,10 @@ BTN_ICON_IDS = [
     (r"readwise", "6282841072993312605"),
     (r"(^|\s)fin(\s|$|\||‎)", "5373145666597961572"),
     (r"descript", "5818857774641062590"),
-    (r"gmail\s*2fa", "5008025248314950702"),     # Gmail 2FA
+    (r"gmail", "5008025248314950702"),     # Gmail (الزر المختصر يحذف 2FA)؛ ChatGPT ... Gmail NW يلتقطه قبلها chatgpt
+    (r"picsart", "5440533024867394333"),
+    (r"apple\s*(tv|12m)", "5069267169808745341"),     # Apple TV (الزر المختصر: APPLE 12M)
+    (r"coursera", "5267255150585621432"),
 ]
 
 def _psn_amount_icons(mk):
