@@ -4840,8 +4840,15 @@ def vente_buytest_command(message):
     if not is_admin_msg(message) or not _vt_need_key(message):
         return
     parts = (message.text or "").split()
+    cap = Decimal("1.00")
+    if len(parts) == 3:
+        try:
+            cap = min(Decimal(parts[2]), Decimal("3.00"))     # سقف اختياري لا يتجاوز 3$
+        except Exception:
+            parts = parts[:1]
+        parts = parts[:2]
     if len(parts) != 2 or not parts[1].isdigit():
-        bot.reply_to(message, "الاستخدام: /vente_buytest رقم_المنتج_عند_المورد\nمثال: /vente_buytest 121\n(شراء حقيقي بكمية 1، حد أقصى للتكلفة 1.00$)")
+        bot.reply_to(message, "الاستخدام: /vente_buytest رقم_المنتج_عند_المورد [أقصى_تكلفة]\nمثال: /vente_buytest 121\n/vente_buytest 23 2\n(شراء حقيقي بكمية 1، الحد الافتراضي 1.00$ وأقصاه 3$)")
         return
     vid = int(parts[1])
     if not _VT_PRODS:
@@ -4850,8 +4857,8 @@ def vente_buytest_command(message):
     if not p:
         bot.reply_to(message, "❌ هذا الرقم غير موجود في الكتالوج.")
         return
-    if Decimal(str(p["cost"])) > Decimal("1.00"):
-        bot.reply_to(message, f"❌ تكلفته {p['cost']}$ أكبر من حد الاختبار 1.00$. لم أشترِ شيئاً.")
+    if Decimal(str(p["cost"])) > cap:
+        bot.reply_to(message, f"❌ تكلفته {p['cost']}$ أكبر من حد الاختبار {cap}$. لم أشترِ شيئاً.\nلرفع الحد: /vente_buytest {vid} {p['cost']}")
         return
     if p["stock"] <= 0:
         bot.reply_to(message, "❌ مخزونه صفر عند المورّد. لم أشترِ شيئاً.")
