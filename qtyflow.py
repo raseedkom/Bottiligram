@@ -357,7 +357,9 @@ def _qf_send_tracked(*a, **k):
         if res is not None and getattr(res, "message_id", None):
             if len(_qf_last) > 3000:
                 _qf_last.clear()
-            _qf_last[str(cid)] = (res.message_id, _qf_time.time(), str(text or ""), k.get("reply_markup"))
+            _lst = _qf_last.setdefault(str(cid), [])
+            _lst.append((res.message_id, _qf_time.time(), str(text or ""), k.get("reply_markup")))
+            del _lst[:-8]                         # نحتفظ بآخر 8 رسائل فقط
     except Exception:
         pass
     return res
@@ -414,13 +416,20 @@ def _qf_delivery_markup(lang, oid, old):
 def _qf_attach(uid, canon, delivery):
     if not _qf_txt_on():
         return
-    rec = _qf_last.get(str(uid))
-    if not rec or _qf_time.time() - rec[1] > 120:
-        return
-    plain = _qf_html.unescape(rec[2])
     lines = [l.strip() for l in str(delivery).split("\n") if l.strip()]
-    if not lines or not any(l[:30] in plain for l in lines):
-        return                                   # آخر رسالة ليست رسالة التسليم
+    if not lines:
+        return
+    rec = None
+    # نبحث في آخر الرسائل (رسالة الكوينز قد تصل بعد التسليم مباشرة وتسبقنا)
+    for r in reversed(_qf_last.get(str(uid)) or []):
+        if _qf_time.time() - r[1] > 120:
+            break
+        plain = _qf_html.unescape(r[2])
+        if any(l[:30] in plain for l in lines):
+            rec = r
+            break
+    if not rec:
+        return                                   # لم نجد رسالة التسليم
     try:
         lang = get_lang(uid)
     except Exception:
