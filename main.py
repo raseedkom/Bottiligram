@@ -30,7 +30,7 @@ VENTE_MARGIN_PCT = 30       # نسبة ربحك فوق سعر المورّد (%)
 # استثناءات نسبة الربح بالاسم (regex ← %): Higgsfield بربح 25% بدل 30%
 VENTE_MARGIN_OVERRIDE = [(r"higgsfield", 25)]
 # منتجات supplier_api المسموح بيعها (جُرّب Gemini Plus 6: يرجع COMPLETED فوراً مع رابط في account_data بدون بيانات من الزبون)
-VENTE_API_OK = [r"gemini plus 6", r"apple music", r"picsart", r"higgsfield", r"lovable pro lite"]
+VENTE_API_OK = [r"gemini plus 6", r"apple music", r"picsart", r"higgsfield", r"lovable pro lite", r"nordvpn.*3 months basic"]
 VENTE_MAX_QTY = 3           # أقصى كمية في منتجات المورّد
 VENTE_REFRESH_SECONDS = 300 # تحديث الكتالوج كل كم ثانية
 VENTE_LOW_BALANCE = 10      # تنبيه إذا نزل رصيدك عند المورّد عن هذا ($)
@@ -4687,6 +4687,11 @@ def _fulfill_vente(chat_id, uid, lang, claim, canon, retry, mark, failed, vid=No
             tx = VT_TEXTS.get(lang, VT_TEXTS["ar"])
             prod = _VT_PRODS.get("vt" + str(vid)) or {}
             data_html = "\n\n".join(f"<code>{html.escape(a)}</code>" for a in accts)
+            if re.search(r"nord", str(prod.get("name") or claim.get("product_name") or ""), re.I):
+                # كود تفعيل NordVPN: نضيف خطوات التفعيل (نفس المنتج اليدوي) + تنبيه 24 ساعة
+                _h24 = {"ar": "⏳ فعّل الكود خلال 24 ساعة من الشراء.", "en": "⏳ Activate the code within 24 hours of purchase.",
+                        "fr": "⏳ Activez le code dans les 24 h suivant l'achat."}
+                data_html += "\n\n" + html.escape(NORD_GUIDE.get(lang, NORD_GUIDE["ar"])) + "\n" + _h24.get(lang, _h24["ar"])
             text = tx["delivered"].format(product=pname, data=data_html, warranty=_vt_warranty(prod, lang))
             delivered_ok = True
             try:
