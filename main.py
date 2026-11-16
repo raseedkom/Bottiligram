@@ -3750,19 +3750,21 @@ _FIXED_PROFIT = {("apple_gift_in", "100 INR"): Decimal("0.30")}
 _ratio_last_cost = {}   # (pid, label) -> آخر تكلفة رأيناها (في الذاكرة؛ أول قراءة = خط الأساس بدون تنبيه)
 
 def _ratio_price(pid, label, cost):
-    """يحسب السعر الجديد، وينبّه الأدمن إذا انخفضت تكلفة FAZER (لتخفّض سعرك إن أردت)."""
+    """يحسب السعر الجديد بنفس هامشك، وينبّه الأدمن عند ارتفاع/انخفاض تكلفة FAZER (3% فأكثر)."""
     np_ = _ratio_price_core(pid, label, cost)
     try:
         c = Decimal(str(cost))
         prev = _ratio_last_cost.get((pid, label))
         _ratio_last_cost[(pid, label)] = c
-        if prev is not None and prev > 0 and c < prev and (prev - c) / prev >= Decimal("0.03") and (prev - c) >= Decimal("0.03"):
-            pct = ((prev - c) / prev * 100).quantize(Decimal("0.1"))
-            tail = (f"💰 سعر البيع الجديد: <b>{np_}$</b>" if np_ else "⚠️ لم أغيّر سعر البيع تلقائياً (تغيّر كبير)، راجعه.")
-            alert_admin(f"📉 <b>انخفضت تكلفة FAZER</b>\n📦 {pid} — {html.escape(label)}\n"
-                        f"كانت {prev}$ وأصبحت {c}$ (−{pct}%)\n{tail}")
+        if prev is not None and prev > 0 and c != prev and abs(c - prev) / prev >= Decimal("0.03") and abs(c - prev) >= Decimal("0.03"):
+            pct = (abs(c - prev) / prev * 100).quantize(Decimal("0.1"))
+            up = c > prev
+            tail = (f"💰 سعر البيع الآن: <b>{np_}$</b> (بنفس هامشك)" if np_
+                    else "⚠️ تغيّر شاذ جداً، لم أغيّر سعر البيع تلقائياً. راجعه.")
+            alert_admin(f"{'📈 ارتفعت' if up else '📉 انخفضت'} <b>تكلفة FAZER</b>\n📦 {pid} — {html.escape(label)}\n"
+                        f"كانت {prev}$ وأصبحت {c}$ ({'+' if up else '−'}{pct}%)\n{tail}")
     except Exception as e:
-        print("ratio drop alert failed:", e)
+        print("ratio change alert failed:", e)
     return np_
 
 def _ratio_price_core(pid, label, cost):
@@ -3774,15 +3776,8 @@ def _ratio_price_core(pid, label, cost):
     cost = Decimal(str(cost))
     if cost <= 0:
         return None
-    # تغيّر مفاجئ كبير في التكلفة = غالباً خلل في الكتالوج: لا نطبّق وننبّه الأدمن مرة واحدة
-    if abs(cost - bc) / bc > Decimal("0.25") and abs(cost - bc) > Decimal("0.10"):
-        if (pid, label) not in _ratio_alerted:
-            _ratio_alerted.add((pid, label))
-            try:
-                alert_admin(f"⚠️ <b>تغيّر كبير في تكلفة FAZER</b>\n📦 {pid} — {html.escape(label)}\n"
-                            f"كانت {bc}$ وأصبحت {cost}$.\nلم أغيّر سعر البيع تلقائياً، راجعها.")
-            except Exception:
-                pass
+    # السعر يتبع التكلفة صعوداً ونزولاً بنفس الهامش. نوقف فقط التغيّر الشاذ جداً (×3 أو أقل من ثلثها): غالباً خلل في الكتالوج
+    if cost > bc * 3 or cost < bc / 3:
         return None
     _fx = _FIXED_PROFIT.get((pid, label))
     if _fx is not None:
