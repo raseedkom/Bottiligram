@@ -3747,7 +3747,25 @@ _ratio_alerted = set()
 # بطاقات بربح ثابت بالدولار (السعر = التكلفة + هذا الربح، يتبع FAZER صعوداً ونزولاً)
 _FIXED_PROFIT = {("apple_gift_in", "100 INR"): Decimal("0.30")}
 
+_ratio_last_cost = {}   # (pid, label) -> آخر تكلفة رأيناها (في الذاكرة؛ أول قراءة = خط الأساس بدون تنبيه)
+
 def _ratio_price(pid, label, cost):
+    """يحسب السعر الجديد، وينبّه الأدمن إذا انخفضت تكلفة FAZER (لتخفّض سعرك إن أردت)."""
+    np_ = _ratio_price_core(pid, label, cost)
+    try:
+        c = Decimal(str(cost))
+        prev = _ratio_last_cost.get((pid, label))
+        _ratio_last_cost[(pid, label)] = c
+        if prev is not None and prev > 0 and c < prev and (prev - c) / prev >= Decimal("0.03") and (prev - c) >= Decimal("0.03"):
+            pct = ((prev - c) / prev * 100).quantize(Decimal("0.1"))
+            tail = (f"💰 سعر البيع الجديد: <b>{np_}$</b>" if np_ else "⚠️ لم أغيّر سعر البيع تلقائياً (تغيّر كبير)، راجعه.")
+            alert_admin(f"📉 <b>انخفضت تكلفة FAZER</b>\n📦 {pid} — {html.escape(label)}\n"
+                        f"كانت {prev}$ وأصبحت {c}$ (−{pct}%)\n{tail}")
+    except Exception as e:
+        print("ratio drop alert failed:", e)
+    return np_
+
+def _ratio_price_core(pid, label, cost):
     """سعر البيع الجديد بنفس الهامش. None = لا تغيّر السعر."""
     b = _RATIO_BASE.get(pid, {}).get(label)
     if not b:
