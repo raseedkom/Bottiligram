@@ -4692,6 +4692,14 @@ def _fulfill_vente(chat_id, uid, lang, claim, canon, retry, mark, failed, vid=No
                 _h24 = {"ar": "⏳ فعّل الكود خلال 24 ساعة من الشراء.", "en": "⏳ Activate the code within 24 hours of purchase.",
                         "fr": "⏳ Activez le code dans les 24 h suivant l'achat."}
                 data_html += "\n\n" + html.escape(NORD_GUIDE.get(lang, NORD_GUIDE["ar"])) + "\n" + _h24.get(lang, _h24["ar"])
+            if re.search(r"cdk.*google ai pro", str(prod.get("name") or claim.get("product_name") or ""), re.I):
+                # مفتاح CDK ليس كود Google Play: يُدخل في geminipass.si بعد الحصول على رابط التحقق
+                _gm = {
+                    "ar": "📖 <b>طريقة التفعيل:</b>\n1️⃣ اتصل بـ VPN أمريكي وافتح https://gemini.google/students وسجّل الدخول بحساب Google ثم اضغط «مطالبة عرض الطلاب».\n2️⃣ انسخ رابط التحقق (SheerID) الكامل ولا تكمل التحقق.\n3️⃣ افتح https://www.geminipass.si وأدخل المفتاح أعلاه مع الرابط.\n⚠️ لا تُدخل المفتاح في Google Play ولا في «استخدام رمز».",
+                    "en": "📖 <b>How to activate:</b>\n1️⃣ Connect to a US VPN, open https://gemini.google/students, sign in with your Google account and tap “Claim student offer”.\n2️⃣ Copy the full SheerID verification link and do NOT complete the verification.\n3️⃣ Open https://www.geminipass.si and enter the key above together with the link.\n⚠️ Do NOT enter the key in Google Play or in “Redeem code”.",
+                    "fr": "📖 <b>Activation :</b>\n1️⃣ Connectez un VPN US, ouvrez https://gemini.google/students, connectez-vous à Google puis appuyez sur « Réclamer l'offre étudiante ».\n2️⃣ Copiez le lien de vérification SheerID complet sans terminer la vérification.\n3️⃣ Ouvrez https://www.geminipass.si et saisissez la clé ci-dessus avec le lien.\n⚠️ Ne saisissez PAS la clé dans Google Play / « Utiliser un code ».",
+                }
+                data_html += "\n\n" + _gm.get(lang, _gm["ar"])
             text = tx["delivered"].format(product=pname, data=data_html, warranty=_vt_warranty(prod, lang))
             delivered_ok = True
             try:
