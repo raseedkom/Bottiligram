@@ -585,7 +585,28 @@ def _qf_do_retry(chat_id):
         lines.append(f"• {_qf_html.escape(str(cl.get('product_name', '?')))} | <code>{cl.get('user_id', '?')}</code> | <code>{_qf_html.escape(c[:14])}</code>")
     lines.append("\n⏳ جارٍ إعادة المحاولة الآن، وتصلك رسائل النجاح أو الفشل.")
     bot.send_message(chat_id, "\n".join(lines), parse_mode="HTML")
-    _qf_threading.Thread(target=retry_pending_orders, daemon=True).start()
+    _qf_threading.Thread(target=_qf_retry_and_report, args=(chat_id, canons[:15]), daemon=True).start()
+
+
+def _qf_retry_and_report(chat_id, canons):
+    """يعيد المحاولة ثم يخبر الأدمن بنتيجة كل طلب (بدل الصمت)."""
+    try:
+        retry_pending_orders()
+    except Exception as e:
+        print(f"retry_now run failed: {e}")
+    out = ["📋 <b>نتيجة إعادة المحاولة</b>\n"]
+    for c in canons:
+        try:
+            cl = kv_get_json(f"rk:tx:{c}") or {}
+        except Exception:
+            cl = {}
+        name = _qf_html.escape(str(cl.get("product_name", "?")))
+        if cl.get("status") == "delivered":
+            out.append(f"✅ {name} | <code>{cl.get('user_id', '?')}</code> — سُلّم للزبون")
+        else:
+            out.append(f"⏳ {name} | <code>{cl.get('user_id', '?')}</code> — ما زال عالقاً (FAZER لم يُصدر الأكواد بعد، أو يحتاج رصيداً). "
+                       f"البوت يعيد المحاولة وحده كل 3 دقائق ويسلّم تلقائياً عند الجاهزية.")
+    bot.send_message(chat_id, "\n".join(out), parse_mode="HTML")
 
 
 def _qf_retry_cmd(m):
