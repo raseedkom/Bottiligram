@@ -2747,7 +2747,7 @@ ICON_STOP_TIMER = "5359543311897998264" # إيقاف العداد
 VS_EMOJI_ID = "5467412991790043938"     # VS بين الفريقين
 LB_MEDAL_IDS = ("5440539497383087970", "5447203607294265305", "5453902265922376865")  # ميداليات الترتيب 1/2/3
 ICON_LANG_GLOBE ="5224450179368767019"  # 🌍 عنوان اختيار اللغة
-ICON_LANG_AR = "5269400778807720624"     # علم الجزائر
+ICON_LANG_AR = "5877332710699045085"     # علم زر العربية (طلب الأدمن)
 ICON_LANG_FR = "5202132623060640759"     # علم فرنسا
 ICON_LANG_EN = "5458416160586342331"     # علم بريطانيا
 ICON_MENU_GAME = "4972415571384599106"  # لعبة (القائمة الرئيسية)
@@ -3090,7 +3090,7 @@ def send_language_menu(chat_id):
         mk = InlineKeyboardMarkup()
         mk.row(
             InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en"),
-            InlineKeyboardButton(text="🇩🇿 العربية", callback_data="lang_ar"),
+            InlineKeyboardButton(text="🇸🇦 العربية", callback_data="lang_ar"),
             InlineKeyboardButton(text="🇫🇷 Français", callback_data="lang_fr"),
         )
     except Exception as e:
